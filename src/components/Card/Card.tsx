@@ -1,15 +1,38 @@
-import React, {ReactNode} from 'react';
-import {View} from 'react-native';
-import {styles} from './styles';
+import React from 'react';
+import { ViewStyle } from 'react-native';
+import { Box, useTheme } from '../../theme';
 
-interface CardProps {
-  children: ReactNode;
+export interface CardProps {
+  children: React.ReactNode;
+  variant?: 'flat' | 'elevated' | 'outlined';
+  padding?: 'none' | 'xs' | 'sm' | 'md' | 'lg';
+  borderRadius?: 'none' | 'sm' | 'md' | 'lg' | 'xl';
+  style?: ViewStyle;
 }
 
-export function Card({children}: CardProps) {
+export function Card({
+  children,
+  variant = 'flat',
+  padding = 'md',
+  borderRadius = 'md',
+  style,
+}: CardProps) {
+  const theme = useTheme();
+
+  const shadowKey = variant === 'elevated' ? 'sm' : 'none';
+
   return (
-    <View style={styles.card}>
+    <Box
+      bg="surface"
+      borderRadius={borderRadius}
+      p={padding}
+      style={[
+        theme.shadows[shadowKey],
+        variant === 'outlined' && { borderWidth: 1, borderColor: theme.colors.cardBorder },
+        style,
+      ]}
+    >
       {children}
-    </View>
+    </Box>
   );
 }

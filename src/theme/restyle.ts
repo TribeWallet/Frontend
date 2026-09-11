@@ -1,0 +1,87 @@
+import * as React from 'react';
+import { createText, createBox, createTheme } from '@shopify/restyle';
+
+export const lightTheme = createTheme({
+  colors: {
+    white: '#FFFFFF',
+    black: '#000000',
+    background: '#F8FAFB',
+    surface: '#FFFFFF',
+    primary: '#0071DF',
+    primaryDark: '#0068CE',
+    primaryLight: '#E8F1FF',
+    danger: '#EF5067',
+    dangerLight: '#FDE8EB',
+    success: '#16AF7E',
+    successLight: '#E0F7EF',
+    warning: '#E8A924',
+    warningLight: '#FFF4E0',
+    text: '#171717',
+    textSecondary: '#6D7379',
+    textMuted: '#8C949B',
+    placeholder: '#8C949B',
+    border: '#DFE4E7',
+    cardBorder: '#E4E7E9',
+    overlay: 'rgba(0, 0, 0, 0.5)',
+    shadow: '#000000',
+  },
+  spacing: {
+    none: 0,
+    xxs: 4,
+    xs: 8,
+    sm: 12,
+    md: 16,
+    lg: 24,
+    xl: 32,
+    xxl: 48,
+  },
+  breakpoints: {
+    phone: 0,
+    tablet: 768,
+  },
+  textVariants: {
+    defaults: {},
+    display: { fontSize: 32, fontWeight: '700', lineHeight: 40, color: 'text' },
+    h1: { fontSize: 28, fontWeight: '700', lineHeight: 36, color: 'text' },
+    h2: { fontSize: 22, fontWeight: '600', lineHeight: 30, color: 'text' },
+    h3: { fontSize: 18, fontWeight: '600', lineHeight: 24, color: 'text' },
+    body: { fontSize: 16, fontWeight: '400', lineHeight: 24, color: 'text' },
+    bodyStrong: { fontSize: 16, fontWeight: '600', lineHeight: 24, color: 'text' },
+    bodySmall: { fontSize: 14, fontWeight: '400', lineHeight: 20, color: 'textSecondary' },
+    bodySmallStrong: { fontSize: 14, fontWeight: '600', lineHeight: 20, color: 'textSecondary' },
+    caption: { fontSize: 12, fontWeight: '400', lineHeight: 16, color: 'textMuted' },
+    captionStrong: { fontSize: 12, fontWeight: '600', lineHeight: 16, color: 'textMuted' },
+    button: { fontSize: 16, fontWeight: '600', lineHeight: 24, color: 'white' },
+    buttonSecondary: { fontSize: 16, fontWeight: '600', lineHeight: 24, color: 'primary' },
+    label: { fontSize: 13, fontWeight: '600', lineHeight: 18, color: 'textSecondary' },
+    input: { fontSize: 16, fontWeight: '400', lineHeight: 24, color: 'text' },
+    link: { fontSize: 16, fontWeight: '500', lineHeight: 24, color: 'primary' },
+  },
+  borderRadii: {
+    none: 0,
+    xs: 4,
+    sm: 8,
+    md: 12,
+    lg: 16,
+    xl: 24,
+    full: 9999,
+  },
+  shadows: {
+    none: { shadowColor: 'transparent', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0 },
+    xs: { shadowColor: 'shadow', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
+    sm: { shadowColor: 'shadow', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
+    md: { shadowColor: 'shadow', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
+    lg: { shadowColor: 'shadow', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.12, shadowRadius: 16, elevation: 8 },
+  },
+  zIndices: {
+    base: 0,
+    dropdown: 100,
+    sticky: 200,
+    modal: 300,
+    toast: 400,
+  },
+});
+
+export type Theme = typeof lightTheme;
+
+export const darkTheme = lightTheme;

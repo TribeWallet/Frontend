@@ -3,15 +3,12 @@ import sys
 import time
 import socket
 import shutil
+import signal
 import subprocess
 from pathlib import Path
 from datetime import datetime
+from threading import Thread
 
-
-# ============================================================
-# TRIBEWALLET NATIVE
-# PROFESSIONAL WINDOWS DEV LAUNCHER
-# ============================================================
 
 try:
     from colorama import init as colorama_init
@@ -25,806 +22,266 @@ except ImportError:
     input("ENTER para sair...")
     sys.exit(1)
 
+colorama_init(autoreset=True)
 
-colorama_init(
-    autoreset=True
-)
-
-
-# ============================================================
-# CONFIGURAÇÃO
-# ============================================================
 
 PROJECT_DIR = Path(__file__).resolve().parent
-
 TMP_DIR = PROJECT_DIR / ".tmp"
-
 LOG_DIR = TMP_DIR / "logs"
 
-METRO_PORT_START = 8081
-METRO_PORT_END = 8099
+METRO_PORT_MIN = 8081
+METRO_PORT_MAX = 8999
 
 DEVICE_TIMEOUT = 180
 BOOT_TIMEOUT = 180
+METRO_START_WAIT = 6
+BUNDLE_READY_TIMEOUT = 90
+LOG_POLL_INTERVAL = 1.0
 
-METRO_START_WAIT = 5
+METRO_CACHE_NAMES = ("metro-cache", "metro-file-map")
+HASHE_TMP = Path(os.environ.get("TEMP", os.environ.get("TMP", "C:/Windows/Temp")))
 
 APP_ID = "com.tribewalletnative"
-
-
-# ============================================================
-# ESTADO
-# ============================================================
+APP_MAIN_ACTIVITY = ".MainActivity"
 
 START_TIME = time.time()
-
 STEP_COUNTER = 0
-
 CURRENT_LOG_FILE = None
+LAUNCHER_PIDS: list[int] = []
+KEEP_RUNNING = True
+MONITOR_THREAD: Thread | None = None
 
 
-# ============================================================
-# DIRETÓRIOS
-# ============================================================
 
-def create_directories():
-
-    TMP_DIR.mkdir(
-        parents=True,
-        exist_ok=True
-    )
-
-    LOG_DIR.mkdir(
-        parents=True,
-        exist_ok=True
-    )
+def create_directories() -> None:
+    TMP_DIR.mkdir(parents=True, exist_ok=True)
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 
-# ============================================================
-# LOG FILE
-# ============================================================
 
-def create_log_file():
 
+def create_log_file() -> None:
     global CURRENT_LOG_FILE
-
-    timestamp = datetime.now().strftime(
-        "%Y-%m-%d_%H-%M-%S"
-    )
-
-    CURRENT_LOG_FILE = (
-        LOG_DIR
-        / f"launcher_{timestamp}.log"
-    )
-
-    CURRENT_LOG_FILE.touch(
-        exist_ok=True
-    )
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    CURRENT_LOG_FILE = LOG_DIR / f"launcher_{timestamp}.log"
+    CURRENT_LOG_FILE.touch(exist_ok=True)
 
 
-def write_log(message):
-
+def write_log(message: str) -> None:
     if CURRENT_LOG_FILE is None:
         return
-
-    timestamp = datetime.now().strftime(
-        "%Y-%m-%d %H:%M:%S"
-    )
-
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     try:
-
-        with open(
-            CURRENT_LOG_FILE,
-            "a",
-            encoding="utf-8"
-        ) as file:
-
-            file.write(
-                f"[{timestamp}] {message}\n"
-            )
-
+        with open(CURRENT_LOG_FILE, "a", encoding="utf-8") as file:
+            file.write(f"[{timestamp}] {message}\n")
     except Exception:
         pass
 
 
-# ============================================================
-# OUTPUT
-# ============================================================
 
-def out(
-    message="",
-    color=None
-):
-
+def out(message: str = "", color: str | None = None) -> None:
     if color:
-
-        print(
-            color
-            + message
-            + Style.RESET_ALL,
-            flush=True
-        )
-
+        print(color + message + Style.RESET_ALL, flush=True)
     else:
-
-        print(
-            message,
-            flush=True
-        )
-
+        print(message, flush=True)
     write_log(message)
 
 
-def info(message):
-
-    out(
-        f"[INFO] {message}",
-        Fore.CYAN
-    )
+def info(message: str) -> None:
+    out(f"[INFO] {message}", Fore.CYAN)
 
 
-def success(message):
-
-    out(
-        f"[ OK ] {message}",
-        Fore.GREEN
-    )
+def success(message: str) -> None:
+    out(f"[ OK ] {message}", Fore.GREEN)
 
 
-def warning(message):
-
-    out(
-        f"[WARN] {message}",
-        Fore.YELLOW
-    )
+def warning(message: str) -> None:
+    out(f"[WARN] {message}", Fore.YELLOW)
 
 
-def error(message):
-
-    out(
-        f"[ERRO] {message}",
-        Fore.RED
-    )
+def error(message: str) -> None:
+    out(f"[ERRO] {message}", Fore.RED)
 
 
-# ============================================================
-# TEMPO
-# ============================================================
-
-def elapsed():
-
-    seconds = int(
-        time.time() - START_TIME
-    )
-
+def elapsed() -> str:
+    seconds = int(time.time() - START_TIME)
     minutes = seconds // 60
-
     seconds = seconds % 60
-
     return f"{minutes:02d}:{seconds:02d}"
 
 
-# ============================================================
-# HEADER
-# ============================================================
 
-def print_header():
-
+def print_header() -> None:
     print()
-
-    out(
-        "=" * 72,
-        Fore.BLUE
-    )
-
-    out(
-        "                    TRIBEWALLET NATIVE",
-        Fore.CYAN
-    )
-
-    out(
-        "                 PROFESSIONAL DEV LAUNCHER",
-        Fore.CYAN
-    )
-
-    out(
-        "=" * 72,
-        Fore.BLUE
-    )
-
+    out("=" * 72, Fore.BLUE)
+    out("                    TRIBEWALLET NATIVE", Fore.CYAN)
+    out("                 PROFESSIONAL DEV LAUNCHER", Fore.CYAN)
+    out("=" * 72, Fore.BLUE)
     print()
-
-    out(
-        f"Projeto : {PROJECT_DIR}",
-        Fore.WHITE
-    )
-
-    out(
-        f"Python  : {sys.version.split()[0]}",
-        Fore.WHITE
-    )
-
-    out(
-        f"Tempo   : {elapsed()}",
-        Fore.WHITE
-    )
-
+    out(f"Projeto : {PROJECT_DIR}", Fore.WHITE)
+    out(f"Python  : {sys.version.split()[0]}", Fore.WHITE)
+    out(f"Tempo   : {elapsed()}", Fore.WHITE)
     print()
 
 
-# ============================================================
-# STEP
-# ============================================================
 
-def step(title):
-
+def step(title: str) -> None:
     global STEP_COUNTER
-
     STEP_COUNTER += 1
-
     print()
-
-    out(
-        "-" * 72,
-        Fore.BLUE
-    )
-
-    out(
-        f"[{STEP_COUNTER:02d}] {title}",
-        Fore.CYAN
-    )
-
-    out(
-        "-" * 72,
-        Fore.BLUE
-    )
+    out("-" * 72, Fore.BLUE)
+    out(f"[{STEP_COUNTER:02d}] {title}", Fore.CYAN)
+    out("-" * 72, Fore.BLUE)
 
 
-# ============================================================
-# COMANDOS WINDOWS
-# ============================================================
 
-def find_command(name):
-
-    # Primeiro tenta diretamente pelo PATH
-
+def find_command(name: str) -> str | None:
     path = shutil.which(name)
-
     if path:
         return path
-
-    # Windows costuma usar .cmd
-
-    extensions = [
-        ".cmd",
-        ".exe",
-        ".bat"
-    ]
-
-    for extension in extensions:
-
-        path = shutil.which(
-            name + extension
-        )
-
+    for ext in (".cmd", ".exe", ".bat"):
+        path = shutil.which(name + ext)
         if path:
             return path
-
     return None
 
 
-# ============================================================
-# EXECUTAR COMANDO
-# ============================================================
-
 def run_command(
-    command,
-    cwd=None,
-    timeout=None,
-    capture=False
-):
-
-    write_log(
-        "COMMAND: "
-        + " ".join(
-            str(x)
-            for x in command
-        )
-    )
-
+    command: list[str],
+    cwd: Path | None = None,
+    timeout: float | None = None,
+    capture: bool = False,
+) -> subprocess.CompletedProcess:
+    write_log("COMMAND: " + " ".join(str(x) for x in command))
     try:
-
         return subprocess.run(
             command,
-            cwd=str(
-                cwd or PROJECT_DIR
-            ),
+            cwd=str(cwd or PROJECT_DIR),
             timeout=timeout,
             capture_output=capture,
             text=True,
-            shell=False
+            shell=False,
         )
-
     except FileNotFoundError:
-
-        raise RuntimeError(
-            "Executável não encontrado: "
-            + str(command[0])
-        )
-
+        raise RuntimeError("Executável não encontrado: " + str(command[0]))
     except subprocess.TimeoutExpired:
-
-        raise RuntimeError(
-            "Comando excedeu o tempo limite."
-        )
+        raise RuntimeError("Comando excedeu o tempo limite.")
 
 
-# ============================================================
-# NODE
-# ============================================================
 
-def check_node():
-
-    step(
-        "Verificando Node.js"
-    )
-
-    node = find_command(
-        "node"
-    )
-
-    if not node:
-
-        raise RuntimeError(
-            "Node.js não encontrado no PATH."
-        )
-
-    result = run_command(
-        [
-            node,
-            "--version"
-        ],
-        capture=True
-    )
-
+def check_tool(name: str) -> str:
+    exe = find_command(name)
+    if not exe:
+        raise RuntimeError(f"{name} não encontrado no PATH.")
+    result = run_command([exe, "--version"], capture=True)
     if result.returncode != 0:
-
-        raise RuntimeError(
-            "Node.js retornou erro:\n"
-            + result.stderr
-        )
-
-    version = result.stdout.strip()
-
-    success(
-        f"Node.js encontrado: {version}"
-    )
-
-    info(
-        f"Executável: {node}"
-    )
-
-    return node
+        raise RuntimeError(f"{name} retornou erro:\n{result.stderr}")
+    success(f"{name} encontrado: {result.stdout.strip()}")
+    info(f"Executável: {exe}")
+    return exe
 
 
-# ============================================================
-# NPM
-# ============================================================
 
-def check_npm():
-
-    step(
-        "Verificando npm"
-    )
-
-    npm = find_command(
-        "npm"
-    )
-
-    if not npm:
-
-        raise RuntimeError(
-            "npm não encontrado no PATH."
-        )
-
-    result = run_command(
-        [
-            npm,
-            "--version"
-        ],
-        capture=True
-    )
-
-    if result.returncode != 0:
-
-        raise RuntimeError(
-            "npm retornou erro:\n"
-            + result.stderr
-        )
-
-    version = result.stdout.strip()
-
-    success(
-        f"npm encontrado: {version}"
-    )
-
-    info(
-        f"Executável: {npm}"
-    )
-
-    return npm
-
-
-# ============================================================
-# NPX
-# ============================================================
-
-def check_npx():
-
-    step(
-        "Verificando npx"
-    )
-
-    npx = find_command(
-        "npx"
-    )
-
-    if not npx:
-
-        raise RuntimeError(
-            "npx não encontrado no PATH."
-        )
-
-    result = run_command(
-        [
-            npx,
-            "--version"
-        ],
-        capture=True
-    )
-
-    if result.returncode != 0:
-
-        raise RuntimeError(
-            "npx retornou erro:\n"
-            + result.stderr
-        )
-
-    version = result.stdout.strip()
-
-    success(
-        f"npx encontrado: {version}"
-    )
-
-    info(
-        f"Executável: {npx}"
-    )
-
-    return npx
-
-
-# ============================================================
-# PROJETO
-# ============================================================
-
-def validate_project():
-
-    step(
-        "Validando projeto React Native"
-    )
-
-    package_json = (
-        PROJECT_DIR
-        / "package.json"
-    )
-
-    android_dir = (
-        PROJECT_DIR
-        / "android"
-    )
-
-    node_modules = (
-        PROJECT_DIR
-        / "node_modules"
-    )
+def validate_project() -> None:
+    step("Validando projeto React Native")
+    package_json = PROJECT_DIR / "package.json"
+    android_dir = PROJECT_DIR / "android"
+    node_modules = PROJECT_DIR / "node_modules"
 
     if not package_json.exists():
-
-        raise RuntimeError(
-            "package.json não encontrado."
-        )
-
-    success(
-        "package.json encontrado."
-    )
+        raise RuntimeError("package.json não encontrado.")
+    success("package.json encontrado.")
 
     if not android_dir.exists():
-
-        raise RuntimeError(
-            "Pasta android não encontrada."
-        )
-
-    success(
-        "Pasta android encontrada."
-    )
+        raise RuntimeError("Pasta android não encontrada.")
+    success("Pasta android encontrada.")
 
     if not node_modules.exists():
-
-        warning(
-            "node_modules não existe."
-        )
-
-        info(
-            "Execute npm install antes de iniciar."
-        )
-
+        warning("node_modules não existe.")
+        info("Execute 'npm install' antes de iniciar.")
     else:
-
-        success(
-            "node_modules encontrado."
-        )
+        success("node_modules encontrado.")
 
 
-# ============================================================
-# ANDROID SDK
-# ============================================================
 
-def find_android_sdk():
-
-    candidates = []
-
-    android_home = os.environ.get(
-        "ANDROID_HOME"
-    )
-
-    android_sdk_root = os.environ.get(
-        "ANDROID_SDK_ROOT"
-    )
-
-    local_app_data = os.environ.get(
-        "LOCALAPPDATA"
-    )
-
-    if android_home:
-
-        candidates.append(
-            Path(android_home)
-        )
-
-    if android_sdk_root:
-
-        candidates.append(
-            Path(android_sdk_root)
-        )
-
+def find_android_sdk() -> Path | None:
+    candidates: list[Path] = []
+    for env in ("ANDROID_HOME", "ANDROID_SDK_ROOT"):
+        value = os.environ.get(env)
+        if value:
+            candidates.append(Path(value))
+    local_app_data = os.environ.get("LOCALAPPDATA")
     if local_app_data:
-
-        candidates.append(
-            Path(local_app_data)
-            / "Android"
-            / "Sdk"
-        )
-
+        candidates.append(Path(local_app_data) / "Android" / "Sdk")
     for path in candidates:
-
         if path.exists():
-
             return path
-
     return None
 
 
-def find_android_tools():
-
-    step(
-        "Localizando Android SDK"
-    )
-
+def find_android_tools() -> tuple[Path, Path, Path]:
+    step("Localizando Android SDK")
     sdk = find_android_sdk()
-
     if not sdk:
-
-        raise RuntimeError(
-            "Android SDK não encontrado."
-        )
-
-    adb_path = (
-        sdk
-        / "platform-tools"
-        / "adb.exe"
-    )
-
-    emulator_path = (
-        sdk
-        / "emulator"
-        / "emulator.exe"
-    )
-
+        raise RuntimeError("Android SDK não encontrado.")
+    adb_path = sdk / "platform-tools" / "adb.exe"
+    emulator_path = sdk / "emulator" / "emulator.exe"
     if not adb_path.exists():
-
-        raise RuntimeError(
-            "adb.exe não encontrado:\n"
-            + str(adb_path)
-        )
-
+        raise RuntimeError(f"adb.exe não encontrado:\n{adb_path}")
     if not emulator_path.exists():
-
-        raise RuntimeError(
-            "emulator.exe não encontrado:\n"
-            + str(emulator_path)
-        )
-
-    success(
-        f"Android SDK: {sdk}"
-    )
-
-    info(
-        f"ADB: {adb_path}"
-    )
-
-    info(
-        f"Emulator: {emulator_path}"
-    )
-
-    return (
-        sdk,
-        adb_path,
-        emulator_path
-    )
+        raise RuntimeError(f"emulator.exe não encontrado:\n{emulator_path}")
+    success(f"Android SDK: {sdk}")
+    info(f"ADB: {adb_path}")
+    info(f"Emulator: {emulator_path}")
+    return sdk, adb_path, emulator_path
 
 
-# ============================================================
-# ADB
-# ============================================================
 
-def adb_command(
-    adb_path,
-    *args,
-    capture=True
-):
-
-    return run_command(
-        [
-            str(adb_path),
-            *args
-        ],
-        capture=capture
-    )
+def adb_command(adb_path: Path, *args: str, capture: bool = True) -> subprocess.CompletedProcess:
+    return run_command([str(adb_path), *args], capture=capture)
 
 
-def start_adb(
-    adb_path
-):
-
-    step(
-        "Iniciando Android Debug Bridge"
-    )
-
-    result = adb_command(
-        adb_path,
-        "start-server"
-    )
-
+def start_adb(adb_path: Path) -> None:
+    step("Iniciando Android Debug Bridge")
+    result = adb_command(adb_path, "start-server")
     if result.returncode != 0:
-
-        raise RuntimeError(
-            "Falha ao iniciar ADB:\n"
-            + result.stderr
-        )
-
-    success(
-        "ADB iniciado."
-    )
+        raise RuntimeError("Falha ao iniciar ADB:\n" + result.stderr)
+    success("ADB iniciado.")
 
 
-# ============================================================
-# DISPOSITIVOS
-# ============================================================
 
-def get_devices(
-    adb_path
-):
-
-    result = adb_command(
-        adb_path,
-        "devices"
-    )
-
+def get_devices(adb_path: Path) -> list[tuple[str, str]]:
+    result = adb_command(adb_path, "devices")
     if result.returncode != 0:
-
         return []
-
-    devices = []
-
+    devices: list[tuple[str, str]] = []
     for line in result.stdout.splitlines():
-
         line = line.strip()
-
-        if not line:
+        if not line or line.startswith("List of devices"):
             continue
-
-        if line.startswith(
-            "List of devices"
-        ):
-            continue
-
         parts = line.split()
-
         if len(parts) >= 2:
-
-            devices.append(
-                (
-                    parts[0],
-                    parts[1]
-                )
-            )
-
+            devices.append((parts[0], parts[1]))
     return devices
 
 
-def get_ready_device(
-    adb_path
-):
-
-    devices = get_devices(
-        adb_path
-    )
-
-    for serial, state in devices:
-
+def get_ready_device(adb_path: Path) -> str | None:
+    for serial, state in get_devices(adb_path):
         if state == "device":
-
             return serial
-
     return None
 
 
-# ============================================================
-# AVD
-# ============================================================
-
-def get_avds(
-    emulator_path
-):
-
-    result = run_command(
-        [
-            str(emulator_path),
-            "-list-avds"
-        ],
-        capture=True
-    )
-
+def get_avds(emulator_path: Path) -> list[str]:
+    result = run_command([str(emulator_path), "-list-avds"], capture=True)
     if result.returncode != 0:
-
-        raise RuntimeError(
-            "Não foi possível listar os AVDs:\n"
-            + result.stderr
-        )
-
-    avds = []
-
-    for line in result.stdout.splitlines():
-
-        line = line.strip()
-
-        if line:
-
-            avds.append(line)
-
-    return avds
+        raise RuntimeError("Não foi possível listar os AVDs:\n" + result.stderr)
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
 
-def start_emulator(
-    emulator_path,
-    avd
-):
-
-    info(
-        f"Iniciando AVD: {avd}"
-    )
-
-    subprocess.Popen(
+def start_emulator(emulator_path: Path, avd: str) -> subprocess.Popen:
+    info(f"Iniciando AVD: {avd}")
+    process = subprocess.Popen(
         [
             str(emulator_path),
             "-avd",
@@ -832,222 +289,183 @@ def start_emulator(
             "-netdelay",
             "none",
             "-netspeed",
-            "full"
+            "full",
+            "-no-snapshot",
         ],
         cwd=str(PROJECT_DIR),
-        creationflags=(
-            subprocess.CREATE_NEW_CONSOLE
-        )
+        creationflags=subprocess.CREATE_NEW_CONSOLE,
     )
+    LAUNCHER_PIDS.append(process.pid)
+    return process
 
 
-# ============================================================
-# AGUARDAR DEVICE
-# ============================================================
 
-def wait_for_device(
-    adb_path
-):
-
-    step(
-        "Aguardando dispositivo Android"
-    )
-
+def wait_for_device(adb_path: Path) -> str:
+    step("Aguardando dispositivo Android")
     started = time.time()
-
-    dots = 0
-
-    while (
-        time.time() - started
-        < DEVICE_TIMEOUT
-    ):
-
-        device = get_ready_device(
-            adb_path
-        )
-
+    counter = 0
+    while time.time() - started < DEVICE_TIMEOUT:
+        device = get_ready_device(adb_path)
         if device:
-
-            success(
-                f"Dispositivo conectado: {device}"
-            )
-
+            success(f"Dispositivo conectado: {device}")
             return device
-
-        dots += 1
-
-        if dots % 5 == 0:
-
-            elapsed_seconds = int(
-                time.time() - started
-            )
-
-            info(
-                f"Aguardando... "
-                f"{elapsed_seconds}s"
-            )
-
+        counter += 1
+        if counter % 5 == 0:
+            info(f"Aguardando... {int(time.time() - started)}s")
         time.sleep(2)
-
-    raise TimeoutError(
-        "O Android não ficou disponível "
-        "dentro do tempo limite."
-    )
+    raise TimeoutError("O Android não ficou disponível dentro do tempo limite.")
 
 
-# ============================================================
-# BOOT COMPLETO
-# ============================================================
-
-def wait_for_boot(
-    adb_path,
-    device
-):
-
-    step(
-        "Aguardando boot completo do Android"
-    )
-
+def wait_for_boot(adb_path: Path, device: str) -> None:
+    step("Aguardando boot completo do Android")
     started = time.time()
-
-    while (
-        time.time() - started
-        < BOOT_TIMEOUT
-    ):
-
+    while time.time() - started < BOOT_TIMEOUT:
         result = adb_command(
             adb_path,
             "-s",
             device,
             "shell",
             "getprop",
-            "sys.boot_completed"
+            "sys.boot_completed",
         )
-
-        if (
-            result.returncode == 0
-            and result.stdout.strip() == "1"
-        ):
-
-            success(
-                "Android inicializado completamente."
-            )
-
+        if result.returncode == 0 and result.stdout.strip() == "1":
+            success("Android inicializado completamente.")
             return
-
         time.sleep(2)
-
-    raise TimeoutError(
-        "Timeout aguardando boot completo."
-    )
+    raise TimeoutError("Timeout aguardando boot completo.")
 
 
-# ============================================================
-# PORTA
-# ============================================================
 
-def port_is_free(
-    port
-):
-
-    sock = socket.socket(
-        socket.AF_INET,
-        socket.SOCK_STREAM
-    )
-
+def port_is_free(port: int) -> bool:
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
-
-        sock.settimeout(
-            0.25
-        )
-
-        return (
-            sock.connect_ex(
-                (
-                    "127.0.0.1",
-                    port
-                )
-            )
-            != 0
-        )
-
+        sock.settimeout(0.25)
+        return sock.connect_ex(("127.0.0.1", port)) != 0
     finally:
-
         sock.close()
 
 
-def find_metro_port():
+def find_random_metro_port() -> int:
+    import random
 
-    step(
-        "Procurando porta Metro disponível"
-    )
-
-    for port in range(
-        METRO_PORT_START,
-        METRO_PORT_END + 1
-    ):
-
+    step("Selecionando porta Metro disponível")
+    candidates = list(range(METRO_PORT_MIN, METRO_PORT_MAX + 1))
+    random.shuffle(candidates)
+    for port in candidates:
         if port_is_free(port):
-
-            success(
-                f"Porta disponível: {port}"
-            )
-
+            success(f"Porta disponível: {port}")
             return port
-
-        info(
-            f"Porta {port} ocupada."
-        )
-
     raise RuntimeError(
-        f"Nenhuma porta disponível entre "
-        f"{METRO_PORT_START} e "
-        f"{METRO_PORT_END}."
+        f"Nenhuma porta disponível entre {METRO_PORT_MIN} e {METRO_PORT_MAX}."
     )
 
 
-# ============================================================
-# TERMINAL NOVO
-# ============================================================
 
-def open_terminal(
-    title,
-    command
-):
-
-    """
-    Abre uma janela CMD separada.
-
-    Não utiliza caminhos de npm/npx.
-    O próprio PATH do Windows resolve
-    npx.cmd corretamente.
-    """
-
-    safe_title = title.replace(
-        "&",
-        "^&"
-    )
-
-    full_command = (
-        f'title {safe_title} && '
-        f'{command}'
-    )
-
-    write_log(
-        f"OPEN TERMINAL: {full_command}"
-    )
-
-    subprocess.Popen(
-        [
-            "cmd.exe",
-            "/D",
-            "/K",
-            full_command
-        ],
-        cwd=str(PROJECT_DIR),
-        creationflags=(
-            subprocess.CREATE_NEW_CONSOLE
+def kill_process_by_port(port: int) -> bool:
+    """Encerra qualquer processo escutando na porta (Windows)."""
+    try:
+        output = subprocess.check_output(
+            ["netstat", "-ano", "-p", "TCP"],
+            text=True,
+            stderr=subprocess.DEVNULL,
         )
+    except Exception:
+        return False
+    pids: set[int] = set()
+    needle = f":{port} "
+    for line in output.splitlines():
+        if "LISTENING" not in line:
+            continue
+        if needle not in line:
+            continue
+        parts = line.split()
+        if len(parts) >= 5:
+            try:
+                pids.add(int(parts[-1]))
+            except ValueError:
+                pass
+    if not pids:
+        return False
+    for pid in pids:
+        try:
+            subprocess.run(
+                ["taskkill", "/F", "/PID", str(pid)],
+                capture_output=True,
+                check=False,
+            )
+            info(f"Porta {port}: processo {pid} encerrado.")
+        except Exception:
+            pass
+    return True
+
+
+def purge_metro_cache() -> None:
+    """Remove caches corrompidos do Metro (DiskCacheManager / v8.serialize)."""
+    step("Limpando caches do Metro")
+    targets: list[Path] = []
+
+    temp_cache = HASHE_TMP / "metro-cache"
+    if temp_cache.exists():
+        targets.append(temp_cache)
+
+    for entry in HASHE_TMP.glob("metro-file-map-*"):
+        if entry.is_file():
+            targets.append(entry)
+
+    project_cache = PROJECT_DIR / "node_modules" / ".cache" / "metro"
+    if project_cache.exists():
+        targets.append(project_cache)
+
+    if not targets:
+        info("Nenhum cache do Metro encontrado.")
+        return
+
+    for path in targets:
+        try:
+            if path.is_dir():
+                shutil.rmtree(path, ignore_errors=True)
+            else:
+                path.unlink(missing_ok=True)
+            success(f"Removido: {path}")
+        except Exception as exc:
+            warning(f"Falha ao remover {path}: {exc}")
+
+
+def validate_metro_cache() -> None:
+    """Detecta caches do Metro corrompidos antes de iniciar."""
+    step("Validando integridade dos caches do Metro")
+    corrupted: list[Path] = []
+    for entry in HASHE_TMP.glob("metro-file-map-*"):
+        if not entry.is_file():
+            continue
+        try:
+            if entry.stat().st_size == 0:
+                corrupted.append(entry)
+                continue
+            with open(entry, "rb") as file:
+                header = file.read(8)
+            if not header:
+                corrupted.append(entry)
+        except OSError:
+            corrupted.append(entry)
+
+    if corrupted:
+        warning(f"{len(corrupted)} cache(s) do Metro potencialmente corrompido(s).")
+        for path in corrupted:
+            info(f"  - {path}")
+        purge_metro_cache()
+    else:
+        success("Caches do Metro íntegros.")
+
+
+def start_in_new_console(title: str, command: str) -> subprocess.Popen:
+    safe_title = title.replace("&", "^&")
+    full_command = f"title {safe_title} && {command}"
+    write_log(f"OPEN TERMINAL: {full_command}")
+    return subprocess.Popen(
+        ["cmd.exe", "/D", "/K", full_command],
+        cwd=str(PROJECT_DIR),
+        creationflags=subprocess.CREATE_NEW_CONSOLE,
     )
 
 
@@ -1055,143 +473,94 @@ def open_terminal(
 # METRO
 # ============================================================
 
-def start_metro(
-    port
-):
 
-    step(
-        f"Iniciando Metro na porta {port}"
-    )
+def metro_already_running(port: int) -> bool:
+    return not port_is_free(port)
 
+
+def start_metro_terminal(port: int) -> subprocess.Popen:
+    step(f"Iniciando Metro na porta {port}")
     command = (
-        f'npx.cmd react-native start '
-        f'--port {port} '
-        f'--reset-cache'
+        f'npx.cmd --no-install react-native start --port {port}'
     )
+    process = start_in_new_console(
+        f"TribeWallet - Metro {port}", command
+    )
+    LAUNCHER_PIDS.append(process.pid)
+    success("Terminal do Metro aberto.")
+    return process
 
-    open_terminal(
-        f"TribeWallet - Metro {port}",
-        command
-    )
 
-    success(
-        "Terminal do Metro aberto."
-    )
+def wait_for_metro_ready(port: int, timeout: float = BUNDLE_READY_TIMEOUT) -> bool:
+    info(f"Aguardando Metro responder em http://localhost:{port}/status")
+    started = time.time()
+    while time.time() - started < timeout:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=1.5) as sock:
+                sock.sendall(b"GET /status HTTP/1.1\r\nHost: localhost\r\n\r\n")
+                data = sock.recv(4096).decode("utf-8", errors="ignore")
+                if "packager-status:running" in data:
+                    success("Metro pronto.")
+                    return True
+        except OSError:
+            pass
+        time.sleep(LOG_POLL_INTERVAL)
+    warning("Metro não respondeu dentro do tempo limite.")
+    return False
 
 
 # ============================================================
 # GRADLE CLEAN
 # ============================================================
 
-def clean_android_build():
 
-    step(
-        "Preparando build Android"
-    )
-
-    android_dir = (
-        PROJECT_DIR
-        / "android"
-    )
-
-    gradlew = (
-        android_dir
-        / "gradlew.bat"
-    )
-
+def clean_android_build() -> None:
+    step("Preparando build Android")
+    android_dir = PROJECT_DIR / "android"
+    gradlew = android_dir / "gradlew.bat"
     if not gradlew.exists():
-
-        raise RuntimeError(
-            "gradlew.bat não encontrado."
-        )
-
-    info(
-        "Executando Gradle clean..."
-    )
-
-    result = subprocess.run(
-        [
-            str(gradlew),
-            "clean"
-        ],
-        cwd=str(android_dir)
-    )
-
+        raise RuntimeError("gradlew.bat não encontrado.")
+    info("Executando Gradle clean...")
+    result = subprocess.run([str(gradlew), "clean"], cwd=str(android_dir))
     if result.returncode != 0:
-
-        raise RuntimeError(
-            "Gradle clean falhou."
-        )
-
-    success(
-        "Gradle clean concluído."
-    )
+        raise RuntimeError("Gradle clean falhou.")
+    success("Gradle clean concluído.")
 
 
 # ============================================================
 # BUILD ANDROID
 # ============================================================
 
-def build_android(
-    port
-):
 
-    step(
-        "Compilando e instalando aplicativo Android"
-    )
-
-    info(
-        "O primeiro build pode demorar."
-    )
-
-    info(
-        f"Metro configurado para porta {port}."
-    )
-
+def build_android(port: int) -> bool:
+    step("Compilando e instalando aplicativo Android")
+    info("O primeiro build pode demorar.")
+    info(f"Metro configurado para porta {port}.")
     print()
-
     command = [
         "npx.cmd",
+        "--no-install",
         "react-native",
         "run-android",
         "--port",
-        str(port)
+        str(port),
     ]
-
-    write_log(
-        "ANDROID BUILD: "
-        + " ".join(command)
-    )
-
-    result = subprocess.run(
-        command,
-        cwd=str(PROJECT_DIR)
-    )
-
+    write_log("ANDROID BUILD: " + " ".join(command))
+    result = subprocess.run(command, cwd=str(PROJECT_DIR))
     if result.returncode != 0:
-
-        raise RuntimeError(
-            "React Native Android build falhou."
-        )
-
-    success(
-        "Aplicativo compilado e instalado."
-    )
+        error("React Native Android build falhou.")
+        return False
+    success("Aplicativo compilado e instalado.")
+    return True
 
 
 # ============================================================
 # VERIFICAR APP
 # ============================================================
 
-def verify_application(
-    adb_path,
-    device
-):
 
-    step(
-        "Verificando aplicativo no dispositivo"
-    )
-
+def verify_application(adb_path: Path, device: str) -> bool:
+    step("Verificando aplicativo no dispositivo")
     result = adb_command(
         adb_path,
         "-s",
@@ -1200,158 +569,171 @@ def verify_application(
         "pm",
         "list",
         "packages",
-        capture=True
+        capture=True,
     )
-
     if result.returncode != 0:
-
-        warning(
-            "Não foi possível verificar o package."
-        )
-
-        return
-
-    package_line = (
-        "package:"
-        + APP_ID
-    )
-
+        warning("Não foi possível verificar o package.")
+        return False
+    package_line = f"package:{APP_ID}"
     if package_line in result.stdout:
-
-        success(
-            f"Package encontrado: {APP_ID}"
-        )
-
-    else:
-
-        warning(
-            f"Package {APP_ID} não apareceu na lista."
-        )
+        success(f"Package encontrado: {APP_ID}")
+        return True
+    warning(f"Package {APP_ID} não apareceu na lista.")
+    return False
 
 
 # ============================================================
 # LOGCAT
 # ============================================================
 
-def start_logcat(
-    adb_path,
-    device
-):
 
-    step(
-        "Abrindo monitor Logcat"
-    )
-
-    timestamp = datetime.now().strftime(
-        "%Y%m%d_%H%M%S"
-    )
-
-    log_file = (
-        LOG_DIR
-        / f"logcat_{timestamp}.txt"
-    )
-
-    write_log(
-        f"Logcat: {log_file}"
-    )
-
+def start_logcat(adb_path: Path, device: str) -> subprocess.Popen:
+    step("Abrindo monitor Logcat")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = LOG_DIR / f"logcat_{timestamp}.txt"
+    write_log(f"Logcat: {log_file}")
     command = (
-        f'"{adb_path}" '
-        f'-s {device} '
-        f'logcat'
-        f' > "{log_file}"'
+        f'"{adb_path}" -s {device} logcat > "{log_file}"'
     )
+    process = start_in_new_console("TribeWallet - Android Logcat", command)
+    LAUNCHER_PIDS.append(process.pid)
+    success("Logcat aberto.")
+    return process
 
-    open_terminal(
-        "TribeWallet - Android Logcat",
-        command
-    )
 
-    success(
-        "Logcat aberto."
-    )
+# ============================================================
+# ENCERRAMENTO
+# ============================================================
+
+
+def shutdown_all(adb_path: Path | None = None, device: str | None = None) -> None:
+    global KEEP_RUNNING
+    KEEP_RUNNING = False
+    out()
+    out("=" * 72, Fore.YELLOW)
+    out("                  ENCERRANDO TUDO", Fore.YELLOW)
+    out("=" * 72, Fore.YELLOW)
+
+    # 1. Encerrar terminais CMD abertos pelo launcher
+    if LAUNCHER_PIDS:
+        for pid in LAUNCHER_PIDS:
+            try:
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(pid)],
+                    capture_output=True,
+                    check=False,
+                )
+            except Exception:
+                pass
+
+    # 2. Encerrar processos node (Metro) e java (gradle/build)
+    for pattern in ("node.exe", "java.exe"):
+        try:
+            subprocess.run(
+                ["taskkill", "/F", "/IM", pattern],
+                capture_output=True,
+                check=False,
+            )
+        except Exception:
+            pass
+
+    # 3. Encerrar processos filhos do cmd.exe (consoles CMD filhos)
+    try:
+        output = subprocess.check_output(
+            ["wmic", "process", "where", "name='cmd.exe'", "get", "processid,parentprocessid"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        )
+        for line in output.splitlines()[1:]:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                pid_str, ppid_str = line.split()
+            except ValueError:
+                continue
+            try:
+                ppid = int(ppid_str)
+            except ValueError:
+                continue
+            if ppid in LAUNCHER_PIDS:
+                try:
+                    subprocess.run(
+                        ["taskkill", "/F", "/T", "/PID", pid_str],
+                        capture_output=True,
+                        check=False,
+                    )
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    # 4. Encerrar emulador (se houver)
+    if adb_path is not None:
+        try:
+            subprocess.run(
+                [str(adb_path), "emu", "kill"],
+                capture_output=True,
+                check=False,
+            )
+        except Exception:
+            pass
+
+    success("Tudo encerrado.")
+
+
+# ============================================================
+# MONITOR
+# ============================================================
+
+
+def monitor_loop(adb_path: Path) -> None:
+    global KEEP_RUNNING
+    while KEEP_RUNNING:
+        try:
+            command = sys.stdin.readline()
+        except Exception:
+            break
+        if not command:
+            break
+        stripped = command.strip().lower()
+        if stripped in ("0", "q", "quit", "exit", "sair"):
+            KEEP_RUNNING = False
+            shutdown_all(adb_path)
+            break
+        if stripped in ("c", "cache", "clean"):
+            purge_metro_cache()
+            print("Cache limpo. Reinicie o Metro manualmente para aplicar.", flush=True)
 
 
 # ============================================================
 # INFO FINAL
 # ============================================================
 
-def print_summary(
-    device,
-    port
-):
 
-    total_time = elapsed()
-
+def print_summary(device: str, port: int) -> None:
     print()
-
-    out(
-        "=" * 72,
-        Fore.GREEN
-    )
-
-    out(
-        "                  TRIBEWALLET INICIADO",
-        Fore.GREEN
-    )
-
-    out(
-        "=" * 72,
-        Fore.GREEN
-    )
-
+    out("=" * 72, Fore.GREEN)
+    out("                  TRIBEWALLET INICIADO", Fore.GREEN)
+    out("=" * 72, Fore.GREEN)
     print()
-
-    out(
-        f"Projeto       : {PROJECT_DIR}"
-    )
-
-    out(
-        f"Dispositivo   : {device}"
-    )
-
-    out(
-        f"Metro         : {port}"
-    )
-
-    out(
-        f"Tempo total   : {total_time}"
-    )
-
-    out(
-        f"Log           : {CURRENT_LOG_FILE}"
-    )
-
+    out(f"Projeto       : {PROJECT_DIR}")
+    out(f"Dispositivo   : {device}")
+    out(f"Metro         : {port}")
+    out(f"Tempo total   : {elapsed()}")
+    out(f"Log           : {CURRENT_LOG_FILE}")
     print()
-
-    out(
-        "Terminais ativos:",
-        Fore.CYAN
-    )
-
-    out(
-        "  [1] Android Emulator"
-    )
-
-    out(
-        "  [2] Metro Bundler"
-    )
-
-    out(
-        "  [3] Android Build"
-    )
-
-    out(
-        "  [4] Android Logcat"
-    )
-
+    out("Terminais ativos:", Fore.CYAN)
+    out("  [1] Android Emulator")
+    out("  [2] Metro Bundler")
+    out("  [3] Android Logcat")
     print()
-
-    out(
-        "=" * 72,
-        Fore.GREEN
-    )
-
+    out("Comandos disponíveis:", Fore.CYAN)
+    out("  [0] Encerrar tudo (terminais + emulador)", Fore.YELLOW)
+    out("  [c] Limpar caches do Metro", Fore.YELLOW)
+    out("  [ENTER] apenas finaliza este launcher", Fore.YELLOW)
+    print()
+    out("=" * 72, Fore.GREEN)
     print()
 
 
@@ -1359,270 +741,114 @@ def print_summary(
 # MAIN
 # ============================================================
 
-def main():
+
+def main() -> None:
+    global MONITOR_THREAD
 
     create_directories()
-
     create_log_file()
-
     print_header()
-
-    info(
-        f"Log salvo em: {CURRENT_LOG_FILE}"
-    )
-
-    # --------------------------------------------------------
-    # Projeto
-    # --------------------------------------------------------
+    info(f"Log salvo em: {CURRENT_LOG_FILE}")
 
     validate_project()
+    check_tool("node")
+    check_tool("npm")
+    check_tool("npx")
 
-    # --------------------------------------------------------
-    # Node
-    # --------------------------------------------------------
+    sdk, adb_path, emulator_path = find_android_tools()
+    start_adb(adb_path)
 
-    check_node()
+    validate_metro_cache()
 
-    # --------------------------------------------------------
-    # npm
-    # --------------------------------------------------------
-
-    check_npm()
-
-    # --------------------------------------------------------
-    # npx
-    # --------------------------------------------------------
-
-    check_npx()
-
-    # --------------------------------------------------------
-    # Android SDK
-    # --------------------------------------------------------
-
-    (
-        sdk,
-        adb_path,
-        emulator_path
-    ) = find_android_tools()
-
-    # --------------------------------------------------------
-    # ADB
-    # --------------------------------------------------------
-
-    start_adb(
-        adb_path
-    )
-
-    # --------------------------------------------------------
-    # Procurar device
-    # --------------------------------------------------------
-
-    step(
-        "Verificando dispositivos Android"
-    )
-
-    device = get_ready_device(
-        adb_path
-    )
-
+    step("Verificando dispositivos Android")
+    device = get_ready_device(adb_path)
     if device:
-
-        success(
-            f"Dispositivo já ativo: {device}"
-        )
-
+        success(f"Dispositivo já ativo: {device}")
     else:
-
-        warning(
-            "Nenhum dispositivo Android ativo."
-        )
-
-        # ----------------------------------------------------
-        # AVD
-        # ----------------------------------------------------
-
-        step(
-            "Detectando Android Virtual Devices"
-        )
-
-        avds = get_avds(
-            emulator_path
-        )
-
+        warning("Nenhum dispositivo Android ativo.")
+        step("Detectando Android Virtual Devices")
+        avds = get_avds(emulator_path)
         if not avds:
-
             raise RuntimeError(
                 "Nenhum AVD encontrado.\n\n"
                 "Abra o Android Studio > Device Manager "
                 "e crie um emulador."
             )
-
-        out(
-            "AVDs encontrados:",
-            Fore.CYAN
-        )
-
-        for index, avd in enumerate(
-            avds,
-            start=1
-        ):
-
-            out(
-                f"  [{index}] {avd}"
-            )
-
-        # ----------------------------------------------------
-        # Seleção automática
-        # ----------------------------------------------------
-
+        out("AVDs encontrados:", Fore.CYAN)
+        for index, avd in enumerate(avds, start=1):
+            out(f"  [{index}] {avd}")
         selected_avd = avds[0]
+        info(f"Selecionado automaticamente: {selected_avd}")
+        start_emulator(emulator_path, selected_avd)
+        device = wait_for_device(adb_path)
 
-        info(
-            f"Selecionado automaticamente: {selected_avd}"
-        )
+    wait_for_boot(adb_path, device)
 
-        start_emulator(
-            emulator_path,
-            selected_avd
-        )
-
-        # ----------------------------------------------------
-        # Esperar device
-        # ----------------------------------------------------
-
-        device = wait_for_device(
-            adb_path
-        )
-
-    # --------------------------------------------------------
-    # Boot
-    # --------------------------------------------------------
-
-    wait_for_boot(
-        adb_path,
-        device
-    )
-
-    # --------------------------------------------------------
-    # Porta Metro
-    # --------------------------------------------------------
-
-    port = find_metro_port()
-
-    # --------------------------------------------------------
-    # IMPORTANTE
-    #
-    # Primeiro garantimos que o projeto Android está
-    # consistente antes de abrir o Metro.
-    # --------------------------------------------------------
+    # Limpar porta Metro anterior e escolher porta aleatória
+    step("Preparando porta Metro")
+    port = find_random_metro_port()
+    if not port_is_free(port):
+        kill_process_by_port(port)
+        time.sleep(1)
+        if not port_is_free(port):
+            warning(f"Porta {port} ainda ocupada, sorteando outra.")
+            port = find_random_metro_port()
 
     clean_android_build()
 
-    # --------------------------------------------------------
-    # Metro
-    #
-    # Abrimos Metro antes do run-android para que o CLI
-    # consiga conectar ao servidor.
-    # --------------------------------------------------------
+    start_metro_terminal(port)
+    if not wait_for_metro_ready(port):
+        warning("Continuando mesmo assim; o app pode demorar no primeiro bundle.")
 
-    start_metro(
-        port
-    )
+    if not build_android(port):
+        error("Build Android falhou. Verifique o log e tente novamente.")
+        print_summary(device, port)
+        MONITOR_THREAD = Thread(target=monitor_loop, args=(adb_path,), daemon=True)
+        MONITOR_THREAD.start()
+        try:
+            while KEEP_RUNNING:
+                time.sleep(0.5)
+        except KeyboardInterrupt:
+            KEEP_RUNNING = False
+        shutdown_all(adb_path, device)
+        return
 
-    info(
-        f"Aguardando Metro {METRO_START_WAIT}s..."
-    )
+    if not verify_application(adb_path, device):
+        warning("Verificação do app falhou, mas seguindo.")
 
-    time.sleep(
-        METRO_START_WAIT
-    )
+    start_logcat(adb_path, device)
 
-    # --------------------------------------------------------
-    # Build
-    # --------------------------------------------------------
+    print_summary(device, port)
 
-    build_android(
-        port
-    )
+    MONITOR_THREAD = Thread(target=monitor_loop, args=(adb_path,), daemon=True)
+    MONITOR_THREAD.start()
 
-    # --------------------------------------------------------
-    # Verificar package
-    # --------------------------------------------------------
-
-    verify_application(
-        adb_path,
-        device
-    )
-
-    # --------------------------------------------------------
-    # Logcat
-    # --------------------------------------------------------
-
-    start_logcat(
-        adb_path,
-        device
-    )
-
-    # --------------------------------------------------------
-    # Final
-    # --------------------------------------------------------
-
-    print_summary(
-        device,
-        port
-    )
-
-    input(
-        "Pressione ENTER para fechar o launcher..."
-    )
+    try:
+        while KEEP_RUNNING:
+            time.sleep(0.5)
+    except KeyboardInterrupt:
+        KEEP_RUNNING = False
+    finally:
+        shutdown_all(adb_path, device)
 
 
 # ============================================================
 # EXECUÇÃO
 # ============================================================
 
+
 if __name__ == "__main__":
-
     try:
-
         main()
-
     except KeyboardInterrupt:
-
         print()
-
-        warning(
-            "Launcher interrompido pelo usuário."
-        )
-
-        print()
-
-        input(
-            "ENTER para fechar..."
-        )
-
+        warning("Launcher interrompido pelo usuário.")
+        shutdown_all()
     except Exception as exc:
-
         print()
-
-        error(
-            str(exc)
-        )
-
-        write_log(
-            "FATAL ERROR: "
-            + repr(exc)
-        )
-
+        error(str(exc))
+        write_log("FATAL ERROR: " + repr(exc))
         print()
-
-        out(
-            f"Log completo: {CURRENT_LOG_FILE}",
-            Fore.YELLOW
-        )
-
+        out(f"Log completo: {CURRENT_LOG_FILE}", Fore.YELLOW)
         print()
-
-        input(
-            "ENTER para fechar..."
-        )
+        input("ENTER para fechar...")

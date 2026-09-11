@@ -1,68 +1,69 @@
-import React, {forwardRef, useState} from 'react';
-import {
-  Text,
-  TextInput,
-  TextInputProps,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import {Eye, EyeOff} from 'lucide-react-native';
+import React, { forwardRef } from 'react';
+import { TextInput as RNTextInput, TextInputProps, ViewStyle } from 'react-native';
+import { Box, Text } from '../../theme';
 
-import {colors} from '../../config/theme';
-import {styles} from './styles';
-
-interface InputProps extends TextInputProps {
-  label: string;
-  secure?: boolean;
+export interface InputProps extends Omit<TextInputProps, 'style'> {
+  label?: string;
+  error?: string;
+  helperText?: string;
+  leftIcon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
+  containerStyle?: ViewStyle;
 }
 
-export const Input = forwardRef<TextInput, InputProps>(
-  ({label, secure = false, ...props}, ref) => {
-    const [visible, setVisible] = useState(false);
-
-    const isPassword = secure;
-
+export const Input = forwardRef<any, InputProps>(
+  ({ label, error, helperText, leftIcon, rightIcon, containerStyle, ...rest }, ref) => {
     return (
-      <View style={styles.container}>
-        <Text style={styles.label}>{label}</Text>
-
-        <View style={styles.inputWrapper}>
-          <TextInput
-            ref={ref}
-            {...props}
-            secureTextEntry={isPassword && !visible}
-            style={styles.input}
-            placeholderTextColor={colors.placeholder}
-            autoCorrect={false}
-            selectionColor={colors.primary}
-          />
-
-          {isPassword && (
-            <TouchableOpacity
-              style={styles.eyeButton}
-              activeOpacity={0.7}
-              onPress={() => setVisible(current => !current)}
-              accessibilityRole="button"
-              accessibilityLabel={
-                visible ? 'Ocultar senha' : 'Mostrar senha'
-              }>
-              {visible ? (
-                <EyeOff
-                  size={11}
-                  color="#6D7379"
-                  strokeWidth={1.5}
-                />
-              ) : (
-                <Eye
-                  size={11}
-                  color="#6D7379"
-                  strokeWidth={1.5}
-                />
-              )}
-            </TouchableOpacity>
+      <Box style={containerStyle}>
+        {label && (
+          <Text variant="label" marginBottom="xs">
+            {label}
+          </Text>
+        )}
+        <Box
+          flexDirection="row"
+          alignItems="center"
+          bg="surface"
+          borderRadius="md"
+          borderWidth={1}
+          borderColor={error ? 'danger' : 'border'}
+          px="md"
+          minHeight={48}
+        >
+          {leftIcon && (
+            <Box marginRight="xs">
+              {leftIcon}
+            </Box>
           )}
-        </View>
-      </View>
+          <Box flex={1}>
+            <RNTextInput
+              ref={ref}
+              {...rest}
+              placeholderTextColor="#8C949B"
+              style={{
+                fontSize: 16,
+                color: '#171717',
+                paddingVertical: 12,
+                minHeight: 48,
+              }}
+            />
+          </Box>
+          {rightIcon && (
+            <Box marginLeft="xs">
+              {rightIcon}
+            </Box>
+          )}
+        </Box>
+        {(error || helperText) && (
+          <Text
+            variant="caption"
+            color={error ? 'danger' : 'textMuted'}
+            marginTop="xs"
+          >
+            {error || helperText}
+          </Text>
+        )}
+      </Box>
     );
   },
 );

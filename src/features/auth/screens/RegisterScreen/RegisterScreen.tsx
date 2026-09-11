@@ -139,7 +139,7 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
    */
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
+      <StatusBar barStyle="dark-content" />
 
       <KeyboardAvoidingView
         style={styles.keyboard}

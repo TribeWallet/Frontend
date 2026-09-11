@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -8,39 +9,50 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  useWindowDimensions,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 
-// 1. IMPORTAÇÃO DOS ESTILOS SEPARADOS
 import { styles } from './LoginScreen.styles';
-
-// 2. IMPORTAÇÃO DOS COMPONENTES
 import { TribeWalletLogo } from '../../components/TribeWalletLogo';
+import { useAuthStore, AuthUser } from '../../stores/authStore';
 
 export interface LoginScreenProps {
   onCreateAccount: () => void;
   onForgotPassword: () => void;
+  onLogin?: () => void;
+}
+
+const DEV_EMAIL = 'dev@dev.com';
+const DEV_PASSWORD = 'admin';
+
+function initialsFromName(name: string): string {
+  return (
+    name
+      .split(' ')
+      .filter(Boolean)
+      .map((part) => part[0]?.toUpperCase() ?? '')
+      .slice(0, 2)
+      .join('') || 'NV'
+  );
 }
 
 export function LoginScreen({
   onCreateAccount,
   onForgotPassword,
+  onLogin,
 }: LoginScreenProps) {
   const { width, height } = useWindowDimensions();
+  const login = useAuthStore((state) => state.login);
 
-  // Tipagem explícita dos estados
-  const [email, setEmail] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
-  const [passwordVisible, setPasswordVisible] = useState<boolean>(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  /*
-   * ==========================================================
-   * RESPONSIVIDADE
-   * ==========================================================
-   */
   const isSmallPhone: boolean = width < 360;
   const isTablet: boolean = width >= 768;
 
@@ -49,14 +61,11 @@ export function LoginScreen({
     : isSmallPhone
       ? 16
       : 20;
-
   const maxContentWidth: number = isTablet ? 440 : 420;
-
   const contentWidth: number = Math.min(
     width - horizontalPadding * 2,
     maxContentWidth,
   );
-
   const topSpacing: number =
     height <= 640
       ? 28
@@ -66,39 +75,66 @@ export function LoginScreen({
           ? 68
           : 90;
 
-  /*
-   * ==========================================================
-   * HANDLERS
-   * ==========================================================
-   */
-  const handleLogin = (): void => {
-    console.log('Login:', { email, password });
-  };
+  const handleLogin = useCallback((): void => {
+    if (submitting) return;
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedPassword = password.trim();
 
-  const handleForgotPassword = (): void => {
+    if (!normalizedEmail || !normalizedPassword) {
+      setError('Preencha e-mail e senha para continuar.');
+      return;
+    }
+    if (
+      normalizedEmail !== DEV_EMAIL.toLowerCase() ||
+      normalizedPassword !== DEV_PASSWORD
+    ) {
+      setError('E-mail ou senha inválidos.');
+      return;
+    }
+
+    setError(null);
+    setSubmitting(true);
+
+    const user: AuthUser = {
+      id: 'user-dev',
+      name: 'Gabriel',
+      email: DEV_EMAIL,
+      initials: initialsFromName('Gabriel'),
+      notificationCount: 0,
+    };
+
+    login(user);
+    onLogin?.();
+  }, [email, password, submitting, login, onLogin]);
+
+  const handleForgotPassword = useCallback((): void => {
+    Alert.alert(
+      'Recuperar senha',
+      'Entre em contato com o suporte para redefinir a senha da sua conta.',
+    );
     onForgotPassword();
-  };
+  }, [onForgotPassword]);
 
-  const handleCreateAccount = (): void => {
+  const handleCreateAccount = useCallback((): void => {
+    Alert.alert(
+      'Criar conta',
+      'Cadastros são feitos pelo administrador. Fale com o suporte.',
+    );
     onCreateAccount();
-  };
+  }, [onCreateAccount]);
 
   const handleTerms = (): void => {
-    console.log('Termos de Uso');
+    Alert.alert('Termos de Uso', 'Conteúdo em breve.');
   };
-
   const handlePrivacy = (): void => {
-    console.log('Política de Privacidade');
+    Alert.alert('Política de Privacidade', 'Conteúdo em breve.');
   };
 
-  /*
-   * ==========================================================
-   * RENDER
-   * ==========================================================
-   */
+  const canSubmit = email.trim().length > 0 && password.length > 0;
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
+      <StatusBar barStyle="dark-content" />
 
       <KeyboardAvoidingView
         style={styles.keyboard}
@@ -115,37 +151,34 @@ export function LoginScreen({
             },
           ]}
           keyboardShouldPersistTaps="handled"
-          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          keyboardDismissMode={
+            Platform.OS === 'ios' ? 'interactive' : 'on-drag'
+          }
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
           <View style={[styles.content, { width: contentWidth }]}>
-            
-            {/* LOGO */}
             <View style={styles.logoContainer}>
               <TribeWalletLogo />
             </View>
 
-            {/* CARD */}
             <View style={styles.card}>
-              
               <Text style={styles.title}>Bem-vindo de volta</Text>
               <Text style={styles.subtitle}>
                 Entre com suas credenciais para acessar
               </Text>
 
-              {/* FORM */}
               <View style={styles.form}>
-                
-                {/* E-MAIL */}
                 <View style={styles.field}>
                   <Text style={styles.label}>E-mail</Text>
                   <TextInput
                     value={email}
-                    // Remove espaços em branco em tempo real (boa prática para e-mail)
-                    onChangeText={(text: string) => setEmail(text.replace(/\s/g, ''))}
+                    onChangeText={(text: string) => {
+                      setEmail(text.replace(/\s/g, ''));
+                      if (error) setError(null);
+                    }}
                     style={styles.input}
-                    placeholder="seu@email.com"
+                    placeholder="dev@dev.com"
                     placeholderTextColor="#9AA0A6"
                     keyboardType="email-address"
                     autoCapitalize="none"
@@ -154,27 +187,33 @@ export function LoginScreen({
                     textContentType="emailAddress"
                     returnKeyType="next"
                     selectionColor="#087BE5"
+                    editable={!submitting}
                   />
                 </View>
 
-                {/* SENHA */}
                 <View style={styles.field}>
                   <View style={styles.labelRow}>
                     <Text style={styles.label}>Senha</Text>
                     <TouchableOpacity
                       onPress={handleForgotPassword}
                       activeOpacity={0.7}
+                      hitSlop={6}
                     >
-                      <Text style={styles.forgotPassword}>Esqueceu a senha?</Text>
+                      <Text style={styles.forgotPassword}>
+                        Esqueceu a senha?
+                      </Text>
                     </TouchableOpacity>
                   </View>
 
                   <View style={styles.passwordWrapper}>
                     <TextInput
                       value={password}
-                      onChangeText={setPassword} // Senha aceita todos os caracteres (alfanuméricos e especiais)
+                      onChangeText={(text: string) => {
+                        setPassword(text);
+                        if (error) setError(null);
+                      }}
                       style={[styles.input, styles.passwordInput]}
-                      placeholder="Digite sua senha"
+                      placeholder="•••••"
                       placeholderTextColor="#9AA0A6"
                       secureTextEntry={!passwordVisible}
                       autoCapitalize="none"
@@ -184,6 +223,7 @@ export function LoginScreen({
                       returnKeyType="done"
                       selectionColor="#087BE5"
                       onSubmitEditing={handleLogin}
+                      editable={!submitting}
                     />
 
                     <Pressable
@@ -191,7 +231,9 @@ export function LoginScreen({
                         styles.eyeButton,
                         pressed && styles.eyeButtonPressed,
                       ]}
-                      onPress={() => setPasswordVisible((current) => !current)}
+                      onPress={() =>
+                        setPasswordVisible((current) => !current)
+                      }
                       hitSlop={8}
                       accessibilityRole="button"
                       accessibilityLabel={
@@ -203,30 +245,56 @@ export function LoginScreen({
                   </View>
                 </View>
 
-                {/* ENTRAR */}
+                {error ? (
+                  <View
+                    style={{
+                      backgroundColor: '#FDE8EB',
+                      borderRadius: 8,
+                      padding: 10,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: '#B91C2C',
+                        fontSize: 13,
+                        fontWeight: '500',
+                      }}
+                    >
+                      {error}
+                    </Text>
+                  </View>
+                ) : null}
+
                 <Pressable
                   onPress={handleLogin}
+                  disabled={!canSubmit || submitting}
                   style={({ pressed }) => [
                     styles.loginButton,
-                    pressed && styles.loginButtonPressed,
+                    (pressed || !canSubmit) && {
+                      opacity: !canSubmit ? 0.55 : 0.88,
+                    },
+                    submitting && { opacity: 0.7 },
                   ]}
                   accessibilityRole="button"
                   accessibilityLabel="Entrar"
                 >
-                  <Text style={styles.loginButtonText}>Entrar</Text>
+                  <Text style={styles.loginButtonText}>
+                    {submitting ? 'Entrando...' : 'Entrar'}
+                  </Text>
                 </Pressable>
               </View>
 
-              {/* CRIAR CONTA */}
               <View style={styles.createAccount}>
-                <Text style={styles.createAccountText}>Não tem uma conta?</Text>
+                <Text style={styles.createAccountText}>
+                  Não tem uma conta?
+                </Text>
                 <Pressable onPress={handleCreateAccount} hitSlop={8}>
                   <Text style={styles.createAccountLink}>Criar conta</Text>
                 </Pressable>
               </View>
             </View>
 
-            {/* TERMOS */}
             <View style={styles.terms}>
               <Text style={styles.termsText}>
                 Ao entrar, você concorda com nossos{' '}
@@ -236,10 +304,11 @@ export function LoginScreen({
               </Pressable>
               <Text style={styles.termsText}> e </Text>
               <Pressable onPress={handlePrivacy} hitSlop={5}>
-                <Text style={styles.termsLink}>Política de Privacidade</Text>
+                <Text style={styles.termsLink}>
+                  Política de Privacidade
+                </Text>
               </Pressable>
             </View>
-
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -247,15 +316,7 @@ export function LoginScreen({
   );
 }
 
-/* ============================================================ */
-/* ÍCONE DO OLHO */
-/* ============================================================ */
-
-interface PasswordEyeProps {
-  visible: boolean;
-}
-
-function PasswordEye({ visible }: PasswordEyeProps) {
+function PasswordEye({ visible }: { visible: boolean }) {
   return (
     <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
       {visible ? (
@@ -286,9 +347,17 @@ function PasswordEye({ visible }: PasswordEyeProps) {
             stroke="#6F747A"
             strokeWidth={1.5}
           />
-          <Circle cx="12" cy="12" r="2.5" stroke="#6F747A" strokeWidth={1.5} />
+          <Circle
+            cx="12"
+            cy="12"
+            r="2.5"
+            stroke="#6F747A"
+            strokeWidth={1.5}
+          />
         </>
       )}
     </Svg>
   );
 }
+
+export default LoginScreen;

@@ -77,3 +77,8 @@ yarn-error.log
 .tmp/
 .gradle/
 .bundle/
+
+launcher.py
+init.bat
+.md
+__tests__/
