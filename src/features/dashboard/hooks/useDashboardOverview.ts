@@ -1,14 +1,11 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
 import {
-  commitmentsMock,
-} from '../../compromissos/hooks/mockData';
-import {
-  groupsMock,
-} from '../../grupos/hooks/mockData';
-import {
-  paymentsMock,
-} from '../../pagamentos/hooks/mockData';
+  useAppCommitments,
+  useAppGroups,
+  useAppPayments,
+} from '../../../contexts/AppContext';
+import { useAuthStore } from '../../auth/stores/authStore';
 import type { Commitment } from '../../compromissos/types/Commitment';
 import type { Group } from '../../grupos/types/Group';
 import type { Payment } from '../../pagamentos/types/Payment';
@@ -323,28 +320,26 @@ export function buildDashboardData(
   };
 }
 
-const dashboardDataMock = buildDashboardData(
-  groupsMock,
-  commitmentsMock,
-  paymentsMock,
-);
-
-async function fetchDashboardOverview(): Promise<DashboardOverviewData> {
-  await new Promise<void>((resolve) => setTimeout(() => resolve(), 250));
-  return dashboardDataMock;
-}
-
+// Grupos vêm da API; compromissos e pagamentos ainda são locais (o backend não tem esses endpoints).
 export function useDashboardOverview() {
-  const query = useQuery({
-    queryKey: dashboardKeys.overview(),
-    queryFn: fetchDashboardOverview,
-    staleTime: 1000 * 60,
-  });
+  const { groups, groupsLoading, groupsError, refetchGroups } = useAppGroups();
+  const { commitments } = useAppCommitments();
+  const { payments } = useAppPayments();
+  const user = useAuthStore((state) => state.user);
+
+  const data = useMemo(() => {
+    const overview = buildDashboardData(groups, commitments, payments);
+    if (!user) return overview;
+    return {
+      ...overview,
+      user: { ...overview.user, initials: user.initials, name: user.name },
+    };
+  }, [groups, commitments, payments, user]);
 
   return {
-    data: query.data ?? dashboardDataMock,
-    isLoading: query.isLoading,
-    isError: query.isError,
-    refetch: query.refetch,
+    data,
+    isLoading: groupsLoading,
+    isError: Boolean(groupsError),
+    refetch: refetchGroups,
   };
 }

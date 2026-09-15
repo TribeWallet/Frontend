@@ -5,18 +5,30 @@ import React, {
   useMemo,
   useState,
 } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { SideMenu, SideMenuAction } from '../components/SideMenu/SideMenu';
 import { NotificationsModal } from '../features/notificacoes/components/NotificationsModal/NotificationsModal';
 import { useUserStore } from '../features/usuario/stores/userStore';
 import { notificationsMock } from '../features/notificacoes/hooks/mockData';
-import { groupsMock } from '../features/grupos/hooks/mockData';
 import { commitmentsMock } from '../features/compromissos/hooks/mockData';
 import { paymentsMock } from '../features/pagamentos/hooks/mockData';
 import { syncDueNotifications } from '../features/notificacoes/services/notificationSync';
+import { useAuthStore } from '../features/auth/stores/authStore';
+import {
+  createGrupo,
+  deleteGrupo,
+  listGrupos,
+  saveGroupTone,
+  toGroup,
+  updateGrupo,
+} from '../features/grupos/services/grupoService';
+import { ApiError, getErrorMessage } from '../services/api/apiClient';
+import { formatCurrency } from '../utils/currency';
+import { initialsFromName } from '../utils/formatters';
 import type { NotificationItem } from '../features/notificacoes/types/Notification';
 import type { NotificationSettings } from '../features/notificacoes/components/NotificationsModal/NotificationsModal';
-import type { Group, GroupMember } from '../features/grupos/types/Group';
+import type { Group } from '../features/grupos/types/Group';
 import type {
   Commitment,
   CommitmentSplitEntry,
@@ -37,7 +49,14 @@ export interface NewGroupInput {
   name: string;
   description: string;
   tone: Group['tone'];
-  members: { name: string; email?: string }[];
+  /** usuarioToken de cada integrante. Quem cria o grupo entra automaticamente. */
+  memberTokens: string[];
+}
+
+export interface UpdateGroupInput {
+  name: string;
+  description: string;
+  tone: Group['tone'];
 }
 
 export interface NewCommitmentInput {
@@ -66,11 +85,12 @@ interface NotificationsContextValue {
 
 interface GroupsContextValue {
   groups: Group[];
-  addGroup: (input: NewGroupInput) => Group;
-  updateGroup: (id: string, patch: Partial<Group>) => void;
-  deleteGroup: (id: string) => void;
-  addMember: (groupId: string, member: { name: string; email?: string }) => boolean;
-  removeMember: (groupId: string, memberId: string) => void;
+  groupsLoading: boolean;
+  groupsError: string | null;
+  refetchGroups: () => void;
+  addGroup: (input: NewGroupInput) => Promise<Group>;
+  updateGroup: (id: string, input: UpdateGroupInput) => Promise<void>;
+  deleteGroup: (id: string) => Promise<void>;
   getGroup: (id: string) => Group | undefined;
 }
 
@@ -136,11 +156,12 @@ export function useAppGroups(): GroupsContextValue {
   const ctx = useAppContext();
   return {
     groups: ctx.groups,
+    groupsLoading: ctx.groupsLoading,
+    groupsError: ctx.groupsError,
+    refetchGroups: ctx.refetchGroups,
     addGroup: ctx.addGroup,
     updateGroup: ctx.updateGroup,
     deleteGroup: ctx.deleteGroup,
-    addMember: ctx.addMember,
-    removeMember: ctx.removeMember,
     getGroup: ctx.getGroup,
   };
 }
@@ -174,58 +195,8 @@ interface AppProviderProps {
   activeTab?: string;
 }
 
-const TONE_KEYWORDS: { tone: Group['tone']; keywords: string[] }[] = [
-  { tone: 'green', keywords: ['viagem', 'travel', 'ferias', 'férias', 'carnaval'] },
-  { tone: 'family', keywords: ['família', 'familia', 'family'] },
-];
-
-function resolveTone(name: string): Group['tone'] {
-  const lowered = name.toLowerCase();
-  const found = TONE_KEYWORDS.find((entry) =>
-    entry.keywords.some((keyword) => lowered.includes(keyword)),
-  );
-  return found?.tone ?? 'blue';
-}
-
 function createId(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 8)}-${Date.now().toString(36)}`;
-}
-
-function initialsFromName(name: string): string {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .slice(0, 2)
-    .join('') || 'NV';
-}
-
-function buildGroup(input: NewGroupInput): Group {
-  const tone = input.tone ?? resolveTone(input.name);
-  const members: GroupMember[] = input.members
-    .filter((member) => member.name.trim().length > 0)
-    .map((member) => ({
-      id: createId('user'),
-      name: member.name.trim(),
-      email: member.email?.trim() || undefined,
-      initials: initialsFromName(member.name),
-    }));
-  return {
-    id: createId('group'),
-    name: input.name.trim(),
-    description: input.description.trim(),
-    tone,
-    tags: [
-      { label: 'Ativo', tone: 'green' },
-    ],
-    summary: {
-      members: members.length || 1,
-      openValue: 'R$ 0,00',
-      paidValue: 'R$ 0,00',
-    },
-    members,
-    createdAt: new Date().toISOString(),
-  };
 }
 
 function normalizeMethod(method: string): 'pix' | 'card' | 'boleto' | 'other' {
@@ -271,12 +242,6 @@ export function AppProvider({ children, onOpenProfile, onNavigate, onLogout, act
   );
   const [settings, setSettings] =
     useState<NotificationSettings>(DEFAULT_SETTINGS);
-  const [groups, setGroups] = useState<Group[]>(() =>
-    groupsMock.map((group) => ({
-      ...group,
-      createdAt: group.createdAt ?? new Date().toISOString(),
-    })),
-  );
   const [commitments, setCommitments] = useState<Commitment[]>(() =>
     commitmentsMock.map((commitment) => buildCommitment({
       name: commitment.name,
@@ -296,6 +261,46 @@ export function AppProvider({ children, onOpenProfile, onNavigate, onLogout, act
       ...payment,
       method: normalizeMethod(payment.method),
     })),
+  );
+
+  const usuarioToken = useAuthStore((state) => state.user?.id);
+  const queryClient = useQueryClient();
+  const groupsQuery = useQuery({
+    queryKey: ['grupos', usuarioToken],
+    queryFn: () => listGrupos(usuarioToken as string),
+    enabled: Boolean(usuarioToken),
+  });
+  const { refetch: refetchGroupsQuery } = groupsQuery;
+  const groupsLoading = groupsQuery.isLoading;
+  const groupsError = groupsQuery.error ? getErrorMessage(groupsQuery.error) : null;
+
+  const refetchGroups = useCallback(() => {
+    refetchGroupsQuery();
+  }, [refetchGroupsQuery]);
+
+  // Dados e integrantes vêm da API; os totais saem dos compromissos e pagamentos, que ainda são locais.
+  const groups = useMemo<Group[]>(
+    () =>
+      (groupsQuery.data ?? []).map((grupo) => {
+        const group = toGroup(grupo);
+        const openAmount = commitments
+          .filter((commitment) => commitment.groupId === group.id)
+          .flatMap((commitment) => commitment.splits)
+          .filter((split) => !split.paid)
+          .reduce((sum, split) => sum + split.amount, 0);
+        const paidAmount = payments
+          .filter((payment) => payment.groupId === group.id)
+          .reduce((sum, payment) => sum + payment.amount, 0);
+        return {
+          ...group,
+          summary: {
+            ...group.summary,
+            openValue: formatCurrency(openAmount),
+            paidValue: formatCurrency(paidAmount),
+          },
+        };
+      }),
+    [groupsQuery.data, commitments, payments],
   );
 
   const profile = useUserStore((state) => state.profile);
@@ -339,109 +344,54 @@ export function AppProvider({ children, onOpenProfile, onNavigate, onLogout, act
     setSettings(next);
   }, []);
 
-  const addGroup = useCallback((input: NewGroupInput) => {
-    const group = buildGroup(input);
-    setGroups((prev) => [group, ...prev]);
-    return group;
-  }, []);
-
-  const updateGroup = useCallback((id: string, patch: Partial<Group>) => {
-    setGroups((prev) =>
-      prev.map((group) =>
-        group.id === id
-          ? {
-              ...group,
-              ...patch,
-              summary: {
-                ...group.summary,
-                ...(patch.summary ?? {}),
-                members:
-                  patch.members?.length ?? group.summary.members,
-              },
-            }
-          : group,
-      ),
-    );
-  }, []);
-
-  const deleteGroup = useCallback((id: string) => {
-    setGroups((prev) => prev.filter((group) => group.id !== id));
-    setCommitments((prev) =>
-      prev.filter((commitment) => commitment.groupId !== id),
-    );
-    setPayments((prev) => prev.filter((payment) => payment.groupId !== id));
-  }, []);
-
-  const addMember = useCallback(
-    (groupId: string, member: { name: string; email?: string }) => {
-      const trimmedName = member.name.trim();
-      if (!trimmedName) return false;
-      let added = false;
-      setGroups((prev) =>
-        prev.map((group) => {
-          if (group.id !== groupId) return group;
-          const exists = group.members.some(
-            (existing) =>
-              existing.name.toLowerCase() === trimmedName.toLowerCase() ||
-              (member.email &&
-                existing.email?.toLowerCase() === member.email.toLowerCase()),
-          );
-          if (exists) return group;
-          added = true;
-          const newMember: GroupMember = {
-            id: createId('user'),
-            name: trimmedName,
-            email: member.email?.trim() || undefined,
-            initials: initialsFromName(trimmedName),
-          };
-          return {
-            ...group,
-            members: [...group.members, newMember],
-            summary: {
-              ...group.summary,
-              members: group.members.length + 1,
-            },
-          };
-        }),
-      );
-      return added;
-    },
-    [],
+  const invalidateGroups = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: ['grupos'] }),
+    [queryClient],
   );
 
-  const removeMember = useCallback((groupId: string, memberId: string) => {
-    setGroups((prev) =>
-      prev.map((group) => {
-        if (group.id !== groupId) return group;
-        const remaining = group.members.filter((m) => m.id !== memberId);
-        return {
-          ...group,
-          members: remaining,
-          summary: {
-            ...group.summary,
-            members: remaining.length,
-          },
-        };
-      }),
-    );
-    setCommitments((prev) =>
-      prev.map((commitment) =>
-        commitment.groupId === groupId
-          ? {
-              ...commitment,
-              splits: commitment.splits.filter(
-                (split) => split.memberId !== memberId,
-              ),
-            }
-          : commitment,
-      ),
-    );
-    setPayments((prev) =>
-      prev.filter(
-        (payment) => !(payment.groupId === groupId && payment.payerId === memberId),
-      ),
-    );
-  }, []);
+  const addGroup = useCallback(
+    async (input: NewGroupInput) => {
+      if (!usuarioToken) {
+        throw new ApiError('Sua sessão expirou. Entre novamente.', 401);
+      }
+      // A listagem só traz grupos em que o usuário é integrante, então quem cria entra também.
+      const memberTokens = Array.from(new Set([usuarioToken, ...input.memberTokens]));
+      const created = await createGrupo({
+        nome: input.name.trim(),
+        descricao: input.description.trim(),
+        usuarioTokens: memberTokens,
+      });
+      saveGroupTone(created.grupoToken, input.tone);
+      await invalidateGroups();
+      return toGroup(created);
+    },
+    [usuarioToken, invalidateGroups],
+  );
+
+  const updateGroup = useCallback(
+    async (id: string, input: UpdateGroupInput) => {
+      await updateGrupo(id, {
+        nome: input.name.trim(),
+        descricao: input.description.trim(),
+      });
+      saveGroupTone(id, input.tone);
+      await invalidateGroups();
+    },
+    [invalidateGroups],
+  );
+
+  const deleteGroup = useCallback(
+    async (id: string) => {
+      await deleteGrupo(id);
+      // Compromissos e pagamentos ainda são locais: saem junto com o grupo.
+      setCommitments((prev) =>
+        prev.filter((commitment) => commitment.groupId !== id),
+      );
+      setPayments((prev) => prev.filter((payment) => payment.groupId !== id));
+      await invalidateGroups();
+    },
+    [invalidateGroups],
+  );
 
   const getGroup = useCallback(
     (id: string) => groups.find((group) => group.id === id),
@@ -539,8 +489,9 @@ export function AppProvider({ children, onOpenProfile, onNavigate, onLogout, act
       addGroup,
       updateGroup,
       deleteGroup,
-      addMember,
-      removeMember,
+      groupsLoading,
+      groupsError,
+      refetchGroups,
       getGroup,
       commitments,
       addCommitment,
@@ -566,8 +517,9 @@ export function AppProvider({ children, onOpenProfile, onNavigate, onLogout, act
       addGroup,
       updateGroup,
       deleteGroup,
-      addMember,
-      removeMember,
+      groupsLoading,
+      groupsError,
+      refetchGroups,
       getGroup,
       commitments,
       addCommitment,
