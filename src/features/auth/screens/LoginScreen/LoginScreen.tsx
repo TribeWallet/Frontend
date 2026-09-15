@@ -17,26 +17,14 @@ import Svg, { Circle, Path } from 'react-native-svg';
 
 import { styles } from './LoginScreen.styles';
 import { TribeWalletLogo } from '../../components/TribeWalletLogo';
-import { useAuthStore, AuthUser } from '../../stores/authStore';
+import { useAuthStore } from '../../stores/authStore';
+import * as authService from '../../services/authService';
+import { getErrorMessage } from '../../../../services/api/apiClient';
 
 export interface LoginScreenProps {
   onCreateAccount: () => void;
   onForgotPassword: () => void;
   onLogin?: () => void;
-}
-
-const DEV_EMAIL = 'dev@dev.com';
-const DEV_PASSWORD = 'admin';
-
-function initialsFromName(name: string): string {
-  return (
-    name
-      .split(' ')
-      .filter(Boolean)
-      .map((part) => part[0]?.toUpperCase() ?? '')
-      .slice(0, 2)
-      .join('') || 'NV'
-  );
 }
 
 export function LoginScreen({
@@ -75,36 +63,28 @@ export function LoginScreen({
           ? 68
           : 90;
 
-  const handleLogin = useCallback((): void => {
+  const handleLogin = useCallback(async (): Promise<void> => {
     if (submitting) return;
     const normalizedEmail = email.trim().toLowerCase();
-    const normalizedPassword = password.trim();
 
-    if (!normalizedEmail || !normalizedPassword) {
+    if (!normalizedEmail || !password) {
       setError('Preencha e-mail e senha para continuar.');
-      return;
-    }
-    if (
-      normalizedEmail !== DEV_EMAIL.toLowerCase() ||
-      normalizedPassword !== DEV_PASSWORD
-    ) {
-      setError('E-mail ou senha inválidos.');
       return;
     }
 
     setError(null);
     setSubmitting(true);
-
-    const user: AuthUser = {
-      id: 'user-dev',
-      name: 'Gabriel',
-      email: DEV_EMAIL,
-      initials: initialsFromName('Gabriel'),
-      notificationCount: 0,
-    };
-
-    login(user);
-    onLogin?.();
+    try {
+      const session = await authService.login({
+        email: normalizedEmail,
+        senha: password,
+      });
+      login(session.user, session.token);
+      onLogin?.();
+    } catch (loginError) {
+      setError(getErrorMessage(loginError));
+      setSubmitting(false);
+    }
   }, [email, password, submitting, login, onLogin]);
 
   const handleForgotPassword = useCallback((): void => {
@@ -116,10 +96,6 @@ export function LoginScreen({
   }, [onForgotPassword]);
 
   const handleCreateAccount = useCallback((): void => {
-    Alert.alert(
-      'Criar conta',
-      'Cadastros são feitos pelo administrador. Fale com o suporte.',
-    );
     onCreateAccount();
   }, [onCreateAccount]);
 
@@ -178,7 +154,7 @@ export function LoginScreen({
                       if (error) setError(null);
                     }}
                     style={styles.input}
-                    placeholder="dev@dev.com"
+                    placeholder="seu@email.com"
                     placeholderTextColor="#9AA0A6"
                     keyboardType="email-address"
                     autoCapitalize="none"

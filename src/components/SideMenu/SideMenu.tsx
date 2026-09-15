@@ -217,7 +217,7 @@ export function SideMenu({
         }}
       >
         <Box flex={1}>
-          <Box bg="primary" px="lg" pt={`${insets.top + 12}px` as any} pb="lg">
+          <Box bg="primary" px="lg" pb="lg" style={{ paddingTop: insets.top + 12 }}>
             <Box flexDirection="row" alignItems="center" gap="sm">
               <Box
                 width={52}
@@ -343,7 +343,7 @@ export function SideMenu({
             py="md"
             borderTopWidth={1}
             borderColor="border"
-            pb={`${insets.bottom + 12}px` as any}
+            style={{ paddingBottom: insets.bottom + 12 }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">

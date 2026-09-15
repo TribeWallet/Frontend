@@ -11,6 +11,7 @@ import { Pill } from '../../../components/Pill';
 import { Box, Text } from '../../../theme';
 import { ProfileModal } from '../components/ProfileModal/ProfileModal';
 import { useUserStore } from '../stores/userStore';
+import { useSaveProfile } from '../hooks/useSaveProfile';
 import { useAuthStore } from '../../auth/stores/authStore';
 import {
   useAppCommitments,
@@ -28,7 +29,7 @@ export function ProfileScreen() {
   const profile = useUserStore((state) => state.profile);
   const stats = useUserStore((state) => state.stats);
   const setStats = useUserStore((state) => state.setStats);
-  const setProfile = useUserStore((state) => state.setProfile);
+  const saveProfile = useSaveProfile();
   const clearProfile = useUserStore((state) => state.logout);
   const authLogout = useAuthStore((state) => state.logout);
   const { groups } = useAppGroups();
@@ -63,17 +64,11 @@ export function ProfileScreen() {
   }, [clearProfile, authLogout, navigation]);
 
   const handleSave = useCallback(
-    (data: { initials: string; name: string; email: string }) => {
-      setProfile({
-        id: profile?.id ?? 'user-1',
-        initials: data.initials,
-        name: data.name,
-        email: data.email,
-        notificationCount: profile?.notificationCount ?? 0,
-      });
+    async (data: { initials: string; name: string; email: string }) => {
+      await saveProfile(data);
       setEditing(false);
     },
-    [profile, setProfile],
+    [saveProfile],
   );
 
   const handleEdit = () => {
@@ -185,6 +180,7 @@ export function ProfileScreen() {
         name={profile?.name ?? 'Gabriel'}
         email={profile?.email ?? 'dev@dev.com'}
         stats={dynamicStats}
+        emailEditable={false}
         onClose={() => setEditing(false)}
         onSave={handleSave}
       />

@@ -18,6 +18,10 @@ import { styles } from './RegisterScreen.styles';
 
 // 2. IMPORTAÇÃO DOS COMPONENTES
 import { TribeWalletLogo } from '../../components/TribeWalletLogo';
+import { useAuthStore } from '../../stores/authStore';
+import * as authService from '../../services/authService';
+import { getErrorMessage } from '../../../../services/api/apiClient';
+import { isValidEmail } from '../../../../utils/formatters';
 
 export interface RegisterScreenProps {
   onLogin?: () => void;
@@ -39,6 +43,10 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
   const [confirmarSenha, setConfirmarSenha] = useState<string>('');
   const [senhaVisible, setSenhaVisible] = useState<boolean>(false);
   const [confirmarSenhaVisible, setConfirmarSenhaVisible] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState<boolean>(false);
+
+  const setSession = useAuthStore((state) => state.login);
 
   /*
    * ==========================================================
@@ -95,33 +103,52 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
    * AÇÕES
    * ==========================================================
    */
-  const handleRegister = (): void => {
+  const handleRegister = async (): Promise<void> => {
+    if (submitting) return;
+    const normalizedEmail = email.trim().toLowerCase();
+
     if (!nome.trim()) {
-      console.log('Informe o nome');
+      setError('Informe o nome.');
       return;
     }
     if (!sobrenome.trim()) {
-      console.log('Informe o sobrenome');
+      setError('Informe o sobrenome.');
       return;
     }
     if (!usuario.trim()) {
-      console.log('Informe o nome de usuário');
+      setError('Informe o nome de usuário.');
       return;
     }
-    if (!email.trim()) {
-      console.log('Informe o e-mail');
+    if (!isValidEmail(normalizedEmail)) {
+      setError('Informe um e-mail válido.');
       return;
     }
     if (senha.length < 6) {
-      console.log('A senha precisa ter pelo menos 6 caracteres');
+      setError('A senha precisa ter pelo menos 6 caracteres.');
       return;
     }
     if (senha !== confirmarSenha) {
-      console.log('As senhas não coincidem');
+      setError('As senhas não coincidem.');
       return;
     }
 
-    console.log('Cadastro:', { nome, sobrenome, usuario, email, senha });
+    setError(null);
+    setSubmitting(true);
+    try {
+      await authService.register({
+        nome: nome.trim(),
+        sobrenome: sobrenome.trim(),
+        username: usuario.trim(),
+        email: normalizedEmail,
+        senha,
+      });
+      // Cadastro criado: já entra na conta com as mesmas credenciais.
+      const session = await authService.login({ email: normalizedEmail, senha });
+      setSession(session.user, session.token);
+    } catch (registerError) {
+      setError(getErrorMessage(registerError));
+      setSubmitting(false);
+    }
   };
 
   const handleLogin = (): void => {
@@ -317,17 +344,42 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
                   </View>
                 </View>
 
+                {error ? (
+                  <View
+                    style={{
+                      backgroundColor: '#FDE8EB',
+                      borderRadius: 8,
+                      padding: 10,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: '#B91C2C',
+                        fontSize: 13,
+                        fontWeight: '500',
+                      }}
+                    >
+                      {error}
+                    </Text>
+                  </View>
+                ) : null}
+
                 {/* BOTÃO CADASTRAR */}
                 <Pressable
                   onPress={handleRegister}
+                  disabled={submitting}
                   style={({ pressed }) => [
                     styles.registerButton,
                     pressed && styles.registerButtonPressed,
+                    submitting && { opacity: 0.7 },
                   ]}
                   accessibilityRole="button"
                   accessibilityLabel="Criar conta"
                 >
-                  <Text style={styles.registerButtonText}>Criar conta</Text>
+                  <Text style={styles.registerButtonText}>
+                    {submitting ? 'Criando conta...' : 'Criar conta'}
+                  </Text>
                 </Pressable>
               </View>
 

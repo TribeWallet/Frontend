@@ -31,5 +31,5 @@ export interface Group {
   summary: GroupSummary;
   members: GroupMember[];
   extraMembers?: number;
-  createdAt: string;
+  createdAt?: string;
 }

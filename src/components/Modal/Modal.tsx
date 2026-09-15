@@ -103,6 +103,15 @@ export function Modal({
             />
           ) : null}
 
+          {/* Fundo antes do conteúdo: renderizado depois, cobriria o modal e fecharia a cada toque. */}
+          {variant !== 'bottom' ? (
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={dismissOnBackdrop ? onClose : undefined}
+              accessibilityLabel="Fechar"
+            />
+          ) : null}
+
           <Animated.View
             entering={
               variant === 'bottom'
@@ -234,13 +243,6 @@ export function Modal({
             ) : null}
           </Animated.View>
 
-          {variant !== 'bottom' ? (
-            <Pressable
-              style={StyleSheet.absoluteFill}
-              onPress={dismissOnBackdrop ? onClose : undefined}
-              accessibilityLabel="Fechar"
-            />
-          ) : null}
         </Animated.View>
       </KeyboardAvoidingView>
     </RNModal>

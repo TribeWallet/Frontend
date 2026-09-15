@@ -5,11 +5,12 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
 import { ThemeProvider } from '@shopify/restyle';
 import {
+  NavigationContainer,
   NavigationContainerRef,
   useNavigationContainerRef,
 } from '@react-navigation/native';
 
-import AppNavigator from './src/navigation/AppNavigator';
+import AppNavigator, { navTheme } from './src/navigation/AppNavigator';
 import AuthNavigator from './src/navigation/AuthNavigator';
 import { AppProvider } from './src/contexts/AppContext';
 import { useUserStore } from './src/features/usuario/stores/userStore';
@@ -162,7 +163,9 @@ function App() {
                 onLogout={handleLogout}
                 activeTab={activeTab}
               >
-                <RootNavigator />
+                <NavigationContainer ref={navigationRef} theme={navTheme}>
+                  <RootNavigator />
+                </NavigationContainer>
               </AppProvider>
             </View>
           </SafeAreaProvider>
