@@ -4,6 +4,8 @@ import { Modal } from '../../../../components/Modal';
 import { Input } from '../../../../components/Input';
 import { Button } from '../../../../components/Button';
 import { Box, Text } from '../../../../theme';
+import { getErrorMessage } from '../../../../services/api/apiClient';
+import { isValidEmail } from '../../../../utils/formatters';
 
 interface ProfileModalProps {
   visible: boolean;
@@ -12,8 +14,10 @@ interface ProfileModalProps {
   email: string;
   stats: { value: string; label: string }[];
   onClose: () => void;
-  onSave?: (data: { initials: string; name: string; email: string }) => void;
+  onSave?: (data: { initials: string; name: string; email: string }) => void | Promise<void>;
   onLogout?: () => void;
+  /** Desligue quando o e-mail não puder ser alterado (a API não aceita troca de e-mail). */
+  emailEditable?: boolean;
 }
 
 export function ProfileModal({
@@ -25,11 +29,13 @@ export function ProfileModal({
   onClose,
   onSave,
   onLogout,
+  emailEditable = true,
 }: ProfileModalProps) {
   const [initials, setInitials] = useState(initialInitials);
   const [name, setName] = useState(initialName);
   const [email, setEmail] = useState(initialEmail);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setInitials(initialInitials);
@@ -37,21 +43,28 @@ export function ProfileModal({
     setEmail(initialEmail);
   }, [initialInitials, initialName, initialEmail, visible]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (name.trim().length < 3) {
       setError('Informe um nome com pelo menos 3 caracteres.');
       return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!isValidEmail(email)) {
       setError('Informe um e-mail válido.');
       return;
     }
-    onSave?.({
-      initials: initials.trim() || 'NV',
-      name: name.trim(),
-      email: email.trim(),
-    });
-    setError(null);
+    setSaving(true);
+    try {
+      await onSave?.({
+        initials: initials.trim() || 'NV',
+        name: name.trim(),
+        email: email.trim(),
+      });
+      setError(null);
+    } catch (saveError) {
+      setError(getErrorMessage(saveError));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -63,7 +76,7 @@ export function ProfileModal({
       showCloseButton
       footer={
         <Box gap="sm">
-          <Button title="Salvar alterações" onPress={handleSave} fullWidth />
+          <Button title="Salvar alterações" onPress={handleSave} loading={saving} fullWidth />
           {onLogout ? (
             <Button title="Sair" onPress={onLogout} variant="danger" fullWidth />
           ) : null}
@@ -107,6 +120,8 @@ export function ProfileModal({
               placeholder="email@exemplo.com"
               keyboardType="email-address"
               autoCapitalize="none"
+              editable={emailEditable}
+              helperText={emailEditable ? undefined : 'O e-mail não pode ser alterado.'}
             />
           </Box>
           {error ? (

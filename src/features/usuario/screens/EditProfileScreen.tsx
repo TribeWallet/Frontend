@@ -10,6 +10,7 @@ import { Input } from '../../../components/Input';
 import { Box, Text } from '../../../theme';
 import { ProfileModal } from '../components/ProfileModal/ProfileModal';
 import { useUserStore } from '../stores/userStore';
+import { useSaveProfile } from '../hooks/useSaveProfile';
 import { useTopBarActions } from '../../../hooks/useTopBarActions';
 import type { RootStackParamList } from '../../../navigation/types';
 
@@ -18,7 +19,7 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'EditProfile
 export function EditProfileScreen() {
   const navigation = useNavigation<NavigationProp>();
   const profile = useUserStore((state) => state.profile);
-  const setProfile = useUserStore((state) => state.setProfile);
+  const saveProfile = useSaveProfile();
   const topBar = useTopBarActions();
 
   return (
@@ -41,15 +42,10 @@ export function EditProfileScreen() {
             name={profile?.name ?? 'Gabriel'}
             email={profile?.email ?? 'dev@dev.com'}
             stats={[]}
+            emailEditable={false}
             onClose={() => navigation.goBack()}
-            onSave={(data) => {
-              setProfile({
-                id: profile?.id ?? 'user-1',
-                initials: data.initials,
-                name: data.name,
-                email: data.email,
-                notificationCount: profile?.notificationCount ?? 0,
-              });
+            onSave={async (data) => {
+              await saveProfile(data);
               navigation.goBack();
             }}
           />

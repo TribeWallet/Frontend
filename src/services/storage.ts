@@ -9,6 +9,7 @@ export const StorageKeys = {
   auth: 'user.auth',
   preferences: 'user.preferences',
   cache: 'cache',
+  groupTones: 'groups.tones',
 } as const;
 
 export function getStoredValue<T>(key: string): T | null {

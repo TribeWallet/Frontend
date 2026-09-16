@@ -3,15 +3,13 @@ import { ScrollView, View } from 'react-native';
 import { Modal } from '../../../../components/Modal';
 import { Pill } from '../../../../components/Pill';
 import { Button } from '../../../../components/Button';
-import { Input } from '../../../../components/Input';
-import { Box, Text, PressableBox } from '../../../../theme';
+import { Box, Text } from '../../../../theme';
 import { CommitmentCard } from '../../../../features/compromissos/components/CommitmentCard/CommitmentCard';
 import { CommitmentDetailModal } from '../../../../features/compromissos/components/CommitmentDetailModal/CommitmentDetailModal';
 import { NewGroupModal } from '../NewGroupModal/NewGroupModal';
 import { NewCommitmentModal } from '../../../../features/compromissos/components/NewCommitmentModal/NewCommitmentModal';
 import {
   useAppCommitments,
-  useAppGroups,
   useAppPayments,
 } from '../../../../contexts/AppContext';
 import type { Group } from '../../types/Group';
@@ -25,16 +23,12 @@ interface GroupDetailModalProps {
 }
 
 export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalProps) {
-  const { addMember, removeMember } = useAppGroups();
   const { commitments } = useAppCommitments();
   const { payments } = useAppPayments();
 
   const [editing, setEditing] = useState(false);
   const [newCommitment, setNewCommitment] = useState(false);
   const [detailCommitment, setDetailCommitment] = useState<Commitment | null>(null);
-  const [newMemberName, setNewMemberName] = useState('');
-  const [newMemberEmail, setNewMemberEmail] = useState('');
-  const [memberError, setMemberError] = useState<string | null>(null);
 
   if (!group) return null;
 
@@ -45,21 +39,6 @@ export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalPr
     return sum + remaining;
   }, 0);
   const totalPaid = groupPayments.reduce((sum, p) => sum + p.amount, 0);
-
-  const handleAddMember = () => {
-    if (!newMemberName.trim()) return;
-    const added = addMember(group.id, {
-      name: newMemberName,
-      email: newMemberEmail.trim() || undefined,
-    });
-    if (!added) {
-      setMemberError('Já existe um integrante com esse nome ou e-mail.');
-      return;
-    }
-    setNewMemberName('');
-    setNewMemberEmail('');
-    setMemberError(null);
-  };
 
   return (
     <Modal
@@ -154,47 +133,9 @@ export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalPr
                     ) : null}
                   </Box>
                 </Box>
-                <PressableBox
-                  onPress={() => removeMember(group.id, member.id)}
-                  accessibilityRole="button"
-                >
-                  <Text variant="captionStrong" color="danger">Remover</Text>
-                </PressableBox>
               </Box>
             ))}
 
-            <Box flexDirection="row" gap="xs" mt="sm">
-              <Box flex={2}>
-                <Input
-                  label="Novo integrante"
-                  value={newMemberName}
-                  onChangeText={setNewMemberName}
-                  placeholder="Nome"
-                />
-              </Box>
-              <Box flex={1.4}>
-                <Input
-                  label="E-mail"
-                  value={newMemberEmail}
-                  onChangeText={setNewMemberEmail}
-                  placeholder="opcional"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-              </Box>
-            </Box>
-            {memberError ? (
-              <Text variant="caption" color="danger" mt="xs">
-                {memberError}
-              </Text>
-            ) : null}
-            <Button
-              title="Adicionar integrante"
-              onPress={handleAddMember}
-              variant="outline"
-              size="sm"
-              fullWidth
-            />
           </Box>
 
           <Box flexDirection="row" alignItems="center" justifyContent="space-between">
@@ -225,6 +166,7 @@ export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalPr
         visible={editing}
         group={group}
         onClose={() => setEditing(false)}
+        onDeleted={onClose}
       />
       <NewCommitmentModal
         visible={newCommitment}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import { DefaultTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
@@ -26,7 +26,8 @@ import type { MainTabParamList, RootStackParamList } from './types';
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-const navTheme = {
+// O NavigationContainer fica na raiz (App.tsx), compartilhado com o fluxo de login.
+export const navTheme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
@@ -63,70 +64,68 @@ function MainTabs() {
 
 export default function AppNavigator() {
   return (
-    <NavigationContainer theme={navTheme}>
-      <Stack.Navigator
-        screenOptions={{
-          headerShown: false,
-          animation: 'slide_from_right',
-        }}
-      >
-        <Stack.Screen name="Main" component={MainTabs} />
-        <Stack.Screen
-          name="NewPayment"
-          component={NewPaymentScreen}
-          options={{ presentation: 'transparentModal', animation: 'fade' }}
-        />
-        <Stack.Screen
-          name="NewGroup"
-          component={NewGroupScreen}
-          options={{ presentation: 'transparentModal', animation: 'fade' }}
-        />
-        <Stack.Screen
-          name="EditGroup"
-          component={NewGroupScreen}
-          options={{ presentation: 'transparentModal', animation: 'fade' }}
-        />
-        <Stack.Screen
-          name="NewCommitment"
-          component={NewCommitmentScreen}
-          options={{ presentation: 'transparentModal', animation: 'fade' }}
-        />
-        <Stack.Screen
-          name="CommitmentDetail"
-          component={CommitmentDetailScreen}
-          options={{ presentation: 'transparentModal', animation: 'fade' }}
-        />
-        <Stack.Screen
-          name="GroupDetail"
-          component={GroupDetailScreen}
-          options={{ presentation: 'transparentModal', animation: 'fade' }}
-        />
-        <Stack.Screen
-          name="Profile"
-          component={ProfileScreen}
-          options={{ presentation: 'transparentModal', animation: 'fade' }}
-        />
-        <Stack.Screen
-          name="EditProfile"
-          component={EditProfileScreen}
-          options={{ presentation: 'transparentModal', animation: 'fade' }}
-        />
-        <Stack.Screen
-          name="History"
-          component={HistoryScreen}
-          options={{ presentation: 'transparentModal', animation: 'fade' }}
-        />
-        <Stack.Screen
-          name="Support"
-          component={SupportScreen}
-          options={{ presentation: 'transparentModal', animation: 'fade' }}
-        />
-        <Stack.Screen
-          name="Settings"
-          component={SettingsScreen}
-          options={{ presentation: 'transparentModal', animation: 'fade' }}
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+        animation: 'slide_from_right',
+      }}
+    >
+      <Stack.Screen name="Main" component={MainTabs} />
+      <Stack.Screen
+        name="NewPayment"
+        component={NewPaymentScreen}
+        options={{ presentation: 'transparentModal', animation: 'fade' }}
+      />
+      <Stack.Screen
+        name="NewGroup"
+        component={NewGroupScreen}
+        options={{ presentation: 'transparentModal', animation: 'fade' }}
+      />
+      <Stack.Screen
+        name="EditGroup"
+        component={NewGroupScreen}
+        options={{ presentation: 'transparentModal', animation: 'fade' }}
+      />
+      <Stack.Screen
+        name="NewCommitment"
+        component={NewCommitmentScreen}
+        options={{ presentation: 'transparentModal', animation: 'fade' }}
+      />
+      <Stack.Screen
+        name="CommitmentDetail"
+        component={CommitmentDetailScreen}
+        options={{ presentation: 'transparentModal', animation: 'fade' }}
+      />
+      <Stack.Screen
+        name="GroupDetail"
+        component={GroupDetailScreen}
+        options={{ presentation: 'transparentModal', animation: 'fade' }}
+      />
+      <Stack.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{ presentation: 'transparentModal', animation: 'fade' }}
+      />
+      <Stack.Screen
+        name="EditProfile"
+        component={EditProfileScreen}
+        options={{ presentation: 'transparentModal', animation: 'fade' }}
+      />
+      <Stack.Screen
+        name="History"
+        component={HistoryScreen}
+        options={{ presentation: 'transparentModal', animation: 'fade' }}
+      />
+      <Stack.Screen
+        name="Support"
+        component={SupportScreen}
+        options={{ presentation: 'transparentModal', animation: 'fade' }}
+      />
+      <Stack.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{ presentation: 'transparentModal', animation: 'fade' }}
+      />
+    </Stack.Navigator>
   );
 }
