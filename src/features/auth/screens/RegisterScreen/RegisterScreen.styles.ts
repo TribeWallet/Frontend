@@ -1,11 +1,7 @@
 import { StyleSheet } from 'react-native';
 
 export const styles = StyleSheet.create({
-  /*
-   * ==========================================================
-   * TELA
-   * ==========================================================
-   */
+
   safeArea: {
     flex: 1,
     backgroundColor: '#F9FAFB',
@@ -24,22 +20,14 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  /*
-   * ==========================================================
-   * LOGO
-   * ==========================================================
-   */
+
   logoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 28,
   },
 
-  /*
-   * ==========================================================
-   * CARD
-   * ==========================================================
-   */
+
   card: {
     width: '100%',
     backgroundColor: '#FFFFFF',
@@ -56,11 +44,7 @@ export const styles = StyleSheet.create({
     elevation: 3,
   },
 
-  /*
-   * ==========================================================
-   * TÍTULO
-   * ==========================================================
-   */
+
   title: {
     margin: 0,
     textAlign: 'center',
@@ -71,11 +55,7 @@ export const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
 
-  /*
-   * ==========================================================
-   * SUBTÍTULO
-   * ==========================================================
-   */
+
   subtitle: {
     marginTop: 7,
     paddingHorizontal: 4,
@@ -86,11 +66,7 @@ export const styles = StyleSheet.create({
     fontWeight: '400',
   },
 
-  /*
-   * ==========================================================
-   * FORMULÁRIO
-   * ==========================================================
-   */
+
   form: {
     marginTop: 26,
   },
@@ -107,11 +83,7 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  /*
-   * ==========================================================
-   * INPUT
-   * ==========================================================
-   */
+
   input: {
     width: '100%',
     height: 48,
@@ -137,11 +109,7 @@ export const styles = StyleSheet.create({
     paddingRight: 52,
   },
 
-  /*
-   * ==========================================================
-   * BOTÃO DO OLHO
-   * ==========================================================
-   */
+
   eyeButton: {
     position: 'absolute',
     right: 13,
@@ -155,11 +123,7 @@ export const styles = StyleSheet.create({
     opacity: 0.55,
   },
 
-  /*
-   * ==========================================================
-   * BOTÃO CADASTRO
-   * ==========================================================
-   */
+
   registerButton: {
     width: '100%',
     minHeight: 48,
@@ -184,11 +148,7 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  /*
-   * ==========================================================
-   * FOOTER LOGIN
-   * ==========================================================
-   */
+
   loginFooter: {
     marginTop: 20,
     minHeight: 22,

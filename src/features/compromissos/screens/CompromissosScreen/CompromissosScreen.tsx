@@ -138,13 +138,16 @@ export function CompromissosScreen() {
                 onAction={handleNew}
               />
             ) : (
-              filtered.map((commitment) => (
-                <CommitmentCard
-                  key={commitment.id}
-                  commitment={commitment}
-                  onPress={(id) => navigation.navigate('CommitmentDetail', { id })}
-                />
-              ))
+              <Box flexDirection="column" >
+                {filtered.map((commitment) => (
+                  <Box width="100%" mb="md" key={commitment.id}>
+                    <CommitmentCard
+                      commitment={commitment}
+                      onPress={(id) => navigation.navigate('CommitmentDetail', { id })}
+                    />
+                  </Box>
+                ))}
+              </Box>
             )}
           </Box>
         </ScrollView>

@@ -1,4 +1,4 @@
-/* eslint-disable */
+/* eslint-env jest */
 // Mock react-native-gesture-handler
 jest.mock('react-native-gesture-handler', () => {
   const View = require('react-native').View;
@@ -17,8 +17,8 @@ jest.mock('react-native-gesture-handler', () => {
       Tap: () => ({
         onEnd: () => ({}),
       }),
+      GestureDetector: View,
     },
-    GestureDetector: View,
   };
 });
 

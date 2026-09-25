@@ -80,5 +80,11 @@ yarn-error.log
 
 launcher.py
 init.bat
-.md
+*.md
 __tests__/
+remove-comments.js
+__pycache__/launcher.cpython-314.pyc
+PROJECT_DOCS.md
+scripts/build_apk.py
+scripts/build_apk.bat
+.gitignore

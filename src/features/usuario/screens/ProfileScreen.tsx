@@ -1,7 +1,5 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { ScrollView, View } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
+import { SafeAreaView, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -26,7 +24,7 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Profile'>;
 export function ProfileScreen() {
   const navigation = useNavigation<NavigationProp>();
   const profile = useUserStore((state) => state.profile);
-  const stats = useUserStore((state) => state.stats);
+
   const setStats = useUserStore((state) => state.setStats);
   const setProfile = useUserStore((state) => state.setProfile);
   const clearProfile = useUserStore((state) => state.logout);
@@ -52,7 +50,7 @@ export function ProfileScreen() {
     [groups.length, payments.length, punctuality],
   );
 
-  React.useEffect(() => {
+  useEffect(() => {
     setStats(dynamicStats);
   }, [dynamicStats, setStats]);
 
@@ -81,7 +79,7 @@ export function ProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFB' }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFB' }}>
       <Box flex={1} width="100%" maxWidth={430} alignSelf="center" bg="background">
         <TopBar
           initials={profile?.initials ?? 'G'}
@@ -185,6 +183,7 @@ export function ProfileScreen() {
         name={profile?.name ?? 'Gabriel'}
         email={profile?.email ?? 'dev@dev.com'}
         stats={dynamicStats}
+
         onClose={() => setEditing(false)}
         onSave={handleSave}
       />

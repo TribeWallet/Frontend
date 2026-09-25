@@ -31,9 +31,9 @@ export interface ModalProps {
   showCloseButton?: boolean;
   contentStyle?: StyleProp<ViewStyle>;
   scrollable?: boolean;
-  /** Action bar pinned at the bottom (e.g. [Cancel, Save]). */
+
   footer?: React.ReactNode;
-  /** If true, dismiss on tap outside (default true). */
+
   dismissOnBackdrop?: boolean;
 }
 
@@ -66,7 +66,7 @@ export function Modal({
   title,
   subtitle,
   children,
-  variant = 'center',
+  variant = 'bottom',
   showCloseButton = true,
   contentStyle,
   scrollable = true,
@@ -191,7 +191,7 @@ export function Modal({
 
             <Box
               flex={variant === 'full' ? 1 : undefined}
-              style={footer ? { maxHeight: variant === 'full' ? undefined : 520 } : undefined}
+              style={footer ? { maxHeight: variant === 'full' ? undefined : '90%' } : undefined}
             >
               {scrollable ? (
                 <ScrollView
@@ -235,11 +235,11 @@ export function Modal({
           </Animated.View>
 
           {variant !== 'bottom' ? (
-            <Pressable
-              style={StyleSheet.absoluteFill}
-              onPress={dismissOnBackdrop ? onClose : undefined}
-              accessibilityLabel="Fechar"
-            />
+<Pressable
+            style={{ flex:1 }}
+            onPress={dismissOnBackdrop ? onClose : undefined}
+            accessibilityLabel="Fechar"
+          />
           ) : null}
         </Animated.View>
       </KeyboardAvoidingView>

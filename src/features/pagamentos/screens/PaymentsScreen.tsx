@@ -151,16 +151,19 @@ export function PaymentsScreen() {
                 onAction={() => setCreating(true)}
               />
             ) : (
-              filtered.map((payment) => (
-                <PaymentCard
-                  key={payment.id}
-                  payment={payment}
-                  onPress={(id) => {
-                    const next = payments.find((p) => p.id === id) ?? null;
-                    setEditingPayment(next);
-                  }}
-                />
-              ))
+                <Box flexDirection="column" >
+                  {filtered.map((payment) => (
+                    <Box width="100%" mb="md" key={payment.id}>
+                      <PaymentCard
+                        payment={payment}
+                        onPress={(id) => {
+                          const next = payments.find((p) => p.id === id) ?? null;
+                          setEditingPayment(next);
+                        }}
+                      />
+                    </Box>
+                  ))}
+                </Box>
             )}
           </Box>
         </ScrollView>

@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { TopBar } from '../../../components/TopBar';
-import { Button } from '../../../components/Button';
-import { Input } from '../../../components/Input';
+
+
 import { Box, Text } from '../../../theme';
 import { ProfileModal } from '../components/ProfileModal/ProfileModal';
 import { useUserStore } from '../stores/userStore';

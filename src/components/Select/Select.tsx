@@ -14,7 +14,7 @@ import Animated, {
   SlideInDown,
   SlideOutDown,
 } from 'react-native-reanimated';
-// import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import Svg, { Circle, Path } from 'react-native-svg';
 import { Box, Text } from '../../theme';
 
@@ -35,10 +35,10 @@ export interface SelectProps {
   helperText?: string;
   emptyText?: string;
   disabled?: boolean;
-  /** Habilita busca dentro do sheet. */
+
   searchable?: boolean;
   searchPlaceholder?: string;
-  /** Texto curto exibido no header do sheet (ex: "Selecionar grupo"). */
+
   sheetTitle?: string;
 }
 
@@ -108,8 +108,7 @@ export function Select({
 
   useEffect(() => {
     if (open) setOpen(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value]);
+  }, [value, open]);
 
   const filtered = useMemo(() => {
     if (!searchable || !query.trim()) return options;
@@ -137,7 +136,7 @@ export function Select({
     setQuery('');
   };
 
-  // const displayLabel = sheetTitle ?? labelProp ?? 'Selecione';
+
 
   return (
     <Box>

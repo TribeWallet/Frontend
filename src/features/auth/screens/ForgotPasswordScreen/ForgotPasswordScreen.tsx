@@ -13,10 +13,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// 1. IMPORTAÇÃO DOS ESTILOS SEPARADOS
+
 import { styles } from './ForgotPasswordScreen.styles';
 
-// 2. IMPORTAÇÃO DOS COMPONENTES
+
 import { TribeWalletLogo } from '../../components/TribeWalletLogo';
 
 export interface ForgotPasswordScreenProps {
@@ -31,11 +31,7 @@ export function ForgotPasswordScreen({
   const [email, setEmail] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
 
-  /*
-   * ==========================================================
-   * RESPONSIVIDADE
-   * ==========================================================
-   */
+
   const isSmallPhone: boolean = width < 360;
   const isTablet: boolean = width >= 768;
 
@@ -52,11 +48,7 @@ export function ForgotPasswordScreen({
     maxContentWidth,
   );
 
-  /*
-   * ==========================================================
-   * ESPAÇAMENTO SUPERIOR
-   * ==========================================================
-   */
+
   const topSpacing: number =
     height <= 640
       ? 28
@@ -66,11 +58,7 @@ export function ForgotPasswordScreen({
           ? 68
           : 90;
 
-  /*
-   * ==========================================================
-   * RECUPERAÇÃO DE SENHA
-   * ==========================================================
-   */
+
   const handleRecoverPassword = (): void => {
     const emailClean: string = email.trim();
 
@@ -93,20 +81,12 @@ export function ForgotPasswordScreen({
     }, 700);
   };
 
-  /*
-   * ==========================================================
-   * VOLTAR
-   * ==========================================================
-   */
+
   const handleBackToLogin = (): void => {
     onBackToLogin();
   };
 
-  /*
-   * ==========================================================
-   * RENDER
-   * ==========================================================
-   */
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <StatusBar barStyle="dark-content" />
@@ -131,27 +111,27 @@ export function ForgotPasswordScreen({
           bounces={false}
         >
           <View style={[styles.content, { width: contentWidth }]}>
-            
-            {/* LOGO */}
+
+
             <View style={styles.logoContainer}>
               <TribeWalletLogo />
             </View>
 
-            {/* CARD */}
+
             <View style={styles.card}>
-              
-              {/* TÍTULO */}
+
+
               <Text style={styles.title}>Esqueceu a senha?</Text>
 
-              {/* SUBTÍTULO */}
+
               <Text style={styles.subtitle}>
                 Digite seu e-mail para receber as instruções para redefinir sua senha
               </Text>
 
-              {/* FORM */}
+
               <View style={styles.form}>
-                
-                {/* E-MAIL */}
+
+
                 <View style={styles.field}>
                   <Text style={styles.label}>E-mail</Text>
                   <TextInput
@@ -172,7 +152,7 @@ export function ForgotPasswordScreen({
                   />
                 </View>
 
-                {/* ENVIAR */}
+
                 <Pressable
                   onPress={handleRecoverPassword}
                   disabled={loading}
@@ -190,7 +170,7 @@ export function ForgotPasswordScreen({
                 </Pressable>
               </View>
 
-              {/* VOLTAR PARA LOGIN */}
+
               <Pressable
                 onPress={handleBackToLogin}
                 hitSlop={8}

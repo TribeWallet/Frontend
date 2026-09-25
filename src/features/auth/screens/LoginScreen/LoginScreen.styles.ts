@@ -1,11 +1,7 @@
 import { StyleSheet } from 'react-native';
 
 export const styles = StyleSheet.create({
-  /*
-   * ==========================================================
-   * TELA
-   * ==========================================================
-   */
+
   safeArea: {
     flex: 1,
     backgroundColor: '#F9FAFB',
@@ -24,22 +20,14 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  /*
-   * ==========================================================
-   * LOGO
-   * ==========================================================
-   */
+
   logoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 30,
   },
 
-  /*
-   * ==========================================================
-   * CARD
-   * ==========================================================
-   */
+
   card: {
     width: '100%',
     backgroundColor: '#FFFFFF',
@@ -56,11 +44,7 @@ export const styles = StyleSheet.create({
     elevation: 3,
   },
 
-  /*
-   * ==========================================================
-   * TÍTULO
-   * ==========================================================
-   */
+
   title: {
     textAlign: 'center',
     fontSize: 22,
@@ -78,11 +62,7 @@ export const styles = StyleSheet.create({
     color: '#6B7280',
   },
 
-  /*
-   * ==========================================================
-   * FORMULÁRIO
-   * ==========================================================
-   */
+
   form: {
     marginTop: 28,
   },
@@ -108,11 +88,7 @@ export const styles = StyleSheet.create({
     color: '#087BE5',
   },
 
-  /*
-   * ==========================================================
-   * INPUT
-   * ==========================================================
-   */
+
   input: {
     width: '100%',
     height: 48,
@@ -148,11 +124,7 @@ export const styles = StyleSheet.create({
     opacity: 0.55,
   },
 
-  /*
-   * ==========================================================
-   * BOTÃO LOGIN
-   * ==========================================================
-   */
+
   loginButton: {
     width: '100%',
     minHeight: 48,
@@ -175,11 +147,7 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  /*
-   * ==========================================================
-   * CRIAR CONTA
-   * ==========================================================
-   */
+
   createAccount: {
     marginTop: 21,
     minHeight: 22,
@@ -204,11 +172,7 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  /*
-   * ==========================================================
-   * TERMOS
-   * ==========================================================
-   */
+
   terms: {
     width: '100%',
     marginTop: 20,

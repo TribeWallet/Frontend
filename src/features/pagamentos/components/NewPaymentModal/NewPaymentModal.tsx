@@ -183,9 +183,9 @@ export function NewPaymentModal({
       groupName: group.name,
       commitmentId: commitment?.id,
       commitmentName: commitment?.name,
-      payerId: values.payerId,
+      payerId: values.payerId ?? '',
       payerName:
-        resolveMemberName(commitment ?? null, values.payerId) || values.payerId,
+        (resolveMemberName(commitment ?? null, values.payerId ?? '') ?? values.payerId ?? ''),
       category:
         paymentCategoryOptionsMock.find((c) => c.id === values.category)?.label ??
         'Outros',
@@ -193,8 +193,8 @@ export function NewPaymentModal({
       cardBrand: values.method === 'card' ? values.cardBrand : undefined,
       otherMethod: values.method === 'other' ? values.otherMethod?.trim() : undefined,
       recurrence: values.recurrence,
-      date: values.date,
-      notes: values.notes?.trim() || undefined,
+      date: values.date ?? '',
+      notes: values.notes?.trim() ?? undefined,
     };
     const payment = addPayment(draft);
     onCreated?.(payment);
@@ -499,19 +499,7 @@ export function NewPaymentModal({
         ) : null}
       </Box>
 
-      <Box flexDirection="row" gap="sm">
-        <Box flex={1}>
-          <Button title="Cancelar" onPress={handleClose} variant="outline" fullWidth />
-        </Box>
-        <Box flex={1}>
-          <Button
-            title="Registrar"
-            onPress={onValidSubmit}
-            disabled={!isValid}
-            fullWidth
-          />
-        </Box>
-      </Box>
+
     </Modal>
   );
 }

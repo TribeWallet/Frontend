@@ -1,23 +1,13 @@
 import React, { useCallback, useState } from 'react';
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StatusBar,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-  useWindowDimensions,
-} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 import { styles } from './LoginScreen.styles';
 import { TribeWalletLogo } from '../../components/TribeWalletLogo';
-import { useAuthStore, AuthUser } from '../../stores/authStore';
+import { useAuthStore } from '../../stores/authStore';
+import type { AuthUser } from '../../stores/authStore';
+
 
 export interface LoginScreenProps {
   onCreateAccount: () => void;
@@ -45,17 +35,8 @@ export function LoginScreen({
   onLogin,
 }: LoginScreenProps) {
   const { width, height } = useWindowDimensions();
-  const login = useAuthStore((state) => state.login);
-
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [passwordVisible, setPasswordVisible] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const isSmallPhone: boolean = width < 360;
-  const isTablet: boolean = width >= 768;
-
+  const isTablet = width >= 768;
+  const isSmallPhone = width < 350;
   const horizontalPadding: number = isTablet
     ? 32
     : isSmallPhone
@@ -74,6 +55,13 @@ export function LoginScreen({
         : height <= 850
           ? 68
           : 90;
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const login = useAuthStore((state) => state.login);
 
   const handleLogin = useCallback((): void => {
     if (submitting) return;
@@ -108,27 +96,15 @@ export function LoginScreen({
   }, [email, password, submitting, login, onLogin]);
 
   const handleForgotPassword = useCallback((): void => {
-    Alert.alert(
-      'Recuperar senha',
-      'Entre em contato com o suporte para redefinir a senha da sua conta.',
-    );
     onForgotPassword();
   }, [onForgotPassword]);
 
   const handleCreateAccount = useCallback((): void => {
-    Alert.alert(
-      'Criar conta',
-      'Cadastros são feitos pelo administrador. Fale com o suporte.',
-    );
     onCreateAccount();
   }, [onCreateAccount]);
 
-  const handleTerms = (): void => {
-    Alert.alert('Termos de Uso', 'Conteúdo em breve.');
-  };
-  const handlePrivacy = (): void => {
-    Alert.alert('Política de Privacidade', 'Conteúdo em breve.');
-  };
+  const handleTerms = (): void => {};
+  const handlePrivacy = (): void => {};
 
   const canSubmit = email.trim().length > 0 && password.length > 0;
 

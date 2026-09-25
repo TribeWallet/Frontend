@@ -45,11 +45,12 @@ function makeIcon(path: React.ReactNode) {
     const color = active ? ICON_COLOR : ICON_COLOR_NEUTRAL;
     return (
       <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-        {React.Children.map(path, (child) =>
-          React.isValidElement(child)
-            ? React.cloneElement(child as React.ReactElement<{ stroke: string }>, { stroke: color })
-            : child,
-        )}
+        {React.Children.map(path, child => {
+          if (React.isValidElement(child) && child.type !== React.Fragment) {
+            return React.cloneElement(child as React.ReactElement<any>, { stroke: color });
+          }
+          return child;
+        })}
       </Svg>
     );
   };
@@ -119,13 +120,15 @@ const GearIcon = makeIcon(
     <Path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" strokeWidth={1.5} />
   </>,
 );
-const LogoutIcon = makeIcon(
-  <>
-    <Path d="M9 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4" strokeWidth={1.7} strokeLinecap="round" />
-    <Path d="M16 17l5-5-5-5" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" />
-    <Path d="M21 12H10" strokeWidth={1.7} strokeLinecap="round" />
-  </>,
-);
+function LogoutIcon({ color = '#EF5067' }: { color?: string }) {
+  return (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+      <Path d="M9 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
+      <Path d="M16 17l5-5-5-5" stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M21 12H10" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
+    </Svg>
+  );
+}
 
 interface MenuItem {
   id: SideMenuAction;
@@ -217,7 +220,7 @@ export function SideMenu({
         }}
       >
         <Box flex={1}>
-          <Box bg="primary" px="lg" pt={`${insets.top + 12}px` as any} pb="lg">
+          <Box bg="primary" px="lg" style={{ paddingTop: insets.top + 12 }} pb="lg">
             <Box flexDirection="row" alignItems="center" gap="sm">
               <Box
                 width={52}
@@ -324,14 +327,12 @@ export function SideMenu({
                     px="md"
                     py="md"
                     borderRadius="md"
-                    borderWidth={1}
-                    borderColor="border"
-                    bg={pressed ? 'dangerLight' : 'surface'}
+                    bg={pressed ? 'danger' : 'danger'}
                   >
                     <Box width={24} alignItems="center" mr="sm">
-                      <LogoutIcon />
+                      <LogoutIcon color="white" />
                     </Box>
-                    <Text variant="bodyStrong" color="danger">Sair</Text>
+                    <Text variant="bodyStrong" color="white">Sair</Text>
                   </Box>
                 )}
               </Pressable>
@@ -343,7 +344,7 @@ export function SideMenu({
             py="md"
             borderTopWidth={1}
             borderColor="border"
-            pb={`${insets.bottom + 12}px` as any}
+            style={{ paddingBottom: insets.bottom + 12 }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">

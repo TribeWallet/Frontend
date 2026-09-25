@@ -4,7 +4,7 @@ import Svg, { Path } from 'react-native-svg';
 import { Pill } from '../../../../components/Pill';
 import { Box, Text } from '../../../../theme';
 import type { Group, GroupTone } from '../../types/Group';
-import { formatCurrency } from '../../../../utils/currency';
+
 
 interface GroupCardProps {
   group: Group;

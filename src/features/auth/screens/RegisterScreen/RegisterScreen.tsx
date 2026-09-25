@@ -13,10 +13,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 
-// 1. IMPORTAÇÃO DOS ESTILOS SEPARADOS
+
 import { styles } from './RegisterScreen.styles';
 
-// 2. IMPORTAÇÃO DOS COMPONENTES
+
 import { TribeWalletLogo } from '../../components/TribeWalletLogo';
 
 export interface RegisterScreenProps {
@@ -26,11 +26,7 @@ export interface RegisterScreenProps {
 export function RegisterScreen({ onLogin }: RegisterScreenProps) {
   const { width, height } = useWindowDimensions();
 
-  /*
-   * ==========================================================
-   * ESTADOS (Com tipagem explícita)
-   * ==========================================================
-   */
+
   const [nome, setNome] = useState<string>('');
   const [sobrenome, setSobrenome] = useState<string>('');
   const [usuario, setUsuario] = useState<string>('');
@@ -40,14 +36,9 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
   const [senhaVisible, setSenhaVisible] = useState<boolean>(false);
   const [confirmarSenhaVisible, setConfirmarSenhaVisible] = useState<boolean>(false);
 
-  /*
-   * ==========================================================
-   * VALIDAÇÃO EM TEMPO REAL (REGEX)
-   * ==========================================================
-   */
-  
-  // Nome e Sobrenome: Remove QUALQUER coisa que NÃO seja letra (incluindo acentos), espaço ou hífen.
-  // Isso bloqueia números (0-9) e símbolos (@, #, $, etc.) automaticamente.
+
+
+
   const handleNomeChange = (text: string) => {
     setNome(text.replace(/[^a-zA-ZÀ-ÿ\s-]/g, ''));
   };
@@ -56,7 +47,7 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
     setSobrenome(text.replace(/[^a-zA-ZÀ-ÿ\s-]/g, ''));
   };
 
-  // Usuário e Email: Permite alfanuméricos e especiais, mas remove espaços em branco.
+
   const handleUsuarioChange = (text: string) => {
     setUsuario(text.replace(/\s/g, ''));
   };
@@ -65,11 +56,7 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
     setEmail(text.replace(/\s/g, ''));
   };
 
-  /*
-   * ==========================================================
-   * RESPONSIVIDADE (Com tipagem explícita)
-   * ==========================================================
-   */
+
   const isSmallPhone: boolean = width < 360;
   const isTablet: boolean = width >= 768;
 
@@ -90,11 +77,7 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
           ? 58
           : 76;
 
-  /*
-   * ==========================================================
-   * AÇÕES
-   * ==========================================================
-   */
+
   const handleRegister = (): void => {
     if (!nome.trim()) {
       console.log('Informe o nome');
@@ -132,11 +115,7 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
     console.log('Fazer login');
   };
 
-  /*
-   * ==========================================================
-   * RENDER
-   * ==========================================================
-   */
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <StatusBar barStyle="dark-content" />
@@ -161,28 +140,28 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
           bounces={false}
         >
           <View style={[styles.content, { width: contentWidth }]}>
-            
-            {/* LOGO */}
+
+
             <View style={styles.logoContainer}>
               <TribeWalletLogo />
             </View>
 
-            {/* CARD */}
+
             <View style={styles.card}>
               <Text style={styles.title}>Criar conta</Text>
               <Text style={styles.subtitle}>
                 Preencha os dados abaixo para criar sua conta
               </Text>
 
-              {/* FORMULÁRIO */}
+
               <View style={styles.form}>
-                
-                {/* NOME */}
+
+
                 <View style={styles.field}>
                   <Text style={styles.label}>Nome</Text>
                   <TextInput
                     value={nome}
-                    onChangeText={handleNomeChange} // Aplica filtro em tempo real
+                    onChangeText={handleNomeChange}
                     style={styles.input}
                     placeholder="Seu nome"
                     placeholderTextColor="#9AA0A6"
@@ -195,12 +174,12 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
                   />
                 </View>
 
-                {/* SOBRENOME */}
+
                 <View style={styles.field}>
                   <Text style={styles.label}>Sobrenome</Text>
                   <TextInput
                     value={sobrenome}
-                    onChangeText={handleSobrenomeChange} // Aplica filtro em tempo real
+                    onChangeText={handleSobrenomeChange}
                     style={styles.input}
                     placeholder="Seu sobrenome"
                     placeholderTextColor="#9AA0A6"
@@ -213,12 +192,12 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
                   />
                 </View>
 
-                {/* USUÁRIO */}
+
                 <View style={styles.field}>
                   <Text style={styles.label}>Nome de usuário</Text>
                   <TextInput
                     value={usuario}
-                    onChangeText={handleUsuarioChange} // Remove espaços
+                    onChangeText={handleUsuarioChange}
                     style={styles.input}
                     placeholder="Seu nome de usuário"
                     placeholderTextColor="#9AA0A6"
@@ -231,12 +210,12 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
                   />
                 </View>
 
-                {/* EMAIL */}
+
                 <View style={styles.field}>
                   <Text style={styles.label}>E-mail</Text>
                   <TextInput
                     value={email}
-                    onChangeText={handleEmailChange} // Remove espaços
+                    onChangeText={handleEmailChange}
                     style={styles.input}
                     placeholder="seu@email.com"
                     placeholderTextColor="#9AA0A6"
@@ -250,13 +229,13 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
                   />
                 </View>
 
-                {/* SENHA */}
+
                 <View style={styles.field}>
                   <Text style={styles.label}>Senha</Text>
                   <View style={styles.passwordWrapper}>
                     <TextInput
                       value={senha}
-                      onChangeText={setSenha} // Aceita tudo (alfanumérico e especiais)
+                      onChangeText={setSenha}
                       style={[styles.input, styles.passwordInput]}
                       placeholder="Mínimo 6 caracteres"
                       placeholderTextColor="#9AA0A6"
@@ -283,13 +262,13 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
                   </View>
                 </View>
 
-                {/* CONFIRMAR SENHA */}
+
                 <View style={styles.field}>
                   <Text style={styles.label}>Confirmar senha</Text>
                   <View style={styles.passwordWrapper}>
                     <TextInput
                       value={confirmarSenha}
-                      onChangeText={setConfirmarSenha} // Aceita tudo
+                      onChangeText={setConfirmarSenha}
                       style={[styles.input, styles.passwordInput]}
                       placeholder="Repita sua senha"
                       placeholderTextColor="#9AA0A6"
@@ -317,7 +296,7 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
                   </View>
                 </View>
 
-                {/* BOTÃO CADASTRAR */}
+
                 <Pressable
                   onPress={handleRegister}
                   style={({ pressed }) => [
@@ -331,7 +310,7 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
                 </Pressable>
               </View>
 
-              {/* LOGIN FOOTER */}
+
               <View style={styles.loginFooter}>
                 <Text style={styles.loginText}>Já tem uma conta?</Text>
                 <Pressable onPress={handleLogin} hitSlop={8}>
@@ -347,9 +326,9 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
   );
 }
 
-/* ============================================================ */
-/* ÍCONE DO OLHO */
-/* ============================================================ */
+
+
+
 
 interface PasswordEyeProps {
   visible: boolean;

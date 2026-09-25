@@ -1,5 +1,6 @@
-import * as React from 'react';
-import { createText, createBox, createTheme } from '@shopify/restyle';
+
+
+import { createTheme } from "@shopify/restyle";
 
 export const lightTheme = createTheme({
   colors: {

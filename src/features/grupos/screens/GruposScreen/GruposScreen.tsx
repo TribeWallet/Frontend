@@ -111,13 +111,16 @@ export function GruposScreen() {
                 onAction={handleCreate}
               />
             ) : (
-              filteredGroups.map((group) => (
-                <GroupCard
-                  key={group.id}
-                  group={group}
-                  onPress={(id) => navigation.navigate('GroupDetail', { id })}
-                />
-              ))
+                <Box flexDirection="column" >
+                {filteredGroups.map((group) => (
+                  <Box width="100%" mb="md" key={group.id}>
+                    <GroupCard
+                      group={group}
+                      onPress={() => navigation.navigate('GroupDetail', { id: group.id })}
+                    />
+                  </Box>
+                ))}
+                </Box>
             )}
           </Box>
         </ScrollView>

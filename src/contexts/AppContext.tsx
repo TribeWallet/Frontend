@@ -597,9 +597,6 @@ export function AppProvider({ children, onOpenProfile, onNavigate, onLogout, act
             return;
           }
           onNavigate(action);
-          if (action === 'profile') {
-            onOpenProfile();
-          }
         }}
       />
       <NotificationsModal

@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { Alert, ScrollView, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
 
 import { TopBar } from '../../../components/TopBar';
 import { Input } from '../../../components/Input';
@@ -10,12 +9,9 @@ import { Button } from '../../../components/Button';
 import { Box, Text } from '../../../theme';
 import { useUserStore } from '../stores/userStore';
 import { useTopBarActions } from '../../../hooks/useTopBarActions';
-import type { RootStackParamList } from '../../../navigation/types';
 
-type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Support'>;
 
 export function SupportScreen() {
-  const navigation = useNavigation<NavigationProp>();
   const profile = useUserStore((state) => state.profile);
   const topBar = useTopBarActions();
   const { width } = useWindowDimensions();

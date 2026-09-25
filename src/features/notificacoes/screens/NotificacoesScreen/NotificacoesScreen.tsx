@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState } from '../../../../components/EmptyState';
 import { ScreenHeader } from '../../../../components/ScreenHeader';
 import { TopBar } from '../../../../components/TopBar';
-import { Button } from '../../../../components/Button';
+
 import { NotificationItemView } from '../../components/NotificationItem/NotificationItem';
 import { useNotifications } from '../../../../hooks/useNotifications';
 import { Box, Text, PressableBox } from '../../../../theme';

@@ -10,31 +10,30 @@ export const paymentRecurrenceSchema = z.enum([
   'yearly',
 ]);
 
-const amountRegex = /^[0-9]+(?:[,.][0-9]{1,2})?$/;
-
 export const paymentDraftSchema = z
   .object({
     description: z
       .string()
       .min(3, 'Informe uma descrição com pelo menos 3 caracteres'),
-    amount: z
-      .string()
-      .min(1, 'Informe um valor')
-      .regex(amountRegex, 'Valor inválido')
-      .refine((value) => {
-        const num = Number(value.replace(',', '.'));
-        return !Number.isNaN(num) && num > 0;
-      }, 'O valor precisa ser maior que zero'),
+  amount: z
+    .string()
+    .min(1, 'Informe um valor')
+    .refine((value) => {
+      // Remove thousand separators (dots) and replace decimal comma with dot
+      const sanitized = value.replace(/\./g, '').replace(',', '.');
+      const num = Number(sanitized);
+      return !Number.isNaN(num) && num > 0;
+    }, 'Valor inválido ou menor que zero'),
     groupId: z.string().min(1, 'Selecione um grupo'),
     commitmentId: z.string().optional(),
-    payerId: z.string().min(1, 'Selecione o pagador'),
+    payerId: z.string().optional(),
     payerName: z.string().optional(),
     category: z.string().min(1, 'Selecione uma categoria'),
     method: paymentMethodSchema,
     cardBrand: cardBrandSchema.optional(),
     otherMethod: z.string().optional(),
     recurrence: paymentRecurrenceSchema,
-    date: z.string().min(1, 'Informe a data'),
+    date: z.string().optional(),
     notes: z.string().optional(),
   })
   .superRefine((data, ctx) => {
