@@ -9,7 +9,7 @@ export const endpoints = {
   },
   grupos: {
     create: '/api/grupos',
-    byUsuario: (usuarioToken: string) => `/api/grupos/${usuarioToken}`,
+    byUsuario: (usuarioToken: string) => `/api/usuario/grupos/${usuarioToken}`,
     byToken: (grupoToken: string) => `/api/grupos/${grupoToken}`,
   },
 } as const;
