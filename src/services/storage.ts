@@ -1,8 +1,6 @@
-import { createMMKV } from 'react-native-mmkv';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export const storage = createMMKV({
-  id: 'tribewallet-storage',
-});
+export const storage = AsyncStorage;
 
 export const StorageKeys = {
   user: 'user.profile',
@@ -12,20 +10,20 @@ export const StorageKeys = {
   groupTones: 'groups.tones',
 } as const;
 
-export function getStoredValue<T>(key: string): T | null {
-  const value = storage.getString(key);
-  if (!value) return null;
+export async function getStoredValue<T>(key: string): Promise<T | null> {
   try {
+    const value = await storage.getItem(key);
+    if (value === null) return null;
     return JSON.parse(value) as T;
   } catch {
     return null;
   }
 }
 
-export function setStoredValue<T>(key: string, value: T): void {
-  storage.set(key, JSON.stringify(value));
+export async function setStoredValue<T>(key: string, value: T): Promise<void> {
+  await storage.setItem(key, JSON.stringify(value));
 }
 
-export function removeStoredValue(key: string): void {
-  storage.remove(key);
+export async function removeStoredValue(key: string): Promise<void> {
+  await storage.removeItem(key);
 }

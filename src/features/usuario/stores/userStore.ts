@@ -25,19 +25,6 @@ interface UserState {
   logout: () => void;
 }
 
-const mmkvStorage = {
-  getItem: (key: string) => {
-    const value = storage.getString(key);
-    return value ?? null;
-  },
-  setItem: (key: string, value: string) => {
-    storage.set(key, value);
-  },
-  removeItem: (key: string) => {
-    storage.remove(key);
-  },
-};
-
 export const useUserStore = create<UserState>()(
   persist(
     (set) => ({
@@ -52,7 +39,7 @@ export const useUserStore = create<UserState>()(
     }),
     {
       name: StorageKeys.user,
-      storage: createJSONStorage(() => mmkvStorage),
+      storage: createJSONStorage(() => storage),
     },
   ),
 );

@@ -33,19 +33,6 @@ const DEFAULT_STATE: Pick<
   language: 'pt-BR',
 };
 
-const mmkvStorage = {
-  getItem: (key: string) => {
-    const value = storage.getString(key);
-    return value ?? null;
-  },
-  setItem: (key: string, value: string) => {
-    storage.set(key, value);
-  },
-  removeItem: (key: string) => {
-    storage.remove(key);
-  },
-};
-
 export const usePreferencesStore = create<PreferencesState>()(
   persist(
     (set) => ({
@@ -60,7 +47,7 @@ export const usePreferencesStore = create<PreferencesState>()(
     }),
     {
       name: StorageKeys.preferences,
-      storage: createJSONStorage(() => mmkvStorage),
+      storage: createJSONStorage(() => storage),
     },
   ),
 );
