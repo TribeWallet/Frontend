@@ -1,4 +1,13 @@
 {
-  "name": "TribeWalletNative",
-  "displayName": "TribeWalletNative"
+  "expo": {
+    "name": "Tribe Wallet",
+    "slug": "tribe-wallet",
+    "scheme": "tribewallet",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "com.anonymous.tribewallet"
+    }
+  }
 }
