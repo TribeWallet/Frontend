@@ -24,12 +24,6 @@ interface AuthState {
   updateUser: (patch: Partial<AuthUser>) => void;
 }
 
-const mmkvStorage = {
-  getItem: (key: string) => storage.getString(key) ?? null,
-  setItem: (key: string, value: string) => storage.set(key, value),
-  removeItem: (key: string) => storage.remove(key),
-};
-
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
@@ -57,7 +51,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: StorageKeys.auth,
-      storage: createJSONStorage(() => mmkvStorage),
+      storage: createJSONStorage(() => storage),
       partialize: (state) => ({
         isAuthenticated: state.isAuthenticated,
         token: state.token,

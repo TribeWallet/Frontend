@@ -2,6 +2,7 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from 'react';
@@ -273,6 +274,17 @@ export function AppProvider({ children, onOpenProfile, onNavigate, onLogout, act
   const { refetch: refetchGroupsQuery } = groupsQuery;
   const groupsLoading = groupsQuery.isLoading;
   const groupsError = groupsQuery.error ? getErrorMessage(groupsQuery.error) : null;
+  const [mappedGroups, setMappedGroups] = useState<Group[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all((groupsQuery.data ?? []).map((grupo) => toGroup(grupo))).then((nextGroups) => {
+      if (active) setMappedGroups(nextGroups);
+    });
+    return () => {
+      active = false;
+    };
+  }, [groupsQuery.data]);
 
   const refetchGroups = useCallback(() => {
     refetchGroupsQuery();
@@ -281,8 +293,7 @@ export function AppProvider({ children, onOpenProfile, onNavigate, onLogout, act
   // Dados e integrantes vêm da API; os totais saem dos compromissos e pagamentos, que ainda são locais.
   const groups = useMemo<Group[]>(
     () =>
-      (groupsQuery.data ?? []).map((grupo) => {
-        const group = toGroup(grupo);
+      mappedGroups.map((group) => {
         const openAmount = commitments
           .filter((commitment) => commitment.groupId === group.id)
           .flatMap((commitment) => commitment.splits)
@@ -300,7 +311,7 @@ export function AppProvider({ children, onOpenProfile, onNavigate, onLogout, act
           },
         };
       }),
-    [groupsQuery.data, commitments, payments],
+    [mappedGroups, commitments, payments],
   );
 
   const profile = useUserStore((state) => state.profile);
@@ -361,7 +372,7 @@ export function AppProvider({ children, onOpenProfile, onNavigate, onLogout, act
         descricao: input.description.trim(),
         usuarioTokens: memberTokens,
       });
-      saveGroupTone(created.grupoToken, input.tone);
+      await saveGroupTone(created.grupoToken, input.tone);
       await invalidateGroups();
       return toGroup(created);
     },
@@ -374,7 +385,7 @@ export function AppProvider({ children, onOpenProfile, onNavigate, onLogout, act
         nome: input.name.trim(),
         descricao: input.description.trim(),
       });
-      saveGroupTone(id, input.tone);
+      await saveGroupTone(id, input.tone);
       await invalidateGroups();
     },
     [invalidateGroups],

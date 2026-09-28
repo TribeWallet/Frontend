@@ -62,7 +62,7 @@ async function request<T>(
     });
   } catch {
     throw new ApiError(
-      'Não foi possível conectar ao servidor. Verifique se a API está rodando.',
+      'Não foi possível conectar ao servidor. Verifique se a API está rodando: ' + environment.apiUrl,
       0,
     );
   } finally {
