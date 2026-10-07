@@ -18,9 +18,17 @@ export interface UpdateGrupoInput {
 }
 
 export async function listGrupos(usuarioToken: string): Promise<GrupoResponse[]> {
-  const grupos = await apiClient.get<GrupoResponse[]>(endpoints.grupos.byUsuario(usuarioToken));
-  // A exclusão é soft delete e o backend não filtra: grupos excluídos continuam na resposta.
+  const grupos = await apiClient.get<GrupoResponse[]>(
+    `${endpoints.grupos.byUsuario(usuarioToken)}?deleted=false`,
+  );
+  // A exclusão é soft delete: filtra o que já foi excluído.
   return grupos.filter((grupo) => !grupo.deletedAt);
+}
+
+export function getGrupo(grupoToken: string): Promise<GrupoResponse> {
+  return apiClient.get<GrupoResponse>(
+    `${endpoints.grupos.byToken(grupoToken)}?deleted=false`,
+  );
 }
 
 export function createGrupo({
@@ -41,6 +49,26 @@ export function updateGrupo(grupoToken: string, input: UpdateGrupoInput): Promis
 
 export function deleteGrupo(grupoToken: string): Promise<void> {
   return apiClient.delete(endpoints.grupos.byToken(grupoToken));
+}
+
+/** Inclui novos integrantes num grupo existente. */
+export function addIntegrantes(
+  grupoToken: string,
+  usuarioTokens: string[],
+): Promise<unknown> {
+  return apiClient.put(
+    endpoints.grupos.integrantes(grupoToken),
+    usuarioTokens.map((usuarioToken) => ({ usuarioToken })),
+  );
+}
+
+export function removeIntegrante(
+  grupoToken: string,
+  integranteToken: string,
+): Promise<GrupoResponse> {
+  return apiClient.delete<GrupoResponse>(
+    endpoints.grupos.integrante(grupoToken, integranteToken),
+  );
 }
 
 // A API não tem categoria de grupo; a escolhida no app fica guardada no aparelho.
@@ -75,13 +103,15 @@ export function toGroup(grupo: GrupoResponse): Group {
     getStoredValue<ToneMap>(StorageKeys.groupTones)?.[grupo.grupoToken] ??
     resolveTone(grupo.nome);
 
-  const members: GroupMember[] = grupo.integrantes
-    .filter((integrante) => !integrante.usuario.deletedAt)
-    .map(({ usuario }) => {
+  const members: GroupMember[] = (grupo.integrantes ?? [])
+    .filter((integrante) => !integrante.deletedAt && !integrante.usuario.deletedAt)
+    .map((integrante) => {
+      const { usuario } = integrante;
       const name = fullName(usuario.nome, usuario.sobrenome);
       // O id do integrante é o usuarioToken, o mesmo id que o app usa para o usuário logado.
       return {
         id: usuario.usuarioToken,
+        integranteToken: integrante.integranteToken,
         name,
         email: usuario.email,
         initials: initialsFromName(name),
@@ -93,10 +123,7 @@ export function toGroup(grupo: GrupoResponse): Group {
     tone,
     name: grupo.nome,
     description: grupo.descricao ?? '',
-    tags: [
-      { label: TONE_LABELS[tone], tone: 'neutral' },
-      { label: 'Ativo', tone: 'green' },
-    ],
+    tags: [{ label: TONE_LABELS[tone], tone: 'neutral' }],
     summary: {
       members: members.length,
       openValue: formatCurrency(0),

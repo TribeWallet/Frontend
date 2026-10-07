@@ -1,24 +1,30 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Alert } from 'react-native';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Modal } from '../../../../components/Modal';
 import { Input } from '../../../../components/Input';
 import { Button } from '../../../../components/Button';
-import { Select, SelectOption } from '../../../../components/Select';
 import { Box, Text, PressableBox } from '../../../../theme';
 import { useAppPayments } from '../../../../contexts/AppContext';
-import {
-  defaultPaymentFormValues,
-  paymentDraftSchema,
-  type PaymentFormValues,
-} from '../../validations/paymentSchema';
-import {
-  paymentCategoryOptionsMock,
-  paymentMethodsMock,
-  paymentCardBrandsMock,
-  paymentRecurrenceMock,
-} from '../../services/paymentOptions';
-import type { Payment } from '../../types/Payment';
+import { getErrorMessage } from '../../../../services/api/apiClient';
+import { formatCurrency } from '../../../../utils/currency';
+import { paymentMethodOptions } from '../../services/paymentOptions';
+import { paymentMethodSchema } from '../../validations/paymentSchema';
+import type { Payment, PaymentMethod } from '../../types/Payment';
+
+const schema = z.object({
+  amount: z
+    .string()
+    .min(1, 'Informe um valor')
+    .regex(/^[0-9]+(?:[,.][0-9]{1,2})?$/, 'Valor inválido')
+    .refine((value) => Number(value.replace(',', '.')) > 0, 'O valor precisa ser maior que zero'),
+  date: z.string().regex(/^[0-3][0-9]\/[0-1][0-9]\/[0-9]{4}$/, 'Use o formato DD/MM/AAAA'),
+  method: paymentMethodSchema,
+});
+
+type FormValues = z.infer<typeof schema>;
 
 interface EditPaymentModalProps {
   visible: boolean;
@@ -29,94 +35,76 @@ interface EditPaymentModalProps {
 
 export function EditPaymentModal({ visible, payment, onClose, onSaved }: EditPaymentModalProps) {
   const { updatePayment, deletePayment } = useAppPayments();
+  const [busy, setBusy] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const {
     control,
     handleSubmit,
     reset,
     formState: { errors, isValid },
-    watch,
-  } = useForm<PaymentFormValues>({
-    resolver: zodResolver(paymentDraftSchema) as any,
-    defaultValues: defaultPaymentFormValues,
+  } = useForm<FormValues>({
+    resolver: zodResolver(schema) as any,
+    defaultValues: { amount: '', date: '', method: 'pix' },
     mode: 'onChange',
   });
 
   useEffect(() => {
-    if (visible && payment) {
-      const categoryId =
-        paymentCategoryOptionsMock.find(
-          (c) => c.label.toLowerCase() === payment.category.toLowerCase(),
-        )?.id ?? '';
-      reset({
-        description: payment.description,
-        amount: payment.amount.toString().replace('.', ','),
-        groupId: payment.groupId,
-        commitmentId: payment.commitmentId ?? '',
-        payerId: payment.payerId,
-        payerName: payment.payerName,
-        category: categoryId,
-        method: payment.method,
-        cardBrand: payment.cardBrand ?? 'credit',
-        otherMethod: payment.otherMethod ?? '',
-        recurrence: payment.recurrence,
-        date: payment.date,
-        notes: payment.notes ?? '',
-      });
-    }
+    if (!visible || !payment) return;
+    setSubmitError(null);
+    reset({
+      amount: payment.amount.toString().replace('.', ','),
+      date: payment.date,
+      method: payment.method,
+    });
   }, [visible, payment, reset]);
 
   const handleClose = useCallback(() => {
     reset();
+    setSubmitError(null);
     onClose();
   }, [reset, onClose]);
 
-  const watched = watch();
-
-  const methodOptions = React.useMemo<SelectOption[]>(
-    () => paymentMethodsMock.map((option) => ({ id: option.id, label: option.label })),
-    [],
-  );
-  const cardBrandOptions = React.useMemo<SelectOption[]>(
-    () => paymentCardBrandsMock.map((option) => ({ id: option.id, label: option.label })),
-    [],
-  );
-  const categoryOptions = React.useMemo<SelectOption[]>(
-    () => paymentCategoryOptionsMock.map((option) => ({ id: option.id, label: option.label })),
-    [],
-  );
-  const recurrenceOptions = React.useMemo<SelectOption[]>(
-    () => paymentRecurrenceMock.map((option) => ({ id: option.id, label: option.label })),
-    [],
-  );
-
-  const onValidSubmit = handleSubmit((values) => {
+  const onValidSubmit = handleSubmit(async (values) => {
     if (!payment) return;
-    const amount = Number(values.amount.replace(',', '.')) || 0;
-    updatePayment(payment.id, {
-      description: values.description.trim(),
-      amount,
-      category:
-        paymentCategoryOptionsMock.find((c) => c.id === values.category)?.label ??
-        payment.category,
-      method: values.method,
-      cardBrand: values.method === 'card' ? values.cardBrand : undefined,
-      otherMethod: values.method === 'other' ? values.otherMethod?.trim() : undefined,
-      recurrence: values.recurrence,
-      date: values.date,
-      notes: values.notes?.trim() || undefined,
-      payerId: values.payerId,
-      payerName: values.payerId,
-    });
-    onSaved?.();
-    handleClose();
+    setBusy(true);
+    setSubmitError(null);
+    try {
+      await updatePayment(payment.id, {
+        amount: Number(values.amount.replace(',', '.')) || 0,
+        date: values.date,
+        method: values.method,
+      });
+      onSaved?.();
+      handleClose();
+    } catch (error) {
+      setSubmitError(getErrorMessage(error));
+    } finally {
+      setBusy(false);
+    }
   });
 
   const handleDelete = useCallback(() => {
     if (!payment) return;
-    deletePayment(payment.id);
-    onSaved?.();
-    handleClose();
+    Alert.alert('Excluir pagamento', 'Excluir este pagamento?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Excluir',
+        style: 'destructive',
+        onPress: async () => {
+          setBusy(true);
+          try {
+            await deletePayment(payment.id);
+            onSaved?.();
+            handleClose();
+          } catch (error) {
+            setSubmitError(getErrorMessage(error));
+          } finally {
+            setBusy(false);
+          }
+        },
+      },
+    ]);
   }, [payment, deletePayment, onSaved, handleClose]);
 
   if (!payment) return null;
@@ -126,17 +114,24 @@ export function EditPaymentModal({ visible, payment, onClose, onSaved }: EditPay
       visible={visible}
       onClose={handleClose}
       title="Editar pagamento"
-      subtitle="Atualize os dados deste pagamento"
+      subtitle={`${payment.commitmentName} • ${payment.payerName}`}
       showCloseButton
       footer={
         <Box flexDirection="row" gap="sm">
           <Box flex={1}>
-            <Button title="Excluir" onPress={handleDelete} variant="danger" fullWidth />
+            <Button
+              title="Excluir"
+              onPress={handleDelete}
+              variant="danger"
+              loading={busy}
+              fullWidth
+            />
           </Box>
           <Box flex={1}>
             <Button
               title="Salvar"
               onPress={onValidSubmit}
+              loading={busy}
               disabled={!isValid}
               fullWidth
             />
@@ -145,20 +140,16 @@ export function EditPaymentModal({ visible, payment, onClose, onSaved }: EditPay
       }
     >
       <Box gap="md">
-        <Controller
-          control={control}
-          name="description"
-          render={({ field: { onChange, value, onBlur } }) => (
-            <Input
-              label="Descrição"
-              value={value}
-              onChangeText={onChange}
-              onBlur={onBlur}
-              placeholder="Descrição"
-              error={errors.description?.message}
-            />
-          )}
-        />
+        <Box bg="background" borderRadius="md" borderWidth={1} borderColor="border" p="md">
+          <Text variant="captionStrong" color="textSecondary">PAGAMENTO DE</Text>
+          <Text variant="bodyStrong" mt="xxs">{payment.payerName}</Text>
+          <Text variant="caption" color="textSecondary">
+            {payment.commitmentName} • {payment.groupName}
+          </Text>
+          <Text variant="caption" color="textSecondary">
+            Registrado: {formatCurrency(payment.amount)}
+          </Text>
+        </Box>
 
         <Box flexDirection="row" gap="sm">
           <Box flex={1}>
@@ -190,40 +181,7 @@ export function EditPaymentModal({ visible, payment, onClose, onSaved }: EditPay
                   onBlur={onBlur}
                   placeholder="DD/MM/AAAA"
                   keyboardType="numeric"
-                />
-              )}
-            />
-          </Box>
-        </Box>
-
-        <Box flexDirection="row" gap="sm">
-          <Box flex={1}>
-            <Controller
-              control={control}
-              name="category"
-              render={({ field: { onChange, value } }) => (
-                <Select
-                  label="Categoria"
-                  placeholder="Selecione"
-                  value={value}
-                  onChange={onChange}
-                  options={categoryOptions}
-                  error={errors.category?.message}
-                />
-              )}
-            />
-          </Box>
-          <Box flex={1}>
-            <Controller
-              control={control}
-              name="recurrence"
-              render={({ field: { onChange, value } }) => (
-                <Select
-                  label="Recorrência"
-                  placeholder="Selecione"
-                  value={value}
-                  onChange={onChange}
-                  options={recurrenceOptions}
+                  error={errors.date?.message}
                 />
               )}
             />
@@ -235,18 +193,14 @@ export function EditPaymentModal({ visible, payment, onClose, onSaved }: EditPay
           name="method"
           render={({ field: { onChange, value } }) => (
             <Box>
-              <Text variant="label" marginBottom="xs">
-                Forma de pagamento
-              </Text>
+              <Text variant="label" marginBottom="xs">Forma de pagamento</Text>
               <Box flexDirection="row" gap="xs" flexWrap="wrap">
-                {methodOptions.map((option) => {
+                {paymentMethodOptions.map((option) => {
                   const active = value === option.id;
                   return (
                     <PressableBox
                       key={option.id}
-                      onPress={() =>
-                        onChange(option.id as PaymentFormValues['method'])
-                      }
+                      onPress={() => onChange(option.id as PaymentMethod)}
                       accessibilityRole="button"
                       accessibilityState={{ selected: active }}
                     >
@@ -258,10 +212,7 @@ export function EditPaymentModal({ visible, payment, onClose, onSaved }: EditPay
                         borderWidth={1}
                         borderColor={active ? 'primary' : 'border'}
                       >
-                        <Text
-                          variant="captionStrong"
-                          color={active ? 'white' : 'text'}
-                        >
+                        <Text variant="captionStrong" color={active ? 'white' : 'text'}>
                           {option.label}
                         </Text>
                       </Box>
@@ -273,77 +224,11 @@ export function EditPaymentModal({ visible, payment, onClose, onSaved }: EditPay
           )}
         />
 
-        {watched.method === 'card' ? (
-          <Controller
-            control={control}
-            name="cardBrand"
-            render={({ field: { onChange, value } }) => (
-              <Box flexDirection="row" gap="xs">
-                {cardBrandOptions.map((option) => {
-                  const active = value === option.id;
-                  return (
-                    <PressableBox
-                      key={option.id}
-                      onPress={() =>
-                        onChange(option.id as PaymentFormValues['cardBrand'])
-                      }
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: active }}
-                      style={{ flex: 1 }}
-                    >
-                      <Box
-                        alignItems="center"
-                        py="sm"
-                        borderRadius="md"
-                        bg={active ? 'primaryLight' : 'surface'}
-                        borderWidth={1}
-                        borderColor={active ? 'primary' : 'border'}
-                      >
-                        <Text
-                          variant="captionStrong"
-                          color={active ? 'primary' : 'textSecondary'}
-                        >
-                          {option.label}
-                        </Text>
-                      </Box>
-                    </PressableBox>
-                  );
-                })}
-              </Box>
-            )}
-          />
+        {submitError ? (
+          <Text variant="caption" color="danger">
+            {submitError}
+          </Text>
         ) : null}
-
-        {watched.method === 'other' ? (
-          <Controller
-            control={control}
-            name="otherMethod"
-            render={({ field: { onChange, value, onBlur } }) => (
-              <Input
-                label="Especifique a forma de pagamento"
-                value={value ?? ''}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                placeholder="Ex: PicPay, Débito automático..."
-                error={errors.otherMethod?.message}
-              />
-            )}
-          />
-        ) : null}
-
-        <Controller
-          control={control}
-          name="notes"
-          render={({ field: { onChange, value, onBlur } }) => (
-            <Input
-              label="Observações"
-              value={value ?? ''}
-              onChangeText={onChange}
-              onBlur={onBlur}
-              placeholder="Detalhes do pagamento"
-            />
-          )}
-        />
       </Box>
     </Modal>
   );

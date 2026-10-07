@@ -7,10 +7,12 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Button } from '../../../../components/Button';
 import { EmptyState } from '../../../../components/EmptyState';
 import { ScreenHeader } from '../../../../components/ScreenHeader';
+import { Loading } from '../../../../components/Loading';
 import { Select, SelectOption } from '../../../../components/Select';
 import { TopBar } from '../../../../components/TopBar';
 import { CommitmentCard } from '../../components/CommitmentCard/CommitmentCard';
 import { useCommitments } from '../../../../hooks/useCommitments';
+import { useGroups } from '../../../../hooks/useGroups';
 import { useNotifications } from '../../../../hooks/useNotifications';
 import { useUserStore } from '../../../usuario/stores/userStore';
 import { useTopBarActions } from '../../../../hooks/useTopBarActions';
@@ -31,7 +33,9 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 
 export function CompromissosScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { commitments } = useCommitments();
+  const { commitments, commitmentsLoading, commitmentsError, refetchCommitments } =
+    useCommitments();
+  const { groups } = useGroups();
   const { unreadCount } = useNotifications();
   const profile = useUserStore((state) => state.profile);
   const topBar = useTopBarActions();
@@ -39,12 +43,6 @@ export function CompromissosScreen() {
   const isSmallPhone = width < 360;
   const [filter, setFilter] = useState<FilterKey>('todos');
   const [groupFilter, setGroupFilter] = useState<string>('all');
-
-  const groups = useMemo(() => {
-    const set = new Map<string, string>();
-    commitments.forEach((c) => set.set(c.groupId, c.groupName));
-    return Array.from(set.entries()).map(([id, name]) => ({ id, name }));
-  }, [commitments]);
 
   const groupOptions = useMemo<SelectOption[]>(
     () => [
@@ -70,7 +68,7 @@ export function CompromissosScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFB' }} edges={['top']}>
       <Box flex={1} width="100%" maxWidth={430} alignSelf="center" bg="background">
         <TopBar
-          initials={profile?.initials ?? 'G'}
+          initials={profile?.initials ?? ''}
           notificationCount={unreadCount}
           onOpenMenu={topBar.openMenu}
           onOpenNotifications={topBar.openNotifications}
@@ -130,7 +128,16 @@ export function CompromissosScreen() {
               options={groupOptions}
             />
 
-            {filtered.length === 0 ? (
+            {commitmentsLoading ? (
+              <Loading label="Carregando compromissos..." />
+            ) : commitmentsError ? (
+              <EmptyState
+                title="Não foi possível carregar os compromissos"
+                description={commitmentsError}
+                actionLabel="Tentar novamente"
+                onAction={refetchCommitments}
+              />
+            ) : filtered.length === 0 ? (
               <EmptyState
                 title="Nenhum compromisso"
                 description="Crie o primeiro compromisso para começar a dividir."

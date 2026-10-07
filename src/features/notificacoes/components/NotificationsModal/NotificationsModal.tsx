@@ -14,6 +14,7 @@ interface NotificationsModalProps {
   onMarkAllRead?: () => void;
   onMarkRead?: (id: string) => void;
   onDelete?: (id: string) => void;
+  settings: NotificationSettings;
   onConfigureChange?: (settings: NotificationSettings) => void;
 }
 
@@ -39,13 +40,6 @@ const SETTINGS_LABELS: Record<keyof NotificationSettings, string> = {
   weeklyDigest: 'Resumo semanal',
 };
 
-const DEFAULT_SETTINGS: NotificationSettings = {
-  pushEnabled: true,
-  emailEnabled: false,
-  overdueAlerts: true,
-  weeklyDigest: false,
-};
-
 export function NotificationsModal({
   visible,
   onClose,
@@ -54,10 +48,10 @@ export function NotificationsModal({
   onMarkAllRead,
   onMarkRead,
   onDelete,
+  settings,
   onConfigureChange,
 }: NotificationsModalProps) {
   const [filter, setFilter] = useState<FilterKey>('all');
-  const [settings, setSettings] = useState<NotificationSettings>(DEFAULT_SETTINGS);
 
   const filtered = (() => {
     if (filter === 'unread') {
@@ -71,13 +65,9 @@ export function NotificationsModal({
 
   const handleToggle = useCallback(
     (key: keyof NotificationSettings) => {
-      setSettings((prev) => {
-        const next = { ...prev, [key]: !prev[key] };
-        onConfigureChange?.(next);
-        return next;
-      });
+      onConfigureChange?.({ ...settings, [key]: !settings[key] });
     },
-    [onConfigureChange],
+    [settings, onConfigureChange],
   );
 
   return (

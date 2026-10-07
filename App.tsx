@@ -52,7 +52,6 @@ function RootNavigator() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const user = useAuthStore((state) => state.user);
   const setProfile = useUserStore((state) => state.setProfile);
-  const setStats = useUserStore((state) => state.setStats);
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -63,13 +62,8 @@ function RootNavigator() {
         email: user.email,
         notificationCount: user.notificationCount ?? 0,
       });
-      setStats([
-        { value: '4', label: 'Grupos' },
-        { value: '12', label: 'Pagamentos' },
-        { value: '87%', label: 'Pontualidade' },
-      ]);
     }
-  }, [isAuthenticated, user, setProfile, setStats]);
+  }, [isAuthenticated, user, setProfile]);
 
   return isAuthenticated ? (
     <AppNavigator />
