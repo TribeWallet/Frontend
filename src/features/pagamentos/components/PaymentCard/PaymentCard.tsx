@@ -4,7 +4,7 @@ import Svg, { Path } from 'react-native-svg';
 import { Box, Text } from '../../../../theme';
 import { Pill } from '../../../../components/Pill';
 import type { Payment } from '../../types/Payment';
-import { cardBrandLabels, paymentMethodLabels } from '../../types/Payment';
+import { paymentMethodLabels } from '../../types/Payment';
 import { formatCurrency } from '../../../../utils/currency';
 
 interface PaymentCardProps {
@@ -31,16 +31,6 @@ function CardIcon() {
       <Path d="M3.5 10h17" stroke="#0071DF" strokeWidth={1.7} />
     </Svg>
   );
-}
-
-function methodLabel(payment: Payment): string {
-  if (payment.method === 'card') {
-    return `${paymentMethodLabels.card} • ${cardBrandLabels[payment.cardBrand ?? 'credit']}`;
-  }
-  if (payment.method === 'other' && payment.otherMethod) {
-    return `${paymentMethodLabels.other} • ${payment.otherMethod}`;
-  }
-  return paymentMethodLabels[payment.method];
 }
 
 export function PaymentCard({ payment, onPress }: PaymentCardProps) {
@@ -71,7 +61,7 @@ export function PaymentCard({ payment, onPress }: PaymentCardProps) {
             <CardIcon />
           </Box>
           <Box flex={1}>
-            <Text variant="bodyStrong" numberOfLines={1}>{payment.description}</Text>
+            <Text variant="bodyStrong" numberOfLines={1}>{payment.commitmentName}</Text>
             <Text variant="caption" color="textSecondary" numberOfLines={1}>
               {payment.groupName} • {payment.payerName}
             </Text>
@@ -110,7 +100,7 @@ export function PaymentCard({ payment, onPress }: PaymentCardProps) {
           mt="sm"
         >
           <Box flexDirection="row" alignItems="center" gap="xs" flexWrap="wrap">
-            <Pill label={methodLabel(payment)} tone="primary" size="sm" />
+            <Pill label={paymentMethodLabels[payment.method]} tone="primary" size="sm" />
             <Pill label={payment.category} tone="neutral" size="sm" />
           </Box>
           <Text variant="bodyStrong">{formatCurrency(payment.amount)}</Text>
@@ -118,13 +108,7 @@ export function PaymentCard({ payment, onPress }: PaymentCardProps) {
 
         <Text variant="caption" color="textSecondary" mt="xs">
           {payment.date}
-          {payment.commitmentName ? ` • ${payment.commitmentName}` : ''}
         </Text>
-        {payment.notes ? (
-          <Text variant="caption" color="textMuted" mt="xxs" numberOfLines={2}>
-            {payment.notes}
-          </Text>
-        ) : null}
       </Box>
     </Pressable>
   );

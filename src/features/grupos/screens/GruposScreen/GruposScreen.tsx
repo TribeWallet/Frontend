@@ -52,7 +52,7 @@ export function GruposScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFB' }} edges={['top']}>
       <Box flex={1} width="100%" maxWidth={430} alignSelf="center" bg="background">
         <TopBar
-          initials={profile?.initials ?? 'G'}
+          initials={profile?.initials ?? ''}
           notificationCount={unreadCount}
           onOpenMenu={topBar.openMenu}
           onOpenNotifications={topBar.openNotifications}

@@ -23,3 +23,28 @@ export function diffDays(value?: string): number | null {
   start.setHours(0, 0, 0, 0);
   return Math.round((date.getTime() - start.getTime()) / 86400000);
 }
+
+/** DateTime do backend (ISO) para o formato DD/MM/AAAA exibido no app. */
+export function isoToBR(value: string | null | undefined): string {
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return formatBR(parsed);
+}
+
+/**
+ * DD/MM/AAAA digitado no app para o ISO em UTC que o backend espera (as colunas são
+ * `timestamp with time zone`). A hora vai ao meio-dia para o fuso não mudar o dia.
+ */
+export function brToISO(value: string): string {
+  const parsed = parseBRDate(value) ?? new Date();
+  const atNoon = new Date(
+    parsed.getFullYear(),
+    parsed.getMonth(),
+    parsed.getDate(),
+    12,
+    0,
+    0,
+  );
+  return atNoon.toISOString();
+}

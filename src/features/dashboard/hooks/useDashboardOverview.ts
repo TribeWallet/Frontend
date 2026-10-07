@@ -6,14 +6,10 @@ import {
   useAppPayments,
 } from '../../../contexts/AppContext';
 import { useAuthStore } from '../../auth/stores/authStore';
+import { parseBRDate } from '../../../utils/date';
 import type { Commitment } from '../../compromissos/types/Commitment';
 import type { Group } from '../../grupos/types/Group';
 import type { Payment } from '../../pagamentos/types/Payment';
-
-export const dashboardKeys = {
-  all: ['dashboard'] as const,
-  overview: () => [...dashboardKeys.all, 'overview'] as const,
-};
 
 export interface ChartDatum {
   label: string;
@@ -35,7 +31,6 @@ export interface DashboardOverviewData {
     label: string;
     value: string;
     meta?: string;
-    trend?: { direction: 'up' | 'down'; text: string };
   }[];
   alert: { id: string; title: string; description: string };
   transactions: {
@@ -62,18 +57,23 @@ export interface DashboardOverviewData {
     byMethod: ChartDatum[];
     last6Months: ChartDatum[];
     topGroups: ChartDatum[];
-    weeklyPunctuality: ChartDatum[];
   };
   insights: DashboardInsight[];
+  totals: { paymentsCount: number; paymentsTotal: number; openTotal: number };
 }
 
-function summarizeCommitments(commitments: Commitment[]) {
-  const total = commitments.length;
-  const paid = commitments.filter((c) => c.status === 'paid').length;
-  const pending = commitments.filter((c) => c.status === 'pending').length;
-  const partial = commitments.filter((c) => c.status === 'partial').length;
-  const punctuality = total ? Math.round((paid / total) * 100) : 0;
-  return { total, paid, pending, partial, punctuality };
+const currency = (value: number) =>
+  value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+function initialsFor(name: string): string {
+  return (
+    name
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? '')
+      .join('') || '—'
+  );
 }
 
 function countBy<T>(items: T[], get: (item: T) => string): ChartDatum[] {
@@ -95,38 +95,39 @@ function sumBy<T>(items: T[], get: (item: T) => string, value: (item: T) => numb
 }
 
 function buildLast6Months(payments: Payment[]): ChartDatum[] {
-  const buckets: { label: string; value: number }[] = [];
+  const buckets: ChartDatum[] = [];
   const today = new Date();
   for (let i = 5; i >= 0; i--) {
     const ref = new Date(today.getFullYear(), today.getMonth() - i, 1);
-    const month = ref.getMonth();
-    const year = ref.getFullYear();
     const total = payments
-      .filter((p) => {
-        const parts = p.date.split('/');
-        if (parts.length !== 3) return false;
-        return Number(parts[1]) - 1 === month && Number(parts[2]) === year;
+      .filter((payment) => {
+        const date = parseBRDate(payment.date);
+        return (
+          date !== null &&
+          date.getMonth() === ref.getMonth() &&
+          date.getFullYear() === ref.getFullYear()
+        );
       })
-      .reduce((sum, p) => sum + p.amount, 0);
-    const label = ref.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
-    buckets.push({ label, value: Math.round(total) });
+      .reduce((sum, payment) => sum + payment.amount, 0);
+    buckets.push({
+      label: ref.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', ''),
+      value: Math.round(total),
+    });
   }
   return buckets;
 }
 
-function computeMonthlyAverage(payments: Payment[]): number {
-  const months = buildLast6Months(payments);
-  if (!months.length) return 0;
-  const total = months.reduce((sum, m) => sum + m.value, 0);
-  return total / months.length;
+function daysToDue(commitment: Commitment): number | null {
+  const due = parseBRDate(commitment.dueDate);
+  if (!due) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((due.getTime() - today.getTime()) / 86400000);
 }
 
-function buildWeeklyPunctuality(_commitments: Commitment[]): ChartDatum[] {
-  const days = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
-  return days.map((dayLabel) => ({
-    label: dayLabel,
-    value: Math.round(60 + Math.random() * 35),
-  }));
+function remainingOf(commitment: Commitment): number {
+  const paid = commitment.splits.reduce((sum, split) => sum + split.paidAmount, 0);
+  return Math.max(0, commitment.amount - paid);
 }
 
 export function buildDashboardData(
@@ -134,47 +135,39 @@ export function buildDashboardData(
   commitments: Commitment[],
   payments: Payment[],
 ): DashboardOverviewData {
-  const summary = summarizeCommitments(commitments);
-  const overdue = commitments.filter((c) => {
-    if (!c.dueDate) return false;
-    const [day, month, year] = c.dueDate.split('/');
-    if (!day || !month || !year) return false;
-    const due = new Date(Number(year), Number(month) - 1, Number(day));
-    const now = new Date();
-    const paidPart = c.splits.filter((s) => s.paid).reduce((s2, s) => s2 + s.amount, 0);
-    return due.getTime() < now.getTime() && paidPart < c.amount;
-  }).length;
-  const dueSoon = commitments.filter((c) => {
-    if (!c.dueDate) return false;
-    const [day, month, year] = c.dueDate.split('/');
-    if (!day || !month || !year) return false;
-    const due = new Date(Number(year), Number(month) - 1, Number(day));
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const diff = Math.round((due.getTime() - today.getTime()) / 86400000);
-    return diff >= 0 && diff <= 7;
-  }).length;
-  const pendingPayments = payments.filter((p) => p.status !== 'paid').length;
+  const settled = commitments.filter((commitment) => commitment.status === 'paid').length;
+  const punctuality = commitments.length
+    ? Math.round((settled / commitments.length) * 100)
+    : 0;
 
-  const activeGroups = groups.filter(
-    (g) => g.tags?.some((tag) => tag.label === 'Ativo'),
-  ).length || groups.length;
+  const overdue = commitments.filter((commitment) => {
+    const days = daysToDue(commitment);
+    return days !== null && days < 0 && remainingOf(commitment) > 0.01;
+  }).length;
 
-  const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
-  const monthlyAverage = computeMonthlyAverage(payments);
-  const openTotal = commitments.reduce((sum, c) => {
-    const paid = c.splits.filter((s) => s.paid).reduce((s2, s) => s2 + s.amount, 0);
-    return sum + Math.max(0, c.amount - paid);
-  }, 0);
+  const dueSoon = commitments.filter((commitment) => {
+    const days = daysToDue(commitment);
+    return days !== null && days >= 0 && days <= 7 && remainingOf(commitment) > 0.01;
+  }).length;
+
+  const openCommitments = commitments.filter(
+    (commitment) => commitment.status !== 'paid',
+  ).length;
+
+  const totalPaid = payments.reduce((sum, payment) => sum + payment.amount, 0);
+  const openTotal = commitments.reduce((sum, commitment) => sum + remainingOf(commitment), 0);
+  const months = buildLast6Months(payments);
+  const monthlyAverage = months.length
+    ? months.reduce((sum, month) => sum + month.value, 0) / months.length
+    : 0;
 
   const stats = [
     {
       id: 'stat-groups',
       tone: 'blue' as const,
-      label: 'Grupos ativos',
-      value: String(activeGroups),
-      meta: `${groups.length} no total`,
-      trend: { direction: 'up' as const, text: '+1' },
+      label: 'Grupos',
+      value: String(groups.length),
+      meta: groups.length === 1 ? 'grupo ativo' : 'grupos ativos',
     },
     {
       id: 'stat-due-soon',
@@ -184,133 +177,105 @@ export function buildDashboardData(
       meta: 'próximos 7 dias',
     },
     {
-      id: 'stat-pending',
+      id: 'stat-open',
       tone: 'blue' as const,
-      label: 'Pagamentos pendentes',
-      value: String(pendingPayments),
-      meta: 'aguardando',
+      label: 'Compromissos em aberto',
+      value: String(openCommitments),
+      meta: currency(openTotal),
     },
     {
       id: 'stat-punctuality',
       tone: 'green' as const,
-      label: 'Taxa de pontualidade',
-      value: `${summary.punctuality}%`,
-      trend: { direction: summary.punctuality >= 80 ? ('up' as const) : ('down' as const), text: `${summary.punctuality >= 80 ? '+' : '-'}${Math.abs(summary.punctuality - 80)}%` },
+      label: 'Compromissos quitados',
+      value: `${punctuality}%`,
+      meta: `${settled} de ${commitments.length}`,
     },
   ];
 
-  const alert = overdue > 0
-    ? {
-        id: 'alert-overdue',
-        title: `${overdue} compromisso${overdue === 1 ? '' : 's'} vencido${overdue === 1 ? '' : 's'}`,
-        description: 'Regularize para evitar pendências no grupo.',
-      }
-    : {
-        id: 'alert-ok',
-        title: 'Tudo em dia',
-        description: 'Você não possui compromissos vencidos.',
-      };
+  const alert =
+    overdue > 0
+      ? {
+          id: 'alert-overdue',
+          title: `${overdue} compromisso${overdue === 1 ? '' : 's'} vencido${overdue === 1 ? '' : 's'}`,
+          description: 'Regularize para evitar pendências no grupo.',
+        }
+      : {
+          id: 'alert-ok',
+          title: 'Tudo em dia',
+          description: 'Você não possui compromissos vencidos.',
+        };
 
   const transactions = payments.slice(0, 5).map((payment) => ({
     id: payment.id,
-    initials: payment.payerName
-      .split(' ')
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase() ?? '')
-      .join('') || 'PV',
-    name: payment.description,
+    initials: initialsFor(payment.payerName),
+    name: payment.commitmentName,
     group: payment.groupName,
     category: payment.category,
     date: payment.date,
-    value: payment.amount.toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }),
+    value: currency(payment.amount),
     status: payment.status,
   }));
 
   const upcoming = commitments
-    .filter((c) => c.dueDate)
+    .filter((commitment) => remainingOf(commitment) > 0.01)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, 4)
     .map((commitment) => {
-      const [day, month, year] = (commitment.dueDate ?? '').split('/');
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const due = day && month && year
-        ? new Date(Number(year), Number(month) - 1, Number(day))
-        : null;
-      const diff = due ? Math.round((due.getTime() - today.getTime()) / 86400000) : 0;
+      const days = daysToDue(commitment);
       return {
         id: commitment.id,
         name: commitment.name,
         group: commitment.groupName,
-        value: commitment.amount.toLocaleString('pt-BR', {
-          style: 'currency',
-          currency: 'BRL',
-        }),
-        date: commitment.dueDate ?? '',
-        danger: diff < 0,
+        value: currency(commitment.amount),
+        date: commitment.dueDate,
+        danger: days !== null && days < 0,
       };
-    })
-    .sort((a, b) => (a.date > b.date ? 1 : -1))
-    .slice(0, 4);
+    });
+
+  const byGroup = sumBy(payments, (payment) => payment.groupName, (payment) => payment.amount);
 
   const charts = {
-    byCategory: sumBy(payments, (p) => p.category, (p) => p.amount).sort(
+    byCategory: sumBy(payments, (payment) => payment.category, (payment) => payment.amount).sort(
       (a, b) => b.value - a.value,
     ),
-    byGroup: sumBy(payments, (p) => p.groupName, (p) => p.amount),
-    byMethod: countBy(payments, (p) => p.method),
-    last6Months: buildLast6Months(payments),
-    topGroups: sumBy(payments, (p) => p.groupName, (p) => p.amount)
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5),
-    weeklyPunctuality: buildWeeklyPunctuality(commitments),
+    byGroup,
+    byMethod: countBy(payments, (payment) => payment.method),
+    last6Months: months,
+    topGroups: [...byGroup].sort((a, b) => b.value - a.value).slice(0, 5),
   };
+
+  const topGroup = charts.topGroups[0];
 
   const insights: DashboardInsight[] = [
     {
       id: 'i-month',
       title: 'Média mensal de pagamentos',
-      value: monthlyAverage.toLocaleString('pt-BR', {
-        style: 'currency',
-        currency: 'BRL',
-      }),
+      value: currency(monthlyAverage),
       meta: 'Últimos 6 meses',
     },
     {
       id: 'i-open',
       title: 'Total em aberto',
-      value: openTotal.toLocaleString('pt-BR', {
-        style: 'currency',
-        currency: 'BRL',
-      }),
-      meta: `${summary.pending + summary.partial} compromissos`,
+      value: currency(openTotal),
+      meta: `${openCommitments} compromissos`,
     },
     {
       id: 'i-paid',
       title: 'Total pago no histórico',
-      value: totalPaid.toLocaleString('pt-BR', {
-        style: 'currency',
-        currency: 'BRL',
-      }),
+      value: currency(totalPaid),
       meta: `${payments.length} pagamentos`,
     },
     {
       id: 'i-group',
       title: 'Grupo com mais gastos',
-      value: charts.byGroup.sort((a, b) => b.value - a.value)[0]?.label ?? '—',
-      meta: charts.byGroup.length
-        ? `Total ${charts.byGroup[0].value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
-        : 'Sem dados',
+      value: topGroup?.label ?? '—',
+      meta: topGroup ? `Total ${currency(topGroup.value)}` : 'Sem dados',
     },
   ];
 
   return {
-    user: {
-      initials: 'CS',
-      name: 'Camila Santos',
-      notificationCount: overdue + dueSoon,
-    },
+    totals: { paymentsCount: payments.length, paymentsTotal: totalPaid, openTotal },
+    user: { initials: '', name: '', notificationCount: overdue + dueSoon },
     stats,
     alert,
     transactions,
@@ -320,26 +285,29 @@ export function buildDashboardData(
   };
 }
 
-// Grupos vêm da API; compromissos e pagamentos ainda são locais (o backend não tem esses endpoints).
 export function useDashboardOverview() {
   const { groups, groupsLoading, groupsError, refetchGroups } = useAppGroups();
-  const { commitments } = useAppCommitments();
+  const { commitments, commitmentsLoading, commitmentsError } = useAppCommitments();
   const { payments } = useAppPayments();
   const user = useAuthStore((state) => state.user);
 
   const data = useMemo(() => {
     const overview = buildDashboardData(groups, commitments, payments);
-    if (!user) return overview;
     return {
       ...overview,
-      user: { ...overview.user, initials: user.initials, name: user.name },
+      user: {
+        ...overview.user,
+        initials: user?.initials ?? '',
+        name: user?.name ?? '',
+      },
     };
   }, [groups, commitments, payments, user]);
 
   return {
     data,
-    isLoading: groupsLoading,
-    isError: Boolean(groupsError),
+    isLoading: groupsLoading || commitmentsLoading,
+    isError: Boolean(groupsError || commitmentsError),
+    error: groupsError ?? commitmentsError,
     refetch: refetchGroups,
   };
 }

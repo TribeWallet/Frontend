@@ -1,17 +1,15 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ScrollView, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '../../../../components/EmptyState';
 import { ScreenHeader } from '../../../../components/ScreenHeader';
 import { TopBar } from '../../../../components/TopBar';
-import { Button } from '../../../../components/Button';
 import { NotificationItemView } from '../../components/NotificationItem/NotificationItem';
 import { useNotifications } from '../../../../hooks/useNotifications';
 import { Box, Text, PressableBox } from '../../../../theme';
 import { useTopBarActions } from '../../../../hooks/useTopBarActions';
 import { useUserStore } from '../../../usuario/stores/userStore';
-import { useAppCommitments, useAppPayments } from '../../../../contexts/AppContext';
 
 type FilterKey = 'all' | 'unread' | 'pending';
 
@@ -33,15 +31,9 @@ export function NotificacoesScreen() {
   } = useNotifications();
   const profile = useUserStore((state) => state.profile);
   const topBar = useTopBarActions();
-  const { commitments } = useAppCommitments();
-  const { payments } = useAppPayments();
   const [filter, setFilter] = useState<FilterKey>('all');
 
   const isSmallPhone = width < 360;
-
-  useEffect(() => {
-    refreshDueNotifications();
-  }, [commitments, payments, refreshDueNotifications]);
 
   const filtered = useMemo(() => {
     if (filter === 'unread') {
@@ -57,7 +49,7 @@ export function NotificacoesScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFB' }} edges={['top']}>
       <Box flex={1} width="100%" maxWidth={430} alignSelf="center" bg="background">
         <TopBar
-          initials={profile?.initials ?? 'G'}
+          initials={profile?.initials ?? ''}
           notificationCount={unreadCount}
           onOpenMenu={topBar.openMenu}
           onOpenNotifications={topBar.openNotifications}

@@ -26,7 +26,7 @@ export function EditProfileScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFB' }} edges={['top']}>
       <Box flex={1} width="100%" maxWidth={430} alignSelf="center" bg="background">
         <TopBar
-          initials={profile?.initials ?? 'G'}
+          initials={profile?.initials ?? ''}
           onOpenMenu={topBar.openMenu}
           onOpenNotifications={topBar.openNotifications}
           onOpenProfile={topBar.openProfile}
@@ -38,9 +38,9 @@ export function EditProfileScreen() {
           </Text>
           <ProfileModal
             visible
-            initials={profile?.initials ?? 'G'}
-            name={profile?.name ?? 'Gabriel'}
-            email={profile?.email ?? 'dev@dev.com'}
+            initials={profile?.initials ?? ''}
+            name={profile?.name ?? ''}
+            email={profile?.email ?? ''}
             stats={[]}
             emailEditable={false}
             onClose={() => navigation.goBack()}
