@@ -12,6 +12,7 @@ import { useAppCommitments, useAppPayments } from '../../../contexts/AppContext'
 import { useTopBarActions } from '../../../hooks/useTopBarActions';
 import type { RootStackParamList } from '../../../navigation/types';
 import { formatCurrency } from '../../../utils/currency';
+import { parseBRDate } from '../../../utils/date';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'History'>;
 
@@ -25,44 +26,51 @@ export function HistoryScreen() {
 
   const isSmallPhone = width < 360;
 
+  // O backend tem HistoricoAlteracao, mas nenhum endpoint que a exponha: esta é a
+  // linha do tempo dos registros reais que a API devolve.
   const entries = useMemo(() => {
-    const items: { id: string; type: 'commitment' | 'payment'; action: string; description: string; when: string; amount?: number }[] = [];
+    const items: {
+      id: string;
+      action: string;
+      description: string;
+      when: string;
+      amount: number;
+    }[] = [];
+
     commitments.forEach((commitment) => {
       items.push({
-        id: `c-${commitment.id}-create`,
-        type: 'commitment',
-        action: 'Compromisso criado',
-        description: commitment.name,
-        when: commitment.createdAt,
-        amount: commitment.amount,
-      });
-      items.push({
-        id: `c-${commitment.id}-update`,
-        type: 'commitment',
-        action: 'Compromisso atualizado',
-        description: commitment.name,
-        when: commitment.updatedAt,
+        id: `commitment-${commitment.id}`,
+        action: 'Compromisso lançado',
+        description: `${commitment.name} • ${commitment.groupName}`,
+        when: commitment.dueDate,
         amount: commitment.amount,
       });
     });
+
     payments.forEach((payment) => {
       items.push({
-        id: `p-${payment.id}-create`,
-        type: 'payment',
+        id: `payment-${payment.id}`,
         action: 'Pagamento registrado',
-        description: payment.description,
-        when: payment.createdAt,
+        description: `${payment.payerName} • ${payment.commitmentName}`,
+        when: payment.date,
         amount: payment.amount,
       });
     });
-    return items.sort((a, b) => b.when.localeCompare(a.when)).slice(0, 30);
+
+    return items
+      .sort((a, b) => {
+        const left = parseBRDate(b.when)?.getTime() ?? 0;
+        const right = parseBRDate(a.when)?.getTime() ?? 0;
+        return left - right;
+      })
+      .slice(0, 50);
   }, [commitments, payments]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFB' }} edges={['top']}>
       <Box flex={1} width="100%" maxWidth={430} alignSelf="center" bg="background">
         <TopBar
-          initials={profile?.initials ?? 'G'}
+          initials={profile?.initials ?? ''}
           onOpenMenu={topBar.openMenu}
           onOpenNotifications={topBar.openNotifications}
           onOpenProfile={topBar.openProfile}
@@ -75,7 +83,7 @@ export function HistoryScreen() {
           <Box width="100%" px={isSmallPhone ? 'sm' : 'md'} pt="md">
             <Text variant="h2" mb="xs">Histórico de alterações</Text>
             <Text variant="bodySmall" color="textSecondary" mb="md">
-              Acompanhe as últimas ações em compromissos e pagamentos.
+              Compromissos lançados e pagamentos registrados nos seus grupos.
             </Text>
 
             {entries.length === 0 ? (
@@ -100,12 +108,10 @@ export function HistoryScreen() {
                         {entry.description}
                       </Text>
                       <Text variant="caption" color="textMuted">
-                        {new Date(entry.when).toLocaleString('pt-BR')}
+                        {entry.when}
                       </Text>
                     </Box>
-                    {entry.amount !== undefined ? (
-                      <Pill label={formatCurrency(entry.amount)} tone="primary" />
-                    ) : null}
+                    <Pill label={formatCurrency(entry.amount)} tone="primary" />
                   </Box>
                 </Box>
               ))

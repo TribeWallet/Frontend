@@ -79,7 +79,7 @@ export function ProfileScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFB' }} edges={['top']}>
       <Box flex={1} width="100%" maxWidth={430} alignSelf="center" bg="background">
         <TopBar
-          initials={profile?.initials ?? 'G'}
+          initials={profile?.initials ?? ''}
           onOpenMenu={topBar.openMenu}
           onOpenNotifications={topBar.openNotifications}
           onOpenProfile={topBar.openProfile}
@@ -99,13 +99,13 @@ export function ProfileScreen() {
               justifyContent="center"
             >
               <Text variant="display" color="white">
-                {profile?.initials ?? 'G'}
+                {profile?.initials ?? ''}
               </Text>
             </Box>
             <Box alignItems="center">
-              <Text variant="h2">{profile?.name ?? 'Gabriel'}</Text>
+              <Text variant="h2">{profile?.name ?? ''}</Text>
               <Text variant="caption" color="textSecondary">
-                {profile?.email ?? 'dev@dev.com'}
+                {profile?.email ?? ''}
               </Text>
             </Box>
 
@@ -176,9 +176,9 @@ export function ProfileScreen() {
       </Box>
       <ProfileModal
         visible={editing}
-        initials={profile?.initials ?? 'G'}
-        name={profile?.name ?? 'Gabriel'}
-        email={profile?.email ?? 'dev@dev.com'}
+        initials={profile?.initials ?? ''}
+        name={profile?.name ?? ''}
+        email={profile?.email ?? ''}
         stats={dynamicStats}
         emailEditable={false}
         onClose={() => setEditing(false)}

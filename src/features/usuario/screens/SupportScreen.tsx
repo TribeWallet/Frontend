@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, ScrollView, useWindowDimensions } from 'react-native';
+import { Alert, ScrollView, Share, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -25,21 +25,29 @@ export function SupportScreen() {
 
   const isSmallPhone = width < 360;
 
-  const handleSubmit = () => {
+  // Não existe endpoint de suporte na API: a mensagem sai pelo app que o usuário escolher.
+  const handleSubmit = async () => {
     if (!subject.trim() || !message.trim()) {
       Alert.alert('Suporte', 'Preencha o assunto e a mensagem.');
       return;
     }
-    Alert.alert('Suporte', 'Mensagem enviada. Responderemos em breve.');
-    setSubject('');
-    setMessage('');
+    try {
+      await Share.share({
+        title: subject.trim(),
+        message: `${subject.trim()}\n\n${message.trim()}\n\n— ${profile?.name ?? ''} (${profile?.email ?? ''})`,
+      });
+      setSubject('');
+      setMessage('');
+    } catch {
+      Alert.alert('Suporte', 'Não foi possível abrir o compartilhamento.');
+    }
   };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFB' }} edges={['top']}>
       <Box flex={1} width="100%" maxWidth={430} alignSelf="center" bg="background">
         <TopBar
-          initials={profile?.initials ?? 'G'}
+          initials={profile?.initials ?? ''}
           onOpenMenu={topBar.openMenu}
           onOpenNotifications={topBar.openNotifications}
           onOpenProfile={topBar.openProfile}
@@ -53,7 +61,8 @@ export function SupportScreen() {
           <Box width="100%" px={isSmallPhone ? 'sm' : 'md'} pt="md" gap="md">
             <Text variant="h2">Suporte</Text>
             <Text variant="bodySmall" color="textSecondary">
-              Conte para nós o que está acontecendo. Vamos responder no seu e-mail.
+              Descreva o que está acontecendo e envie pelo app de sua preferência
+              (e-mail, mensageria).
             </Text>
             <Input
               label="Assunto"
@@ -70,22 +79,6 @@ export function SupportScreen() {
               numberOfLines={6}
             />
             <Button title="Enviar mensagem" onPress={handleSubmit} fullWidth />
-            <Box
-              bg="surface"
-              borderRadius="md"
-              borderWidth={1}
-              borderColor="cardBorder"
-              p="md"
-              gap="xs"
-            >
-              <Text variant="bodyStrong">Outros canais</Text>
-              <Text variant="bodySmall" color="textSecondary">
-                suporte@tribewallet.com
-              </Text>
-              <Text variant="caption" color="textMuted">
-                Tempo médio de resposta: 24h em dias úteis.
-              </Text>
-            </Box>
           </Box>
         </ScrollView>
       </Box>

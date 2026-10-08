@@ -97,15 +97,9 @@ export function CommitmentCard({ commitment, onPress }: CommitmentCardProps) {
           </View>
         </Box>
 
-        <Text variant="bodySmall" color="textSecondary" numberOfLines={2}>
-          {commitment.description}
-        </Text>
-
-        <Box flexDirection="row" flexWrap="wrap" gap="xs" mt="sm">
+        <Box flexDirection="row" flexWrap="wrap" gap="xs">
           <Pill label={commitment.category} tone="neutral" size="sm" />
-          {commitment.dueDate ? (
-            <Pill label={`Vence ${commitment.dueDate}`} tone="primary" size="sm" />
-          ) : null}
+          <Pill label={`Vence ${commitment.dueDate}`} tone="primary" size="sm" />
           <Pill
             label={
               commitment.splitMode === 'equal'

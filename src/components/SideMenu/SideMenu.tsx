@@ -4,6 +4,7 @@ import Animated, { FadeIn, FadeOut, SlideInLeft } from 'react-native-reanimated'
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Box, Text } from '../../theme';
+import { version as appVersion } from '../../../package.json';
 
 export type SideMenuAction =
   | 'home'
@@ -356,7 +357,7 @@ export function SideMenu({
               </Svg>
               <Text variant="captionStrong" color="primary">TribeWallet</Text>
             </View>
-            <Text variant="caption" color="textMuted">v1.0.0 · build 100</Text>
+            <Text variant="caption" color="textMuted">v{appVersion}</Text>
           </Box>
         </Box>
       </Animated.View>

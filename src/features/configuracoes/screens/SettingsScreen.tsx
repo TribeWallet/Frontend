@@ -6,7 +6,6 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Svg, { Path } from 'react-native-svg';
 
 import { TopBar } from '../../../components/TopBar';
-import { Pill } from '../../../components/Pill';
 import { Button } from '../../../components/Button';
 import { Select, SelectOption } from '../../../components/Select';
 import { Box, Text, PressableBox } from '../../../theme';
@@ -19,10 +18,13 @@ import {
   Currency,
 } from '../stores/preferencesStore';
 import { useAuthStore } from '../../auth/stores/authStore';
+import { useUserStore as useProfileStore } from '../../usuario/stores/userStore';
+import { deleteUsuario } from '../../usuario/services/usuarioService';
+import { getErrorMessage } from '../../../services/api/apiClient';
 import { formatCurrency } from '../../../utils/currency';
-import { formatCurrency as fmt } from '../../../utils/currency';
 import { useTopBarActions } from '../../../hooks/useTopBarActions';
 import type { RootStackParamList } from '../../../navigation/types';
+import { version as appVersion } from '../../../../package.json';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -96,21 +98,18 @@ function SettingRow({ label, description, trailing, onPress }: SettingRowProps) 
   );
 }
 
+// Só as opções que o app realmente aplica hoje.
 const APPEARANCE_OPTIONS: SelectOption[] = [
   { id: 'light', label: 'Claro', description: 'Tema padrão' },
-  { id: 'dark', label: 'Escuro', description: 'Em breve' },
   { id: 'system', label: 'Sistema', description: 'Segue o aparelho' },
 ];
 
 const CURRENCY_OPTIONS: SelectOption[] = [
   { id: 'BRL', label: 'Real (R$)', description: 'Moeda brasileira' },
-  { id: 'USD', label: 'Dólar (US$)', description: 'Em breve' },
-  { id: 'EUR', label: 'Euro (€)', description: 'Em breve' },
 ];
 
 const LANGUAGE_OPTIONS: SelectOption[] = [
   { id: 'pt-BR', label: 'Português (Brasil)' },
-  { id: 'en-US', label: 'English (US)', description: 'Em breve' },
 ];
 
 export function SettingsScreen() {
@@ -120,7 +119,9 @@ export function SettingsScreen() {
   const isSmallPhone = width < 360;
 
   const profile = useUserStore((state) => state.profile);
+  const authUser = useAuthStore((state) => state.user);
   const authLogout = useAuthStore((state) => state.logout);
+  const clearProfile = useProfileStore((state) => state.logout);
 
   const {
     appearance,
@@ -163,6 +164,30 @@ export function SettingsScreen() {
     ]);
   }, [authLogout, navigation]);
 
+  const handleDeleteAccount = useCallback(() => {
+    if (!authUser) return;
+    Alert.alert(
+      'Excluir conta',
+      'Sua conta será excluída e você sairá do app. Deseja continuar?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteUsuario(authUser.id);
+              clearProfile();
+              authLogout();
+            } catch (error) {
+              Alert.alert('Erro', getErrorMessage(error));
+            }
+          },
+        },
+      ],
+    );
+  }, [authUser, clearProfile, authLogout]);
+
   const handleReset = useCallback(() => {
     Alert.alert(
       'Restaurar preferências',
@@ -174,18 +199,11 @@ export function SettingsScreen() {
     );
   }, [reset]);
 
-  const sampleCurrency =
-    currency === 'BRL'
-      ? formatCurrency(1234.56)
-      : currency === 'USD'
-        ? '$ 1,234.56'
-        : '€ 1.234,56';
-
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFB' }} edges={['top']}>
       <Box flex={1} width="100%" maxWidth={430} alignSelf="center" bg="background">
         <TopBar
-          initials={profile?.initials ?? 'G'}
+          initials={profile?.initials ?? ''}
           onOpenMenu={topBar.openMenu}
           onOpenNotifications={topBar.openNotifications}
           onOpenProfile={topBar.openProfile}
@@ -215,13 +233,12 @@ export function SettingsScreen() {
                   CONTA ATIVA
                 </Text>
                 <Text variant="bodyStrong" color="primary">
-                  {profile?.name ?? 'Gabriel'}
+                  {profile?.name ?? ''}
                 </Text>
                 <Text variant="caption" color="textSecondary">
-                  {profile?.email ?? 'dev@dev.com'}
+                  {profile?.email ?? ''}
                 </Text>
               </Box>
-              <Pill label="Plano gratuito" tone="primary" />
             </Box>
 
             <SectionTitle>Conta</SectionTitle>
@@ -256,7 +273,7 @@ export function SettingsScreen() {
                 value={currency}
                 onChange={(value) => setCurrency(value as Currency)}
                 options={CURRENCY_OPTIONS}
-                helperText={`Padrão atual: ${sampleCurrency}`}
+                helperText={`Exemplo: ${formatCurrency(1234.56)}`}
               />
               <Select
                 label="Idioma"
@@ -362,10 +379,7 @@ export function SettingsScreen() {
             />
 
             <SectionTitle>Sobre</SectionTitle>
-            <SettingRow
-              label="TribeWallet"
-              description="Versão 1.0.0 · compilação 100"
-            />
+            <SettingRow label="TribeWallet" description={`Versão ${appVersion}`} />
             <SettingRow
               label="Termos de uso"
               description="Condições do serviço"
@@ -390,10 +404,13 @@ export function SettingsScreen() {
                 variant="danger"
                 fullWidth
               />
+              <Button
+                title="Excluir conta"
+                onPress={handleDeleteAccount}
+                variant="outline"
+                fullWidth
+              />
             </Box>
-            <Text variant="caption" color="textMuted" alignSelf="center" mt="md">
-              Exemplo de formatação: {fmt(2800)}
-            </Text>
           </Box>
         </ScrollView>
       </Box>

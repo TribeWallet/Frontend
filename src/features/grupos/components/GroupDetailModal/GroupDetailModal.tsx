@@ -8,10 +8,7 @@ import { CommitmentCard } from '../../../../features/compromissos/components/Com
 import { CommitmentDetailModal } from '../../../../features/compromissos/components/CommitmentDetailModal/CommitmentDetailModal';
 import { NewGroupModal } from '../NewGroupModal/NewGroupModal';
 import { NewCommitmentModal } from '../../../../features/compromissos/components/NewCommitmentModal/NewCommitmentModal';
-import {
-  useAppCommitments,
-  useAppPayments,
-} from '../../../../contexts/AppContext';
+import { useAppCommitments } from '../../../../contexts/AppContext';
 import type { Group } from '../../types/Group';
 import type { Commitment } from '../../../../features/compromissos/types/Commitment';
 import { formatCurrency } from '../../../../utils/currency';
@@ -24,21 +21,31 @@ interface GroupDetailModalProps {
 
 export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalProps) {
   const { commitments } = useAppCommitments();
-  const { payments } = useAppPayments();
 
   const [editing, setEditing] = useState(false);
   const [newCommitment, setNewCommitment] = useState(false);
   const [detailCommitment, setDetailCommitment] = useState<Commitment | null>(null);
+  const [editingCommitment, setEditingCommitment] = useState<Commitment | null>(null);
 
   if (!group) return null;
 
-  const groupCommitments = commitments.filter((c) => c.groupId === group.id);
-  const groupPayments = payments.filter((p) => p.groupId === group.id);
-  const totalOpen = groupCommitments.reduce((sum, c) => {
-    const remaining = c.splits.filter((s) => !s.paid).reduce((s2, s) => s2 + s.amount, 0);
-    return sum + remaining;
-  }, 0);
-  const totalPaid = groupPayments.reduce((sum, p) => sum + p.amount, 0);
+  const groupCommitments = commitments.filter(
+    (commitment) => commitment.groupId === group.id,
+  );
+  const totalPaid = groupCommitments.reduce(
+    (sum, commitment) =>
+      sum + commitment.splits.reduce((inner, split) => inner + split.paidAmount, 0),
+    0,
+  );
+  const totalOpen = groupCommitments.reduce(
+    (sum, commitment) =>
+      sum +
+      commitment.splits.reduce(
+        (inner, split) => inner + Math.max(0, split.amount - split.paidAmount),
+        0,
+      ),
+    0,
+  );
 
   return (
     <Modal
@@ -176,10 +183,16 @@ export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalPr
         visible={detailCommitment !== null}
         commitment={detailCommitment ?? undefined}
         onClose={() => setDetailCommitment(null)}
-        onEdit={() => {
-          if (!detailCommitment) return;
+        onEdit={(commitment) => {
           setDetailCommitment(null);
+          setEditingCommitment(commitment);
         }}
+        onDeleted={() => setDetailCommitment(null)}
+      />
+      <NewCommitmentModal
+        visible={editingCommitment !== null}
+        commitment={editingCommitment}
+        onClose={() => setEditingCommitment(null)}
       />
     </Modal>
   );

@@ -1,84 +1,66 @@
 import type { TransactionStatus } from '../../../types/transactionStatus';
 
-export type PaymentMethod = 'pix' | 'card' | 'boleto' | 'other';
-
-export type CardBrand = 'credit' | 'debit';
-
-export type PaymentRecurrence = 'unique' | 'weekly' | 'monthly' | 'yearly';
+/** Espelha o enum MetodoPagamento do backend. */
+export type PaymentMethod =
+  | 'pix'
+  | 'dinheiro'
+  | 'credito'
+  | 'debito'
+  | 'transferencia'
+  | 'boleto';
 
 export interface Payment {
+  /** pagamentoToken. */
   id: string;
-  description: string;
   amount: number;
+  /** DD/MM/AAAA. */
+  date: string;
+  method: PaymentMethod;
+  receiptUrl?: string;
+  /** integranteCompromissoToken: a fatia do compromisso que este pagamento quita. */
+  shareId: string;
+  commitmentId: string;
+  commitmentName: string;
   groupId: string;
   groupName: string;
-  commitmentId?: string;
-  commitmentName?: string;
+  category: string;
+  /** usuarioToken de quem pagou. */
   payerId: string;
   payerName: string;
-  category: string;
-  method: PaymentMethod;
-  cardBrand?: CardBrand;
-  otherMethod?: string;
-  recurrence: PaymentRecurrence;
-  date: string;
-  notes?: string;
+  /** Situação da fatia quitada por este pagamento. */
   status: TransactionStatus;
-  createdAt: string;
-  updatedAt: string;
 }
 
+/** O backend amarra todo pagamento a uma fatia (integranteCompromisso). */
 export interface PaymentDraft {
-  description: string;
+  shareId: string;
   amount: number;
-  groupId: string;
-  groupName: string;
-  commitmentId?: string;
-  commitmentName?: string;
-  payerId: string;
-  payerName: string;
-  category: string;
-  method: PaymentMethod;
-  cardBrand?: CardBrand;
-  otherMethod?: string;
-  recurrence: PaymentRecurrence;
   date: string;
-  notes?: string;
-  status?: TransactionStatus;
+  method: PaymentMethod;
+  receiptBase64?: string;
 }
 
-export interface PaymentGroupOption {
-  id: string;
-  label: string;
-}
-
-export interface PaymentCategoryOption {
-  id: string;
-  label: string;
+export interface PaymentPatch {
+  amount?: number;
+  date?: string;
+  method?: PaymentMethod;
+  receiptBase64?: string;
 }
 
 export const paymentMethodLabels: Record<PaymentMethod, string> = {
   pix: 'PIX',
-  card: 'Cartão',
+  dinheiro: 'Dinheiro',
+  credito: 'Crédito',
+  debito: 'Débito',
+  transferencia: 'Transferência',
   boleto: 'Boleto',
-  other: 'Outro',
 };
 
 export const paymentMethodFullLabels: Record<PaymentMethod, string> = {
   pix: 'PIX',
-  card: 'Cartão',
+  dinheiro: 'Dinheiro',
+  credito: 'Cartão de crédito',
+  debito: 'Cartão de débito',
+  transferencia: 'Transferência bancária',
   boleto: 'Boleto bancário',
-  other: 'Outra forma',
-};
-
-export const cardBrandLabels: Record<CardBrand, string> = {
-  credit: 'Crédito',
-  debit: 'Débito',
-};
-
-export const paymentRecurrenceLabels: Record<PaymentRecurrence, string> = {
-  unique: 'Única',
-  weekly: 'Semanal',
-  monthly: 'Mensal',
-  yearly: 'Anual',
 };

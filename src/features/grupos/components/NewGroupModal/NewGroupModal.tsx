@@ -11,7 +11,10 @@ import { useAppGroups } from '../../../../contexts/AppContext';
 import { getErrorMessage } from '../../../../services/api/apiClient';
 import { fullName, isValidEmail } from '../../../../utils/formatters';
 import { useAuthStore } from '../../../auth/stores/authStore';
-import { findUsuarioByEmail } from '../../../usuario/services/usuarioService';
+import {
+  findUsuarioByEmail,
+  searchUsuariosByNome,
+} from '../../../usuario/services/usuarioService';
 import type { Group } from '../../types/Group';
 
 const schema = z.object({
@@ -49,12 +52,13 @@ export function NewGroupModal({
   onDeleted,
   group,
 }: NewGroupModalProps) {
-  const { addGroup, updateGroup, deleteGroup } = useAppGroups();
+  const { addGroup, updateGroup, deleteGroup, addGroupMembers, removeGroupMember } =
+    useAppGroups();
   const currentUser = useAuthStore((state) => state.user);
   const isEdit = Boolean(group);
 
   const [members, setMembers] = useState<PendingMember[]>([]);
-  const [newEmail, setNewEmail] = useState('');
+  const [search, setSearch] = useState('');
   const [memberError, setMemberError] = useState<string | null>(null);
   const [lookingUp, setLookingUp] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -85,46 +89,82 @@ export function NewGroupModal({
       reset({ name: '', description: '', tone: 'blue' });
     }
     setMembers([]);
-    setNewEmail('');
+    setSearch('');
     setMemberError(null);
     setSubmitError(null);
   }, [visible, group, reset]);
 
   const watched = watch();
 
-  // A API vincula integrantes por usuarioToken, então só entra quem já tem conta.
+  /** A API vincula integrantes por usuarioToken: só entra quem já tem conta. */
+  const lookupUsuario = async (term: string): Promise<PendingMember | null> => {
+    if (isValidEmail(term)) {
+      const usuario = await findUsuarioByEmail(term);
+      if (!usuario) {
+        setMemberError('Nenhum usuário cadastrado com esse e-mail.');
+        return null;
+      }
+      return {
+        usuarioToken: usuario.usuarioToken,
+        name: fullName(usuario.nome, usuario.sobrenome),
+        email: usuario.email,
+      };
+    }
+    const encontrados = await searchUsuariosByNome(term);
+    if (encontrados.length === 0) {
+      setMemberError('Nenhum usuário encontrado com esse nome.');
+      return null;
+    }
+    if (encontrados.length > 1) {
+      setMemberError(
+        `${encontrados.length} usuários com esse nome. Informe o e-mail para escolher.`,
+      );
+      return null;
+    }
+    const [usuario] = encontrados;
+    return {
+      usuarioToken: usuario.usuarioToken,
+      name: fullName(usuario.nome, usuario.sobrenome),
+      email: usuario.email,
+    };
+  };
+
   const handleAddMember = async () => {
-    const email = newEmail.trim().toLowerCase();
-    if (!isValidEmail(email)) {
-      setMemberError('Informe um e-mail válido.');
+    const term = search.trim();
+    if (term.length < 2) {
+      setMemberError('Informe o nome ou o e-mail do integrante.');
       return;
     }
-    if (email === currentUser?.email.toLowerCase()) {
-      setMemberError('Você já entra no grupo automaticamente.');
-      return;
-    }
-    if (members.some((member) => member.email.toLowerCase() === email)) {
-      setMemberError('Esse integrante já foi adicionado.');
+    if (term.toLowerCase() === currentUser?.email.toLowerCase()) {
+      setMemberError('Você já faz parte do grupo.');
       return;
     }
 
     setLookingUp(true);
     setMemberError(null);
     try {
-      const usuario = await findUsuarioByEmail(email);
-      if (!usuario) {
-        setMemberError('Nenhum usuário cadastrado com esse e-mail.');
+      const found = await lookupUsuario(term);
+      if (!found) return;
+
+      const alreadyInGroup = group?.members.some(
+        (member) => member.id === found.usuarioToken,
+      );
+      if (alreadyInGroup) {
+        setMemberError('Esse integrante já está no grupo.');
         return;
       }
-      setMembers((prev) => [
-        ...prev,
-        {
-          usuarioToken: usuario.usuarioToken,
-          name: fullName(usuario.nome, usuario.sobrenome),
-          email: usuario.email,
-        },
-      ]);
-      setNewEmail('');
+      if (members.some((member) => member.usuarioToken === found.usuarioToken)) {
+        setMemberError('Esse integrante já foi adicionado.');
+        return;
+      }
+
+      if (group) {
+        // Grupo já existe: o vínculo vai direto para a API.
+        await addGroupMembers(group.id, [found.usuarioToken]);
+      } else {
+        setMembers((prev) => [...prev, found]);
+      }
+      setSearch('');
     } catch (error) {
       setMemberError(getErrorMessage(error));
     } finally {
@@ -132,14 +172,36 @@ export function NewGroupModal({
     }
   };
 
-  const handleRemoveMember = (usuarioToken: string) => {
+  const handleRemovePending = (usuarioToken: string) => {
     setMembers((prev) => prev.filter((member) => member.usuarioToken !== usuarioToken));
+  };
+
+  const handleRemoveMember = (integranteToken: string, name: string) => {
+    if (!group) return;
+    Alert.alert('Remover integrante', `Remover ${name} do grupo?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Remover',
+        style: 'destructive',
+        onPress: async () => {
+          setSubmitting(true);
+          setSubmitError(null);
+          try {
+            await removeGroupMember(group.id, integranteToken);
+          } catch (error) {
+            setSubmitError(getErrorMessage(error));
+          } finally {
+            setSubmitting(false);
+          }
+        },
+      },
+    ]);
   };
 
   const handleClose = useCallback(() => {
     reset();
     setMembers([]);
-    setNewEmail('');
+    setSearch('');
     setMemberError(null);
     setSubmitError(null);
     onClose();
@@ -175,30 +237,26 @@ export function NewGroupModal({
 
   const handleDelete = () => {
     if (!group) return;
-    Alert.alert(
-      'Excluir grupo',
-      `Tem certeza que deseja excluir "${group.name}"?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Excluir',
-          style: 'destructive',
-          onPress: async () => {
-            setSubmitting(true);
-            setSubmitError(null);
-            try {
-              await deleteGroup(group.id);
-              handleClose();
-              onDeleted?.();
-            } catch (error) {
-              setSubmitError(getErrorMessage(error));
-            } finally {
-              setSubmitting(false);
-            }
-          },
+    Alert.alert('Excluir grupo', `Tem certeza que deseja excluir "${group.name}"?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Excluir',
+        style: 'destructive',
+        onPress: async () => {
+          setSubmitting(true);
+          setSubmitError(null);
+          try {
+            await deleteGroup(group.id);
+            handleClose();
+            onDeleted?.();
+          } catch (error) {
+            setSubmitError(getErrorMessage(error));
+          } finally {
+            setSubmitting(false);
+          }
         },
-      ],
-    );
+      },
+    ]);
   };
 
   return (
@@ -206,17 +264,14 @@ export function NewGroupModal({
       visible={visible}
       onClose={handleClose}
       title={isEdit ? 'Editar grupo' : 'Novo grupo'}
-      subtitle={isEdit ? 'Atualize as informações do grupo' : 'Crie um grupo e adicione integrantes'}
+      subtitle={
+        isEdit ? 'Atualize as informações do grupo' : 'Crie um grupo e adicione integrantes'
+      }
       showCloseButton
       footer={
         <Box flexDirection="row" gap="sm">
           <Box flex={1}>
-            <Button
-              title="Cancelar"
-              onPress={handleClose}
-              variant="outline"
-              fullWidth
-            />
+            <Button title="Cancelar" onPress={handleClose} variant="outline" fullWidth />
           </Box>
           {isEdit ? (
             <Box flex={1}>
@@ -256,7 +311,7 @@ export function NewGroupModal({
                 value={value}
                 onChangeText={onChange}
                 onBlur={onBlur}
-                placeholder="Ex: República Universitária"
+                placeholder="Ex: Apartamento 302"
                 error={errors.name?.message}
               />
             )}
@@ -325,27 +380,40 @@ export function NewGroupModal({
 
           <Box>
             <Text variant="label" marginBottom="xs">Integrantes</Text>
+
             {group ? (
-              <>
-                {group.members.map((member, index) => (
-                  <Box
-                    key={member.id}
-                    py="xs"
-                    borderTopWidth={index === 0 ? 0 : 1}
-                    borderColor="border"
-                  >
-                    <Text variant="bodyStrong">{member.name}</Text>
+              group.members.map((member, index) => (
+                <Box
+                  key={member.integranteToken}
+                  flexDirection="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  py="xs"
+                  borderTopWidth={index === 0 ? 0 : 1}
+                  borderColor="border"
+                >
+                  <Box flex={1}>
+                    <Text variant="bodyStrong">
+                      {member.name}
+                      {member.id === currentUser?.id ? ' (você)' : ''}
+                    </Text>
                     {member.email ? (
                       <Text variant="caption" color="textSecondary">
                         {member.email}
                       </Text>
                     ) : null}
                   </Box>
-                ))}
-                <Text variant="caption" color="textSecondary" mt="xs">
-                  Os integrantes são definidos na criação do grupo.
-                </Text>
-              </>
+                  {member.id === currentUser?.id ? null : (
+                    <PressableBox
+                      onPress={() => handleRemoveMember(member.integranteToken, member.name)}
+                      accessibilityRole="button"
+                      hitSlop={6}
+                    >
+                      <Text variant="captionStrong" color="danger">Remover</Text>
+                    </PressableBox>
+                  )}
+                </Box>
+              ))
             ) : (
               <>
                 {currentUser ? (
@@ -373,7 +441,7 @@ export function NewGroupModal({
                       </Text>
                     </Box>
                     <PressableBox
-                      onPress={() => handleRemoveMember(member.usuarioToken)}
+                      onPress={() => handleRemovePending(member.usuarioToken)}
                       accessibilityRole="button"
                       hitSlop={6}
                     >
@@ -381,32 +449,32 @@ export function NewGroupModal({
                     </PressableBox>
                   </Box>
                 ))}
-                <Box mt="sm">
-                  <Input
-                    label="E-mail do integrante"
-                    value={newEmail}
-                    onChangeText={(text) => {
-                      setNewEmail(text.replace(/\s/g, ''));
-                      if (memberError) setMemberError(null);
-                    }}
-                    placeholder="email@exemplo.com"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    error={memberError ?? undefined}
-                    helperText="A pessoa precisa ter uma conta no TribeWallet."
-                  />
-                </Box>
-                <Button
-                  title="Adicionar integrante"
-                  onPress={handleAddMember}
-                  variant="outline"
-                  size="sm"
-                  loading={lookingUp}
-                  fullWidth
-                />
               </>
             )}
+
+            <Box mt="sm">
+              <Input
+                label="Nome ou e-mail do integrante"
+                value={search}
+                onChangeText={(text) => {
+                  setSearch(text);
+                  if (memberError) setMemberError(null);
+                }}
+                placeholder="Ana ou ana@exemplo.com"
+                autoCapitalize="none"
+                autoCorrect={false}
+                error={memberError ?? undefined}
+                helperText="A pessoa precisa ter uma conta no TribeWallet."
+              />
+            </Box>
+            <Button
+              title="Adicionar integrante"
+              onPress={handleAddMember}
+              variant="outline"
+              size="sm"
+              loading={lookingUp}
+              fullWidth
+            />
           </Box>
 
           {submitError ? (

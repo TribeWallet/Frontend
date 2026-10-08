@@ -6,7 +6,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { TopBar } from '../../../../components/TopBar';
 import { Button } from '../../../../components/Button';
-import { Pill } from '../../../../components/Pill';
+import { Loading } from '../../../../components/Loading';
 import { Box, Text } from '../../../../theme';
 import { useDashboardOverview } from '../../hooks/useDashboardOverview';
 import { StatCard } from '../../components/StatCard/StatCard';
@@ -23,21 +23,17 @@ import {
 import { useTopBarActions } from '../../../../hooks/useTopBarActions';
 import { useAppNotifications } from '../../../../hooks/useNotifications';
 import { formatCurrency } from '../../../../utils/currency';
+import { paymentMethodLabels } from '../../../pagamentos/types/Payment';
+import type { PaymentMethod } from '../../../pagamentos/types/Payment';
 import type { RootStackParamList } from '../../../../navigation/types';
 
-type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-const METHOD_LABEL: Record<string, string> = {
-  pix: 'PIX',
-  card: 'Cartão',
-  boleto: 'Boleto',
-  other: 'Outro',
-};
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export function DashboardScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { width } = useWindowDimensions();
-  const { data } = useDashboardOverview();
+  const { data, isLoading, isError, error, refetch } = useDashboardOverview();
   const topBar = useTopBarActions();
   const { unreadCount } = useAppNotifications();
   const isSmallPhone = width < 360;
@@ -47,7 +43,7 @@ export function DashboardScreen() {
   const methodChartData = useMemo(
     () =>
       data.charts.byMethod.map((item) => ({
-        label: METHOD_LABEL[item.label] ?? item.label,
+        label: paymentMethodLabels[item.label as PaymentMethod] ?? item.label,
         value: item.value,
       })),
     [data.charts.byMethod],
@@ -90,11 +86,29 @@ export function DashboardScreen() {
               <Text variant="captionStrong" color="primary">
                 {greeting.toUpperCase()}
               </Text>
-              <Text variant="h1">{data.user.name.split(' ')[0]}</Text>
+              <Text variant="h1">{data.user.name.split(' ')[0] || 'Olá'}</Text>
               <Text variant="bodySmall" color="textSecondary">
                 Sua visão geral financeira em um só lugar.
               </Text>
             </Box>
+
+            {isError ? (
+              <Box bg="dangerLight" borderRadius="md" p="md" mb="md">
+                <Text variant="bodyStrong" color="danger">
+                  Não foi possível carregar seus dados
+                </Text>
+                <Text variant="caption" color="textSecondary" mb="sm">
+                  {error ?? 'Verifique se a API está rodando.'}
+                </Text>
+                <Button title="Tentar novamente" onPress={refetch} size="sm" />
+              </Box>
+            ) : null}
+
+            {isLoading ? (
+              <Box mb="md">
+                <Loading label="Carregando seus dados..." />
+              </Box>
+            ) : null}
 
             <Box flexDirection="row" flexWrap="wrap" gap="sm" mb="md">
               {statCards.map((stat) => (
@@ -310,20 +324,17 @@ export function DashboardScreen() {
             >
               <Box flex={1}>
                 <Text variant="captionStrong" color="primary">
-                  RESUMO DO MÊS
+                  RESUMO GERAL
                 </Text>
                 <Text variant="bodyStrong" color="primary">
-                  {data.transactions.length} pagamentos •
-                  {' '}
-                  {formatCurrency(
-                    data.charts.byCategory.reduce((sum, item) => sum + item.value, 0),
-                  )}
+                  {data.totals.paymentsCount} pagamento
+                  {data.totals.paymentsCount === 1 ? '' : 's'} •{' '}
+                  {formatCurrency(data.totals.paymentsTotal)}
                 </Text>
                 <Text variant="caption" color="textSecondary">
-                  {data.charts.last6Months.at(-1)?.label ?? '—'} em diante
+                  Em aberto: {formatCurrency(data.totals.openTotal)}
                 </Text>
               </Box>
-              <Pill label="Atualizado agora" tone="primary" />
             </Box>
           </Box>
         </ScrollView>

@@ -5,7 +5,10 @@ export type GroupTone = 'blue' | 'green' | 'family';
 export type GroupTagTone = PillTone | 'blue' | 'green';
 
 export interface GroupMember {
+  /** usuarioToken. */
   id: string;
+  /** integranteToken: o vínculo com este grupo, usado nos compromissos. */
+  integranteToken: string;
   name: string;
   initials: string;
   email?: string;
@@ -23,6 +26,7 @@ export interface GroupSummary {
 }
 
 export interface Group {
+  /** grupoToken. */
   id: string;
   tone: GroupTone;
   name: string;
@@ -30,6 +34,4 @@ export interface Group {
   tags: GroupTag[];
   summary: GroupSummary;
   members: GroupMember[];
-  extraMembers?: number;
-  createdAt?: string;
 }
