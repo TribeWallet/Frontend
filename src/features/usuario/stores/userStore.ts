@@ -6,6 +6,7 @@ import { storage, StorageKeys } from '../../../services/storage';
 export interface UserProfile {
   id: string;
   initials: string;
+  imageUrl: string | null;
   name: string;
   email: string;
   notificationCount: number;

@@ -11,6 +11,7 @@ export interface AuthUser {
   lastName: string;
   username: string;
   email: string;
+  imageUrl?: string | null;
   initials: string;
   notificationCount?: number;
 }

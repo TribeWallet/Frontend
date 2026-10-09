@@ -1,5 +1,5 @@
-import React from 'react';
-import { Pressable } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Image, Pressable } from 'react-native';
 import { Box, Text } from '../../theme';
 import { BellIcon, MenuIcon } from './icons';
 
@@ -7,6 +7,7 @@ export type TopBarSize = 'standard' | 'compact';
 
 interface TopBarProps {
   initials: string;
+  imageUrl?: string | null;
   notificationCount?: number;
   size?: TopBarSize;
   onOpenMenu?: () => void;
@@ -16,6 +17,7 @@ interface TopBarProps {
 
 export function TopBar({
   initials,
+  imageUrl,
   notificationCount = 0,
   size = 'standard',
   onOpenMenu,
@@ -23,6 +25,11 @@ export function TopBar({
   onOpenProfile,
 }: TopBarProps) {
   const compact = size === 'compact';
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [imageUrl]);
 
   return (
     <Box
@@ -94,10 +101,25 @@ export function TopBar({
             bg="primary"
             alignItems="center"
             justifyContent="center"
+            overflow="hidden"
           >
-            <Text variant="bodyStrong" color="white" style={{ fontSize: compact ? 14 : 16 }}>
-              {initials}
-            </Text>
+            {imageUrl && !imageFailed ? (
+              <Image
+                source={{ uri: imageUrl }}
+                onError={() => setImageFailed(true)}
+                resizeMode="cover"
+                style={{
+                  width: compact ? 40 : 44,
+                  height: compact ? 40 : 44,
+                  borderRadius: compact ? 20 : 22,
+                }}
+                accessible={false}
+              />
+            ) : (
+              <Text variant="bodyStrong" color="white" style={{ fontSize: compact ? 14 : 16 }}>
+                {initials}
+              </Text>
+            )}
           </Box>
         </Pressable>
       </Box>

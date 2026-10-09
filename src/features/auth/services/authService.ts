@@ -14,6 +14,7 @@ export function toAuthUser(usuario: UsuarioResponse): AuthUser {
     lastName: usuario.sobrenome,
     username: usuario.username,
     email: usuario.email,
+    imageUrl: usuario.imageUrl ?? null,
     initials: initialsFromName(name),
     notificationCount: 0,
   };

@@ -11,6 +11,7 @@ interface ProfileModalProps {
   visible: boolean;
   initials: string;
   name: string;
+  imageUrl?: string | null;
   email: string;
   stats: { value: string; label: string }[];
   onClose: () => void;
@@ -24,6 +25,7 @@ export function ProfileModal({
   visible,
   initials: initialInitials,
   name: initialName,
+  imageUrl: initialImageUrl,
   email: initialEmail,
   stats,
   onClose,
@@ -32,6 +34,7 @@ export function ProfileModal({
   emailEditable = true,
 }: ProfileModalProps) {
   const [initials, setInitials] = useState(initialInitials);
+  const [imageUrl, setImageUrl] = useState<string | null | undefined>(undefined);
   const [name, setName] = useState(initialName);
   const [email, setEmail] = useState(initialEmail);
   const [error, setError] = useState<string | null>(null);
@@ -40,8 +43,9 @@ export function ProfileModal({
   useEffect(() => {
     setInitials(initialInitials);
     setName(initialName);
+    setImageUrl(initialImageUrl);
     setEmail(initialEmail);
-  }, [initialInitials, initialName, initialEmail, visible]);
+  }, [initialInitials, initialName, initialEmail, initialImageUrl, visible]);
 
   const handleSave = async () => {
     if (name.trim().length < 3) {
