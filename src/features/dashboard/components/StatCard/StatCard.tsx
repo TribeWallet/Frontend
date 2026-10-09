@@ -1,12 +1,13 @@
 import React from 'react';
 import { Pressable, View } from 'react-native';
-import Svg, { Circle, Path } from 'react-native-svg';
+import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { Box, Text } from '../../../../theme';
 
 interface StatCardProps {
   stat: {
     id: string;
     tone: 'blue' | 'yellow' | 'green';
+    icon: 'groups' | 'clock' | 'card' | 'trend';
     label: string;
     value: string;
     meta?: string;
@@ -21,9 +22,9 @@ const toneColors = {
   green: { bg: '#E0F7EF' as const, icon: '#16AF7E' as const, trend: '#16AF7E' as const },
 };
 
-function renderIcon(tone: 'blue' | 'yellow' | 'green', color: string): React.ReactNode {
-  switch (tone) {
-    case 'blue':
+function renderIcon(icon: 'groups' | 'clock' | 'card' | 'trend', color: string): React.ReactNode {
+  switch (icon) {
+    case 'groups':
       return (
         <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
           <Circle cx={9} cy={7.5} r={3} stroke={color} strokeWidth={1.7} />
@@ -42,7 +43,7 @@ function renderIcon(tone: 'blue' | 'yellow' | 'green', color: string): React.Rea
           />
         </Svg>
       );
-    case 'yellow':
+    case 'clock':
       return (
         <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
           <Circle cx={12} cy={12} r={7.6} stroke={color} strokeWidth={1.7} />
@@ -55,18 +56,33 @@ function renderIcon(tone: 'blue' | 'yellow' | 'green', color: string): React.Rea
           />
         </Svg>
       );
-    case 'green':
+    case 'card':
+      return (
+        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+          <Rect
+            x={3.5}
+            y={5.5}
+            width={17}
+            height={13}
+            rx={2}
+            stroke={color}
+            strokeWidth={1.7}
+          />
+          <Path d="M4 9.5h16M7 14.5h4" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
+        </Svg>
+      );
+    case 'trend':
       return (
         <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
           <Path
-            d="m4 16 4.1-4 3.1 2.5L18.8 7"
+            d="m3.5 17 5-5 3.5 3 8-8"
             stroke={color}
             strokeWidth={1.8}
             strokeLinecap="round"
             strokeLinejoin="round"
           />
           <Path
-            d="M14.5 7h4.3v4.2"
+            d="M15.5 7h4.5v4.5"
             stroke={color}
             strokeWidth={1.8}
             strokeLinecap="round"
@@ -102,7 +118,7 @@ export function StatCard({ stat, onPress }: StatCardProps) {
               marginBottom: 12,
             }}
           >
-            {renderIcon(stat.tone, palette.icon)}
+            {renderIcon(stat.icon, palette.icon)}
           </View>
 
           <Text variant="caption" color="textSecondary" numberOfLines={1}>
