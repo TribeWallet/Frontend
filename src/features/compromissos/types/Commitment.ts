@@ -23,9 +23,11 @@ export interface CommitmentSplitEntry {
 }
 
 export interface Commitment {
+  [x: string]: any;
   /** compromissoFinanceiroToken. */
   id: string;
   initials: string;
+  imagem: string | null;
   avatarTone: 'blue' | 'teal' | 'indigo';
   /** titulo. */
   name: string;

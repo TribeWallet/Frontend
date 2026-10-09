@@ -1,10 +1,11 @@
-import React from 'react';
-import { Pressable, View } from 'react-native';
+import React, { useEffect } from 'react';
+import { Image, Pressable, View } from 'react-native';
 import { Pill } from '../../../../components/Pill';
 import { Box, Text } from '../../../../theme';
 import type { Commitment } from '../../types/Commitment';
 import { summarizeCommitment } from '../../services/split';
 import { formatCurrency } from '../../../../utils/currency';
+import { environment } from '../../../../config/environment';
 
 interface CommitmentCardProps {
   commitment: Commitment;
@@ -33,6 +34,10 @@ export function CommitmentCard({ commitment, onPress }: CommitmentCardProps) {
   const palette = statusPalette[commitment.status];
   const summary = summarizeCommitment(commitment);
 
+  useEffect(() => {
+    console.log(commitment.imagem);
+  }, []);
+
   return (
     <Pressable
       onPress={() => onPress?.(commitment.id)}
@@ -58,9 +63,16 @@ export function CommitmentCard({ commitment, onPress }: CommitmentCardProps) {
               justifyContent: 'center',
             }}
           >
-            <Text variant="bodyStrong" color="white" style={{ fontSize: 16 }}>
+            {commitment.imagem ? (
+              <Image
+                source={{ uri: `${environment.mediaUrl}/${commitment.imagem}` }}
+                style={{ width: 44, height: 44, borderRadius: 9999 }}
+              />
+            ) : (
+              <Text variant="bodyStrong" color="white" style={{ fontSize: 16 }}>
               {commitment.initials}
             </Text>
+            )}
           </View>
 
           <Box flex={1}>
