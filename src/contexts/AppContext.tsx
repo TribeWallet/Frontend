@@ -260,14 +260,14 @@ export function AppProvider({
     };
   }, [groupsQuery.data]);
 
-  const baseGroups = useMemo<Group[]>(
-    () => (groupsQuery.data ?? []).map(toGroup),
-    [groupsQuery.data],
+  const uniqueBaseGroups = useMemo(
+    () => [...new Map(mappedGroups.map((group) => [group.id, group])).values()],
+    [mappedGroups],
   );
 
   // A listagem de grupos não traz as participações; os compromissos vêm por grupo.
   const commitmentQueries = useQueries({
-    queries: baseGroups.map((group) => ({
+    queries: uniqueBaseGroups.map((group) => ({
       queryKey: ['compromissos', group.id],
       queryFn: () => listCompromissosByGrupo(group.id),
     })),
@@ -281,13 +281,13 @@ export function AppProvider({
 
   const commitments = useMemo<Commitment[]>(
     () =>
-      baseGroups.flatMap((group, index) =>
+      uniqueBaseGroups.flatMap((group, index) =>
         (commitmentQueries[index]?.data ?? []).map((dto) =>
           toCommitment(dto, { id: group.id, name: group.name }),
         ),
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [baseGroups, commitmentQueries.map((query) => query.dataUpdatedAt).join('|')],
+    [uniqueBaseGroups, commitmentQueries.map((query) => query.dataUpdatedAt).join('|')],
   );
 
   // Mais recentes primeiro: as telas mostram "últimos pagamentos".

@@ -22,7 +22,10 @@ export async function listGrupos(usuarioToken: string): Promise<GrupoResponse[]>
     `${endpoints.grupos.byUsuario(usuarioToken)}?deleted=false`,
   );
   // A exclusão é soft delete: filtra o que já foi excluído.
-  return grupos.filter((grupo) => !grupo.deletedAt);
+  const activeGroups = grupos.filter((grupo) => !grupo.deletedAt);
+  const uniqueGroups = new Map<string, GrupoResponse>();
+  activeGroups.forEach((grupo) => uniqueGroups.set(grupo.grupoToken, grupo));
+  return [...uniqueGroups.values()];
 }
 
 export function getGrupo(grupoToken: string): Promise<GrupoResponse> {

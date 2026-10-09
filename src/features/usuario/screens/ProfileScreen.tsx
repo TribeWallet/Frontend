@@ -22,6 +22,7 @@ import { useTopBarActions } from '../../../hooks/useTopBarActions';
 import type { RootStackParamList } from '../../../navigation/types';
 import { formatCurrency } from '../../../utils/currency';
 import { environment } from '../../../config/environment';
+import { useAppDashboard } from '../../dashboard/hooks/useDashboard';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Profile'>;
 
@@ -37,18 +38,16 @@ export function ProfileScreen() {
   const { payments } = useAppPayments();
   const topBar = useTopBarActions();
   const [editing, setEditing] = useState(false);
+  const { data, isLoading, isError: dashboardError, refetch } = useAppDashboard();
 
-  const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
-  const punctuality = commitments.length
-    ? Math.round(
-        (commitments.filter((c) => c.status === 'paid').length / commitments.length) * 100,
-      )
-    : 0;
+  const totalPaid = data?.valorTotalPago ?? payments.reduce((sum, p) => sum + p.amount, 0);
+  const punctuality = data?.taxaDePontualidade? (data.taxaDePontualidade)*100 : 0;
+  const totalGroups = data?.gruposAtivosCount ?? groups.length;
   const dynamicStats = useMemo(
     () => [
-      { value: String(groups.length), label: 'Grupos' },
-      { value: String(payments.length), label: 'Pagamentos' },
-      { value: `${punctuality}%`, label: 'Pontualidade' },
+      { value: String(data?.gruposAtivosCount ?? 0), label: 'Grupos' },
+      { value: String(data?.compromissosCountTotal ?? 0), label: 'Compromissos' },
+      { value: String(data?.pagamentosCountTotal ?? 0), label: 'Pagamentos' },
     ],
     [groups.length, payments.length, punctuality],
   );
@@ -161,7 +160,7 @@ export function ProfileScreen() {
               </Box>
               <Box flexDirection="row" alignItems="center" justifyContent="space-between">
                 <Text variant="bodyStrong">Grupos</Text>
-                <Pill label={String(groups.length)} tone="primary" />
+                <Pill label={String(totalGroups)} tone="primary" />
               </Box>
             </Box>
 

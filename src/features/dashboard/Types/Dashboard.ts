@@ -2,8 +2,11 @@ export interface Dashboard {
     usuarioToken: string;
     gruposAtivosCount: number;
     pagamentosPendentesCount: number;
+    pagamentosCountTotal: number;
+    valorTotalPago: number;
     compromissosAVencerCount: number;
     compromissosVencidosCount: number;
+    compromissosCountTotal: number;
     taxaDePontualidade: number;
     transacoesEVencimentos: IntegranteCompromissoDashboard[];
 }

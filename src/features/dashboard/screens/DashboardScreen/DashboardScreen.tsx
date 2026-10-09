@@ -147,8 +147,8 @@ export function DashboardScreen() {
     navigation.navigate('NewPayment');
   }, [navigation]);
 
-  const handleViewAlerts = useCallback(() => {
-    navigation.navigate('Main', { screen: 'Alerts' } as never);
+  const handleViewOverdue = useCallback(() => {
+    navigation.navigate('Main', { screen: 'Commitments' });
   }, [navigation]);
 
   const greeting = useMemo(() => {
@@ -218,7 +218,7 @@ export function DashboardScreen() {
                 <AlertBanner
                   title={`${data.compromissosVencidosCount} compromisso${data.compromissosVencidosCount === 1 ? '' : 's'} vencido${data.compromissosVencidosCount === 1 ? '' : 's'}`}
                   description="Regularize os valores em aberto para evitar pendências no grupo."
-                  onPressView={handleViewAlerts}
+                  onPressView={handleViewOverdue}
                 />
               </Box>
             ) : data ? (
