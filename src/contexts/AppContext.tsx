@@ -43,8 +43,10 @@ import { parseBRDate } from '../utils/date';
 import type { NotificationItem } from '../features/notificacoes/types/Notification';
 import type { NotificationSettings } from '../features/notificacoes/components/NotificationsModal/NotificationsModal';
 import type { Group } from '../features/grupos/types/Group';
+import type { Dashboard } from "../features/dashboard/Types/Dashboard";
 import type { Commitment, CommitmentInput } from '../features/compromissos/types/Commitment';
 import type { Payment, PaymentDraft, PaymentPatch } from '../features/pagamentos/types/Payment';
+import {fetchDashboard} from "../features/dashboard/Services/dashboardService";
 
 export interface TopBarActions {
   openMenu: () => void;
@@ -119,6 +121,10 @@ interface AppContextValue
     CommitmentsContextValue,
     PaymentsContextValue {
   topBar: TopBarActions;
+  dashboard?: Dashboard;
+  dashboardLoading: boolean;
+  dashboardError: string | null;
+  refetchDashboard: () => void;
 }
 
 // Preferências de notificação não existem na API: ficam só na sessão do app.
@@ -224,6 +230,15 @@ export function AppProvider({
   const usuarioToken = useAuthStore((state) => state.user?.id);
   const queryClient = useQueryClient();
 
+  const dashboardQuery = useQuery({
+      queryKey: ['dashboard', usuarioToken],
+      queryFn: () => fetchDashboard(usuarioToken as string),
+      enabled: Boolean(usuarioToken),
+  });
+  const dashboard = dashboardQuery.data;
+  const dashboardLoading = dashboardQuery.isLoading;
+  const dashboardError = dashboardQuery.isError ? getErrorMessage(dashboardQuery.error) : null;
+
   const groupsQuery = useQuery({
     queryKey: ['grupos', usuarioToken],
     queryFn: () => listGrupos(usuarioToken as string),
@@ -233,6 +248,7 @@ export function AppProvider({
   const groupsLoading = groupsQuery.isLoading;
   const groupsError = groupsQuery.error ? getErrorMessage(groupsQuery.error) : null;
   const [mappedGroups, setMappedGroups] = useState<Group[]>([]);
+
 
   useEffect(() => {
     let active = true;
@@ -522,6 +538,10 @@ export function AppProvider({
   const value = useMemo<AppContextValue>(
     () => ({
       topBar,
+      dashboard,
+      dashboardLoading,
+      dashboardError,
+      refetchDashboard: dashboardQuery.refetch,
       notifications,
       unreadCount,
       markAsRead,
@@ -557,6 +577,10 @@ export function AppProvider({
     }),
     [
       topBar,
+      dashboard,
+      dashboardLoading,
+      dashboardError,
+      dashboardQuery.refetch,
       notifications,
       unreadCount,
       markAsRead,

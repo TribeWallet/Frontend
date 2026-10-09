@@ -7,6 +7,7 @@ export const endpoints = {
     list: '/api/usuarios',
     byNome: (nome: string) => `/api/usuarios/${encodeURIComponent(nome)}`,
     byToken: (usuarioToken: string) => `/api/usuarios/${usuarioToken}`,
+    dashboard: (usuarioToken: string) => `/api/usuarios/${usuarioToken}/dashboard`,
   },
   grupos: {
     create: '/api/grupos',
