@@ -34,10 +34,6 @@ export function CommitmentCard({ commitment, onPress }: CommitmentCardProps) {
   const palette = statusPalette[commitment.status];
   const summary = summarizeCommitment(commitment);
 
-  useEffect(() => {
-    console.log(commitment.imagem);
-  }, []);
-
   return (
     <Pressable
       onPress={() => onPress?.(commitment.id)}

@@ -10,3 +10,4 @@ android/
 ios/
 .md
 __tests__/
+src/config/environment.ts

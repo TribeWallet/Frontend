@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { ScrollView, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -36,21 +36,7 @@ const transactionStatusByPaymentSituation: Record<SituacaoPagamento, Transaction
 
 function resolveCommitmentImageUrl(imageUrl: string | null): string | null {
   if (!imageUrl) return null;
-  if (/^https?:\/\//i.test(imageUrl)) {
-    const mediaOrigin = environment.mediaUrl.match(/^https?:\/\/[^/]+/i)?.[0];
-    const loopbackUrl = /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(?=\/|$)/i;
-
-    return mediaOrigin && loopbackUrl.test(imageUrl)
-      ? imageUrl.replace(loopbackUrl, mediaOrigin)
-      : imageUrl;
-  }
-
-  const path = imageUrl
-    .replace(/^\/+/, '')
-    .split('/')
-    .map(encodeURIComponent)
-    .join('/');
-  return `${environment.mediaUrl}/${path}`;
+  return `${environment.mediaUrl}/${imageUrl}`;
 }
 
 export function DashboardScreen() {
@@ -61,6 +47,7 @@ export function DashboardScreen() {
   const { unreadCount } = useAppNotifications();
   const user = useAuthStore((state) => state.user);
   const isSmallPhone = width < 360;
+
 
   const statCards = useMemo(
     () =>

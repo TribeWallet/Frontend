@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Image, Pressable } from 'react-native';
 import { Box, Text } from '../../theme';
+import { environment } from '../../config/environment';
+import { useAuthStore } from '../../features/auth/stores/authStore';
 import { BellIcon, MenuIcon } from './icons';
 
 export type TopBarSize = 'standard' | 'compact';
@@ -25,11 +27,15 @@ export function TopBar({
   onOpenProfile,
 }: TopBarProps) {
   const compact = size === 'compact';
+  const authImageUrl = useAuthStore((state) => state.user?.imageUrl);
+  const resolvedImageUrl = imageUrl ?? (authImageUrl
+    ?`${environment.mediaUrl}/${authImageUrl}`
+    : undefined);
   const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
     setImageFailed(false);
-  }, [imageUrl]);
+  }, [resolvedImageUrl]);
 
   return (
     <Box
@@ -103,9 +109,9 @@ export function TopBar({
             justifyContent="center"
             overflow="hidden"
           >
-            {imageUrl && !imageFailed ? (
+            {resolvedImageUrl && !imageFailed ? (
               <Image
-                source={{ uri: imageUrl }}
+                source={{ uri: resolvedImageUrl }}
                 onError={() => setImageFailed(true)}
                 resizeMode="cover"
                 style={{
