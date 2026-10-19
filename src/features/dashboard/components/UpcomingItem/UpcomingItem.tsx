@@ -1,14 +1,25 @@
 import React from 'react';
 import { Box, Text } from '../../../../theme';
-import type { DashboardOverviewData } from '../../hooks/useDashboardOverview';
+import { CommitmentAvatar } from '../CommitmentAvatar/CommitmentAvatar';
 
-type DashboardUpcoming = DashboardOverviewData['upcoming'][number];
+interface DashboardUpcoming {
+  id: string;
+  imageUrl: string | null;
+  initials: string;
+  name: string;
+  group: string;
+  value: string;
+  date: string;
+  daysToDue: number;
+}
 
 interface UpcomingItemProps {
   upcoming: DashboardUpcoming;
 }
 
 export function UpcomingItem({ upcoming }: UpcomingItemProps) {
+  const urgent = upcoming.daysToDue < 7;
+
   return (
     <Box
       flexDirection="row"
@@ -16,8 +27,9 @@ export function UpcomingItem({ upcoming }: UpcomingItemProps) {
       justifyContent="space-between"
       py="sm"
     >
-      <Box flex={1} pr="md">
-        <Text variant="bodyStrong" numberOfLines={1}>
+      <CommitmentAvatar imageUrl={upcoming.imageUrl} initials={upcoming.initials} />
+      <Box flex={1} px="md">
+        <Text variant="h3" numberOfLines={1}>
           {upcoming.name}
         </Text>
         <Text variant="caption" color="textSecondary" numberOfLines={1} mt="xxs">
@@ -32,12 +44,12 @@ export function UpcomingItem({ upcoming }: UpcomingItemProps) {
           px="sm"
           py="xxs"
           borderRadius="full"
-          bg={upcoming.danger ? 'dangerLight' : 'primaryLight'}
+          bg={urgent ? 'dangerLight' : 'primaryLight'}
         >
           <Text
             variant="caption"
             style={{
-              color: upcoming.danger ? '#EF5067' : '#0071DF',
+              color: urgent ? '#EF5067' : '#0071DF',
               fontWeight: '600',
             }}
           >

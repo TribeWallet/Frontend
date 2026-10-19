@@ -56,7 +56,7 @@ function MainTabs() {
       <Tab.Screen name="Home" component={DashboardScreen} />
       <Tab.Screen name="Groups" component={GruposScreen} />
       <Tab.Screen name="Commitments" component={CompromissosScreen} />
-      <Tab.Screen name="Payments" component={PaymentsScreen} />
+      {/*<Tab.Screen name="Payments" component={PaymentsScreen} />*/}
       <Tab.Screen name="Reports" component={ReportsScreen} />
     </Tab.Navigator>
   );

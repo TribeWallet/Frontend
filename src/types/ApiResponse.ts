@@ -6,6 +6,7 @@ export interface UsuarioResponse {
   sobrenome: string;
   email: string;
   username: string;
+  imageUrl?: string | null;
   deletedAt: string | null;
 }
 

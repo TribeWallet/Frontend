@@ -13,8 +13,10 @@ import {
 import AppNavigator, { navTheme } from './src/navigation/AppNavigator';
 import AuthNavigator from './src/navigation/AuthNavigator';
 import { AppProvider } from './src/contexts/AppContext';
+import { Loading } from './src/components/Loading';
 import { useUserStore } from './src/features/usuario/stores/userStore';
 import { useAuthStore } from './src/features/auth/stores/authStore';
+import { usePreferencesStore } from './src/features/configuracoes/stores/preferencesStore';
 import { lightTheme } from './src/theme';
 import type { RootStackParamList } from './src/navigation/types';
 import type { SideMenuAction } from './src/components/SideMenu/SideMenu';
@@ -49,9 +51,36 @@ const TAB_NAVIGATION: Record<SideMenuAction, string | null> = {
 };
 
 function RootNavigator() {
+  const [storesHydrated, setStoresHydrated] = React.useState(
+    () =>
+      useAuthStore.persist.hasHydrated() &&
+      useUserStore.persist.hasHydrated() &&
+      usePreferencesStore.persist.hasHydrated(),
+  );
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const user = useAuthStore((state) => state.user);
   const setProfile = useUserStore((state) => state.setProfile);
+
+  React.useEffect(() => {
+    const updateHydration = () => {
+      if (
+        useAuthStore.persist.hasHydrated() &&
+        useUserStore.persist.hasHydrated() &&
+        usePreferencesStore.persist.hasHydrated()
+      ) {
+        setStoresHydrated(true);
+      }
+    };
+    const unsubscribeAuth = useAuthStore.persist.onFinishHydration(updateHydration);
+    const unsubscribeUser = useUserStore.persist.onFinishHydration(updateHydration);
+    const unsubscribePreferences = usePreferencesStore.persist.onFinishHydration(updateHydration);
+    updateHydration();
+    return () => {
+      unsubscribeAuth();
+      unsubscribeUser();
+      unsubscribePreferences();
+    };
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -64,6 +93,8 @@ function RootNavigator() {
       });
     }
   }, [isAuthenticated, user, setProfile]);
+
+  if (!storesHydrated) return <Loading fullScreen />;
 
   return isAuthenticated ? (
     <AppNavigator />

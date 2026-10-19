@@ -101,6 +101,7 @@ export function toCommitment(
   return {
     id: dto.compromissoFinanceiroToken,
     initials: initialsFromName(commitmentName),
+    imagem: dto.imagem,
     avatarTone: resolveTone(commitmentName),
     name: commitmentName,
     status: resolveStatus(splits),

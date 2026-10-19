@@ -41,14 +41,28 @@ function ChevronRight({ color }: { color: string }) {
 const ICON_COLOR = '#0071DF';
 const ICON_COLOR_NEUTRAL = '#69757C';
 
+function flattenFragments(children: React.ReactNode): React.ReactNode[] {
+  return React.Children.toArray(children).flatMap((child) => {
+    if (!React.isValidElement<{ children?: React.ReactNode }>(child)) {
+      return [child];
+    }
+    return child.type === React.Fragment
+      ? flattenFragments(child.props.children)
+      : [child];
+  });
+}
+
 function makeIcon(path: React.ReactNode) {
   return function Icon({ active }: { active?: boolean }) {
     const color = active ? ICON_COLOR : ICON_COLOR_NEUTRAL;
     return (
       <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-        {React.Children.map(path, (child) =>
+        {flattenFragments(path).map((child, index) =>
           React.isValidElement(child)
-            ? React.cloneElement(child as React.ReactElement<{ stroke: string }>, { stroke: color })
+            ? React.cloneElement(
+                child as React.ReactElement<{ stroke?: string }>,
+                { key: child.key ?? index, stroke: color },
+              )
             : child,
         )}
       </Svg>
@@ -158,7 +172,7 @@ export function SideMenu({
           { id: 'home', label: 'Início', Icon: HomeIcon },
           { id: 'groups', label: 'Grupos', Icon: GroupsIcon },
           { id: 'commitments', label: 'Despesas', Icon: PayIcon },
-          { id: 'payments', label: 'Pagamentos', Icon: PayIcon },
+          //{ id: 'payments', label: 'Pagamentos', Icon: PayIcon },
           { id: 'reports', label: 'Relatórios', Icon: ReportsIcon },
           { id: 'alerts', label: 'Notificações', Icon: BellIcon },
         ],

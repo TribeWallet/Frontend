@@ -60,7 +60,7 @@ const TABS: TabConfig[] = [
   { key: 'Home', label: 'Início', icon: <HomeIcon color="#0071DF" /> },
   { key: 'Groups', label: 'Grupos', icon: <GroupsIcon color="#0071DF" /> },
   { key: 'Commitments', label: 'Despesas', icon: <CommitmentsIcon color="#0071DF" /> },
-  { key: 'Payments', label: 'Pagar', icon: <PayIcon color="#0071DF" /> },
+  /*{ key: 'Payments', label: 'Pagar', icon: <PayIcon color="#0071DF" /> },*/
   { key: 'Reports', label: 'Relatórios', icon: <ReportsIcon color="#0071DF" /> },
 ];
 

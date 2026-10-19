@@ -22,7 +22,10 @@ export async function listGrupos(usuarioToken: string): Promise<GrupoResponse[]>
     `${endpoints.grupos.byUsuario(usuarioToken)}?deleted=false`,
   );
   // A exclusão é soft delete: filtra o que já foi excluído.
-  return grupos.filter((grupo) => !grupo.deletedAt);
+  const activeGroups = grupos.filter((grupo) => !grupo.deletedAt);
+  const uniqueGroups = new Map<string, GrupoResponse>();
+  activeGroups.forEach((grupo) => uniqueGroups.set(grupo.grupoToken, grupo));
+  return [...uniqueGroups.values()];
 }
 
 export function getGrupo(grupoToken: string): Promise<GrupoResponse> {
@@ -74,9 +77,9 @@ export function removeIntegrante(
 // A API não tem categoria de grupo; a escolhida no app fica guardada no aparelho.
 type ToneMap = Record<string, GroupTone>;
 
-export function saveGroupTone(grupoToken: string, tone: GroupTone): void {
-  const tones = getStoredValue<ToneMap>(StorageKeys.groupTones) ?? {};
-  setStoredValue(StorageKeys.groupTones, { ...tones, [grupoToken]: tone });
+export async function saveGroupTone(grupoToken: string, tone: GroupTone): Promise<void> {
+  const tones = (await getStoredValue<ToneMap>(StorageKeys.groupTones)) ?? {};
+  await setStoredValue(StorageKeys.groupTones, { ...tones, [grupoToken]: tone });
 }
 
 const TONE_LABELS: Record<GroupTone, string> = {
@@ -98,9 +101,9 @@ function resolveTone(name: string): GroupTone {
   return found?.tone ?? 'blue';
 }
 
-export function toGroup(grupo: GrupoResponse): Group {
+export async function toGroup(grupo: GrupoResponse): Promise<Group> {
   const tone =
-    getStoredValue<ToneMap>(StorageKeys.groupTones)?.[grupo.grupoToken] ??
+    (await getStoredValue<ToneMap>(StorageKeys.groupTones))?.[grupo.grupoToken] ??
     resolveTone(grupo.nome);
 
   const members: GroupMember[] = (grupo.integrantes ?? [])

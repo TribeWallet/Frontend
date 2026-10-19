@@ -11,6 +11,7 @@ export interface AuthUser {
   lastName: string;
   username: string;
   email: string;
+  imageUrl?: string | null;
   initials: string;
   notificationCount?: number;
 }
@@ -23,12 +24,6 @@ interface AuthState {
   logout: () => void;
   updateUser: (patch: Partial<AuthUser>) => void;
 }
-
-const mmkvStorage = {
-  getItem: (key: string) => storage.getString(key) ?? null,
-  setItem: (key: string, value: string) => storage.set(key, value),
-  removeItem: (key: string) => storage.remove(key),
-};
 
 export const useAuthStore = create<AuthState>()(
   persist(
@@ -57,7 +52,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: StorageKeys.auth,
-      storage: createJSONStorage(() => mmkvStorage),
+      storage: createJSONStorage(() => storage),
       partialize: (state) => ({
         isAuthenticated: state.isAuthenticated,
         token: state.token,

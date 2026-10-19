@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { Image, ScrollView, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -21,13 +21,14 @@ import {
 import { useTopBarActions } from '../../../hooks/useTopBarActions';
 import type { RootStackParamList } from '../../../navigation/types';
 import { formatCurrency } from '../../../utils/currency';
+import { environment } from '../../../config/environment';
+import { useAppDashboard } from '../../dashboard/hooks/useDashboard';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Profile'>;
 
 export function ProfileScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const profile = useUserStore((state) => state.profile);
-  const stats = useUserStore((state) => state.stats);
+  const user = useAuthStore((state) => state.user);
   const setStats = useUserStore((state) => state.setStats);
   const saveProfile = useSaveProfile();
   const clearProfile = useUserStore((state) => state.logout);
@@ -37,18 +38,16 @@ export function ProfileScreen() {
   const { payments } = useAppPayments();
   const topBar = useTopBarActions();
   const [editing, setEditing] = useState(false);
+  const { data, isLoading, isError: dashboardError, refetch } = useAppDashboard();
 
-  const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
-  const punctuality = commitments.length
-    ? Math.round(
-        (commitments.filter((c) => c.status === 'paid').length / commitments.length) * 100,
-      )
-    : 0;
+  const totalPaid = data?.valorTotalPago ?? payments.reduce((sum, p) => sum + p.amount, 0);
+  const punctuality = data?.taxaDePontualidade? (data.taxaDePontualidade)*100 : 0;
+  const totalGroups = data?.gruposAtivosCount ?? groups.length;
   const dynamicStats = useMemo(
     () => [
-      { value: String(groups.length), label: 'Grupos' },
-      { value: String(payments.length), label: 'Pagamentos' },
-      { value: `${punctuality}%`, label: 'Pontualidade' },
+      { value: String(data?.gruposAtivosCount ?? 0), label: 'Grupos' },
+      { value: String(data?.compromissosCountTotal ?? 0), label: 'Compromissos' },
+      { value: String(data?.pagamentosCountTotal ?? 0), label: 'Pagamentos' },
     ],
     [groups.length, payments.length, punctuality],
   );
@@ -79,10 +78,11 @@ export function ProfileScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFB' }} edges={['top']}>
       <Box flex={1} width="100%" maxWidth={430} alignSelf="center" bg="background">
         <TopBar
-          initials={profile?.initials ?? ''}
+          initials={user?.initials ?? ''}
           onOpenMenu={topBar.openMenu}
           onOpenNotifications={topBar.openNotifications}
           onOpenProfile={topBar.openProfile}
+          imageUrl={user?.imageUrl ? `${environment.mediaUrl}/${user.imageUrl}` : undefined}
         />
         <ScrollView
           style={{ flex: 1 }}
@@ -97,15 +97,24 @@ export function ProfileScreen() {
               bg="primary"
               alignItems="center"
               justifyContent="center"
+              overflow="hidden"
             >
-              <Text variant="display" color="white">
-                {profile?.initials ?? ''}
-              </Text>
+              {user?.imageUrl ? (
+                <Image
+                  source={{ uri: `${environment.mediaUrl}/${user.imageUrl}` }}
+                  resizeMode="cover"
+                  style={{ width: 96, height: 96 }}
+                />
+              ) : (
+                <Text variant="display" color="white">
+                  {user?.initials ?? ''}
+                </Text>
+              )}
             </Box>
             <Box alignItems="center">
-              <Text variant="h2">{profile?.name ?? ''}</Text>
+              <Text variant="h2">{user?.name ?? ''}</Text>
               <Text variant="caption" color="textSecondary">
-                {profile?.email ?? ''}
+                {user?.email ?? ''}
               </Text>
             </Box>
 
@@ -151,7 +160,7 @@ export function ProfileScreen() {
               </Box>
               <Box flexDirection="row" alignItems="center" justifyContent="space-between">
                 <Text variant="bodyStrong">Grupos</Text>
-                <Pill label={String(groups.length)} tone="primary" />
+                <Pill label={String(totalGroups)} tone="primary" />
               </Box>
             </Box>
 
@@ -176,9 +185,9 @@ export function ProfileScreen() {
       </Box>
       <ProfileModal
         visible={editing}
-        initials={profile?.initials ?? ''}
-        name={profile?.name ?? ''}
-        email={profile?.email ?? ''}
+        initials={user?.initials ?? ''}
+        name={user?.name ?? ''}
+        email={user?.email ?? ''}
         stats={dynamicStats}
         emailEditable={false}
         onClose={() => setEditing(false)}

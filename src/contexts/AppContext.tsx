@@ -2,6 +2,7 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from 'react';
@@ -42,8 +43,10 @@ import { parseBRDate } from '../utils/date';
 import type { NotificationItem } from '../features/notificacoes/types/Notification';
 import type { NotificationSettings } from '../features/notificacoes/components/NotificationsModal/NotificationsModal';
 import type { Group } from '../features/grupos/types/Group';
+import type { Dashboard } from "../features/dashboard/Types/Dashboard";
 import type { Commitment, CommitmentInput } from '../features/compromissos/types/Commitment';
 import type { Payment, PaymentDraft, PaymentPatch } from '../features/pagamentos/types/Payment';
+import {fetchDashboard} from "../features/dashboard/Services/dashboardService";
 
 export interface TopBarActions {
   openMenu: () => void;
@@ -118,6 +121,10 @@ interface AppContextValue
     CommitmentsContextValue,
     PaymentsContextValue {
   topBar: TopBarActions;
+  dashboard?: Dashboard;
+  dashboardLoading: boolean;
+  dashboardError: string | null;
+  refetchDashboard: () => void;
 }
 
 // Preferências de notificação não existem na API: ficam só na sessão do app.
@@ -223,6 +230,15 @@ export function AppProvider({
   const usuarioToken = useAuthStore((state) => state.user?.id);
   const queryClient = useQueryClient();
 
+  const dashboardQuery = useQuery({
+      queryKey: ['dashboard', usuarioToken],
+      queryFn: () => fetchDashboard(usuarioToken as string),
+      enabled: Boolean(usuarioToken),
+  });
+  const dashboard = dashboardQuery.data;
+  const dashboardLoading = dashboardQuery.isLoading;
+  const dashboardError = dashboardQuery.isError ? getErrorMessage(dashboardQuery.error) : null;
+
   const groupsQuery = useQuery({
     queryKey: ['grupos', usuarioToken],
     queryFn: () => listGrupos(usuarioToken as string),
@@ -231,15 +247,27 @@ export function AppProvider({
   const { refetch: refetchGroupsQuery } = groupsQuery;
   const groupsLoading = groupsQuery.isLoading;
   const groupsError = groupsQuery.error ? getErrorMessage(groupsQuery.error) : null;
+  const [mappedGroups, setMappedGroups] = useState<Group[]>([]);
 
-  const baseGroups = useMemo<Group[]>(
-    () => (groupsQuery.data ?? []).map(toGroup),
-    [groupsQuery.data],
+
+  useEffect(() => {
+    let active = true;
+    Promise.all((groupsQuery.data ?? []).map((grupo) => toGroup(grupo))).then((nextGroups) => {
+      if (active) setMappedGroups(nextGroups);
+    });
+    return () => {
+      active = false;
+    };
+  }, [groupsQuery.data]);
+
+  const uniqueBaseGroups = useMemo(
+    () => [...new Map(mappedGroups.map((group) => [group.id, group])).values()],
+    [mappedGroups],
   );
 
   // A listagem de grupos não traz as participações; os compromissos vêm por grupo.
   const commitmentQueries = useQueries({
-    queries: baseGroups.map((group) => ({
+    queries: uniqueBaseGroups.map((group) => ({
       queryKey: ['compromissos', group.id],
       queryFn: () => listCompromissosByGrupo(group.id),
     })),
@@ -253,13 +281,13 @@ export function AppProvider({
 
   const commitments = useMemo<Commitment[]>(
     () =>
-      baseGroups.flatMap((group, index) =>
+      uniqueBaseGroups.flatMap((group, index) =>
         (commitmentQueries[index]?.data ?? []).map((dto) =>
           toCommitment(dto, { id: group.id, name: group.name }),
         ),
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [baseGroups, commitmentQueries.map((query) => query.dataUpdatedAt).join('|')],
+    [uniqueBaseGroups, commitmentQueries.map((query) => query.dataUpdatedAt).join('|')],
   );
 
   // Mais recentes primeiro: as telas mostram "últimos pagamentos".
@@ -276,7 +304,7 @@ export function AppProvider({
 
   const groups = useMemo<Group[]>(
     () =>
-      baseGroups.map((group) => {
+      mappedGroups.map((group) => {
         const groupCommitments = commitments.filter(
           (commitment) => commitment.groupId === group.id,
         );
@@ -294,6 +322,7 @@ export function AppProvider({
             ),
           0,
         );
+
         return {
           ...group,
           summary: {
@@ -303,7 +332,7 @@ export function AppProvider({
           },
         };
       }),
-    [baseGroups, commitments],
+    [mappedGroups, commitments],
   );
 
   const profile = useUserStore((state) => state.profile);
@@ -370,7 +399,7 @@ export function AppProvider({
         descricao: input.description.trim(),
         usuarioTokens: memberTokens,
       });
-      saveGroupTone(created.grupoToken, input.tone);
+      await saveGroupTone(created.grupoToken, input.tone);
       await invalidateGroups();
       return toGroup(created);
     },
@@ -383,7 +412,7 @@ export function AppProvider({
         nome: input.name.trim(),
         descricao: input.description.trim(),
       });
-      saveGroupTone(id, input.tone);
+      await saveGroupTone(id, input.tone);
       await invalidateGroups();
     },
     [invalidateGroups],
@@ -509,6 +538,10 @@ export function AppProvider({
   const value = useMemo<AppContextValue>(
     () => ({
       topBar,
+      dashboard,
+      dashboardLoading,
+      dashboardError,
+      refetchDashboard: dashboardQuery.refetch,
       notifications,
       unreadCount,
       markAsRead,
@@ -544,6 +577,10 @@ export function AppProvider({
     }),
     [
       topBar,
+      dashboard,
+      dashboardLoading,
+      dashboardError,
+      dashboardQuery.refetch,
       notifications,
       unreadCount,
       markAsRead,
