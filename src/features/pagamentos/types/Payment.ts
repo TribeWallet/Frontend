@@ -1,6 +1,6 @@
 import type { TransactionStatus } from '../../../types/transactionStatus';
+import type { AttachedFile } from '../../../types/file';
 
-/** Espelha o enum MetodoPagamento do backend. */
 export type PaymentMethod =
   | 'pix'
   | 'dinheiro'
@@ -37,14 +37,14 @@ export interface PaymentDraft {
   amount: number;
   date: string;
   method: PaymentMethod;
-  receiptBase64?: string;
+  comprovante?: AttachedFile;
 }
 
 export interface PaymentPatch {
   amount?: number;
   date?: string;
   method?: PaymentMethod;
-  receiptBase64?: string;
+  comprovante?: AttachedFile;
 }
 
 export const paymentMethodLabels: Record<PaymentMethod, string> = {

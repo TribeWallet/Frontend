@@ -5,33 +5,34 @@ import { useAuthStore } from '../../auth/stores/authStore';
 import { toAuthUser } from '../../auth/services/authService';
 import { updateUsuario } from '../services/usuarioService';
 import { splitFullName } from '../../../utils/formatters';
+import type { ProfileSaveData } from '../components/ProfileModal/ProfileModal';
 
-export interface ProfileFormData {
-  initials: string;
-  name: string;
-  email: string;
-}
-
-/** Salva nome no backend. Iniciais não existem na API e ficam só no aparelho. */
 export function useSaveProfile() {
   const user = useAuthStore((state) => state.user);
   const updateUser = useAuthStore((state) => state.updateUser);
   const queryClient = useQueryClient();
 
   return useCallback(
-    async (data: ProfileFormData) => {
+    async (data: ProfileSaveData) => {
       if (!user) return;
-      if (data.name.trim() === user.name) {
+      const nameChanged = data.name.trim() !== user.name;
+      if (!nameChanged && !data.imagem) {
         updateUser({ initials: data.initials });
         return;
       }
-      const updated = await updateUsuario(user.id, splitFullName(data.name));
+      const { nome, sobrenome } = nameChanged
+        ? splitFullName(data.name)
+        : { nome: undefined, sobrenome: undefined };
+      const updated = await updateUsuario(user.id, {
+        nome,
+        sobrenome,
+        imagem: data.imagem,
+      });
       updateUser({
         ...toAuthUser(updated),
         initials: data.initials,
         notificationCount: user.notificationCount,
       });
-      // Os grupos exibem o nome dos integrantes vindo da API.
       await queryClient.invalidateQueries({ queryKey: ['grupos'] });
     },
     [user, updateUser, queryClient],

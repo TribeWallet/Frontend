@@ -30,7 +30,7 @@ export type RootStackParamList = {
 export type MainTabParamList = {
   Home: undefined;
   Groups: undefined;
-  Commitments: undefined;
+  Commitments: { filter?: 'vencidos' } | undefined;
   Payments: undefined;
   Reports: undefined;
 };

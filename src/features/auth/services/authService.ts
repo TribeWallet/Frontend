@@ -32,12 +32,17 @@ export async function login(input: LoginInput): Promise<{ user: AuthUser; token:
 }
 
 export async function register(input: RegisterInput): Promise<UsuarioResponse> {
+  const form = new FormData();
+  form.append('Nome', input.nome);
+  form.append('Sobrenome', input.sobrenome);
+  form.append('Username', input.username);
+  form.append('Email', input.email);
+  form.append('Senha', input.senha);
   try {
-    return await apiClient.post<UsuarioResponse>(endpoints.auth.register, input, {
+    return await apiClient.postForm<UsuarioResponse>(endpoints.auth.register, form, {
       auth: false,
     });
   } catch (error) {
-    // E-mail e username são únicos no banco; a violação chega como erro genérico do EF Core.
     if (error instanceof ApiError && error.status === 400 && error.message.includes('saving the entity')) {
       throw new ApiError('E-mail ou nome de usuário já cadastrado.', 400);
     }

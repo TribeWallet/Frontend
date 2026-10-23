@@ -18,18 +18,13 @@ export function GroupDetailScreen() {
 
   const cached = getGroup(route.params.id);
 
-  // A listagem pode estar vazia (app recém-aberto, grupo compartilhado por link):
-  // nesse caso o grupo vem do endpoint individual.
   const detailQuery = useQuery({
     queryKey: ['grupo', route.params.id],
-    queryFn: () => getGrupo(route.params.id),
+    queryFn: async () => toGroup(await getGrupo(route.params.id)),
     enabled: !cached,
   });
 
-  const group = useMemo(
-    () => cached ?? (detailQuery.data ? toGroup(detailQuery.data) : undefined),
-    [cached, detailQuery.data],
-  );
+  const group = cached ?? detailQuery.data;
 
   return (
     <GroupDetailModal visible group={group} onClose={() => navigation.goBack()} />
