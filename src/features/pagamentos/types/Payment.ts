@@ -31,6 +31,7 @@ export interface Payment {
   status: TransactionStatus;
 }
 
+/** O backend amarra todo pagamento a uma fatia (integranteCompromisso). */
 export interface PaymentDraft {
   shareId: string;
   amount: number;

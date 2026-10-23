@@ -214,6 +214,7 @@ export function NewPaymentModal({
               onChange={(next) => {
                 onChange(next);
                 setValue('commitmentId', '', { shouldValidate: true });
+                setValue('shareId', '', { shouldValidate: true });
               }}
               options={groupOptions}
               emptyText="Nenhum grupo disponível"

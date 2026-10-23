@@ -18,7 +18,7 @@ interface UpcomingItemProps {
 }
 
 export function UpcomingItem({ upcoming }: UpcomingItemProps) {
-  const soon = upcoming.daysToDue < 7;
+  const urgent = upcoming.daysToDue < 7;
 
   return (
     <Box
@@ -44,12 +44,12 @@ export function UpcomingItem({ upcoming }: UpcomingItemProps) {
           px="sm"
           py="xxs"
           borderRadius="full"
-          bg={soon ? 'warningLight' : 'primaryLight'}
+          bg={urgent ? 'dangerLight' : 'primaryLight'}
         >
           <Text
             variant="caption"
             style={{
-              color: soon ? '#E8A924' : '#0071DF',
+              color: urgent ? '#EF5067' : '#0071DF',
               fontWeight: '600',
             }}
           >
