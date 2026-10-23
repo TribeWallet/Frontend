@@ -16,7 +16,7 @@ export function LoginScreen() {
   }, [navigation]);
 
   const handleLogin = useCallback(() => {
-
+    // Login is handled inside LoginScreenBase, just notify navigation
   }, []);
 
   return (

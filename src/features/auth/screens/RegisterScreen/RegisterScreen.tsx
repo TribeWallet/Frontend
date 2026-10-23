@@ -13,11 +13,15 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 
-
+// 1. IMPORTAÇÃO DOS ESTILOS SEPARADOS
 import { styles } from './RegisterScreen.styles';
 
-
+// 2. IMPORTAÇÃO DOS COMPONENTES
 import { TribeWalletLogo } from '../../components/TribeWalletLogo';
+import { useAuthStore } from '../../stores/authStore';
+import * as authService from '../../services/authService';
+import { getErrorMessage } from '../../../../services/api/apiClient';
+import { isValidEmail } from '../../../../utils/formatters';
 
 export interface RegisterScreenProps {
   onLogin?: () => void;
@@ -26,7 +30,11 @@ export interface RegisterScreenProps {
 export function RegisterScreen({ onLogin }: RegisterScreenProps) {
   const { width, height } = useWindowDimensions();
 
-
+  /*
+   * ==========================================================
+   * ESTADOS (Com tipagem explícita)
+   * ==========================================================
+   */
   const [nome, setNome] = useState<string>('');
   const [sobrenome, setSobrenome] = useState<string>('');
   const [usuario, setUsuario] = useState<string>('');
@@ -35,10 +43,19 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
   const [confirmarSenha, setConfirmarSenha] = useState<string>('');
   const [senhaVisible, setSenhaVisible] = useState<boolean>(false);
   const [confirmarSenhaVisible, setConfirmarSenhaVisible] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState<boolean>(false);
 
+  const setSession = useAuthStore((state) => state.login);
 
-
-
+  /*
+   * ==========================================================
+   * VALIDAÇÃO EM TEMPO REAL (REGEX)
+   * ==========================================================
+   */
+  
+  // Nome e Sobrenome: Remove QUALQUER coisa que NÃO seja letra (incluindo acentos), espaço ou hífen.
+  // Isso bloqueia números (0-9) e símbolos (@, #, $, etc.) automaticamente.
   const handleNomeChange = (text: string) => {
     setNome(text.replace(/[^a-zA-ZÀ-ÿ\s-]/g, ''));
   };
@@ -47,7 +64,7 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
     setSobrenome(text.replace(/[^a-zA-ZÀ-ÿ\s-]/g, ''));
   };
 
-
+  // Usuário e Email: Permite alfanuméricos e especiais, mas remove espaços em branco.
   const handleUsuarioChange = (text: string) => {
     setUsuario(text.replace(/\s/g, ''));
   };
@@ -56,7 +73,11 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
     setEmail(text.replace(/\s/g, ''));
   };
 
-
+  /*
+   * ==========================================================
+   * RESPONSIVIDADE (Com tipagem explícita)
+   * ==========================================================
+   */
   const isSmallPhone: boolean = width < 360;
   const isTablet: boolean = width >= 768;
 
@@ -77,34 +98,57 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
           ? 58
           : 76;
 
+  /*
+   * ==========================================================
+   * AÇÕES
+   * ==========================================================
+   */
+  const handleRegister = async (): Promise<void> => {
+    if (submitting) return;
+    const normalizedEmail = email.trim().toLowerCase();
 
-  const handleRegister = (): void => {
     if (!nome.trim()) {
-      console.log('Informe o nome');
+      setError('Informe o nome.');
       return;
     }
     if (!sobrenome.trim()) {
-      console.log('Informe o sobrenome');
+      setError('Informe o sobrenome.');
       return;
     }
     if (!usuario.trim()) {
-      console.log('Informe o nome de usuário');
+      setError('Informe o nome de usuário.');
       return;
     }
-    if (!email.trim()) {
-      console.log('Informe o e-mail');
+    if (!isValidEmail(normalizedEmail)) {
+      setError('Informe um e-mail válido.');
       return;
     }
     if (senha.length < 6) {
-      console.log('A senha precisa ter pelo menos 6 caracteres');
+      setError('A senha precisa ter pelo menos 6 caracteres.');
       return;
     }
     if (senha !== confirmarSenha) {
-      console.log('As senhas não coincidem');
+      setError('As senhas não coincidem.');
       return;
     }
 
-    console.log('Cadastro:', { nome, sobrenome, usuario, email, senha });
+    setError(null);
+    setSubmitting(true);
+    try {
+      await authService.register({
+        nome: nome.trim(),
+        sobrenome: sobrenome.trim(),
+        username: usuario.trim(),
+        email: normalizedEmail,
+        senha,
+      });
+      // Cadastro criado: já entra na conta com as mesmas credenciais.
+      const session = await authService.login({ email: normalizedEmail, senha });
+      setSession(session.user, session.token);
+    } catch (registerError) {
+      setError(getErrorMessage(registerError));
+      setSubmitting(false);
+    }
   };
 
   const handleLogin = (): void => {
@@ -115,7 +159,11 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
     console.log('Fazer login');
   };
 
-
+  /*
+   * ==========================================================
+   * RENDER
+   * ==========================================================
+   */
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <StatusBar barStyle="dark-content" />
@@ -140,28 +188,28 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
           bounces={false}
         >
           <View style={[styles.content, { width: contentWidth }]}>
-
-
+            
+            {/* LOGO */}
             <View style={styles.logoContainer}>
               <TribeWalletLogo />
             </View>
 
-
+            {/* CARD */}
             <View style={styles.card}>
               <Text style={styles.title}>Criar conta</Text>
               <Text style={styles.subtitle}>
                 Preencha os dados abaixo para criar sua conta
               </Text>
 
-
+              {/* FORMULÁRIO */}
               <View style={styles.form}>
-
-
+                
+                {/* NOME */}
                 <View style={styles.field}>
                   <Text style={styles.label}>Nome</Text>
                   <TextInput
                     value={nome}
-                    onChangeText={handleNomeChange}
+                    onChangeText={handleNomeChange} // Aplica filtro em tempo real
                     style={styles.input}
                     placeholder="Seu nome"
                     placeholderTextColor="#9AA0A6"
@@ -174,12 +222,12 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
                   />
                 </View>
 
-
+                {/* SOBRENOME */}
                 <View style={styles.field}>
                   <Text style={styles.label}>Sobrenome</Text>
                   <TextInput
                     value={sobrenome}
-                    onChangeText={handleSobrenomeChange}
+                    onChangeText={handleSobrenomeChange} // Aplica filtro em tempo real
                     style={styles.input}
                     placeholder="Seu sobrenome"
                     placeholderTextColor="#9AA0A6"
@@ -192,12 +240,12 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
                   />
                 </View>
 
-
+                {/* USUÁRIO */}
                 <View style={styles.field}>
                   <Text style={styles.label}>Nome de usuário</Text>
                   <TextInput
                     value={usuario}
-                    onChangeText={handleUsuarioChange}
+                    onChangeText={handleUsuarioChange} // Remove espaços
                     style={styles.input}
                     placeholder="Seu nome de usuário"
                     placeholderTextColor="#9AA0A6"
@@ -210,12 +258,12 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
                   />
                 </View>
 
-
+                {/* EMAIL */}
                 <View style={styles.field}>
                   <Text style={styles.label}>E-mail</Text>
                   <TextInput
                     value={email}
-                    onChangeText={handleEmailChange}
+                    onChangeText={handleEmailChange} // Remove espaços
                     style={styles.input}
                     placeholder="seu@email.com"
                     placeholderTextColor="#9AA0A6"
@@ -229,13 +277,13 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
                   />
                 </View>
 
-
+                {/* SENHA */}
                 <View style={styles.field}>
                   <Text style={styles.label}>Senha</Text>
                   <View style={styles.passwordWrapper}>
                     <TextInput
                       value={senha}
-                      onChangeText={setSenha}
+                      onChangeText={setSenha} // Aceita tudo (alfanumérico e especiais)
                       style={[styles.input, styles.passwordInput]}
                       placeholder="Mínimo 6 caracteres"
                       placeholderTextColor="#9AA0A6"
@@ -262,13 +310,13 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
                   </View>
                 </View>
 
-
+                {/* CONFIRMAR SENHA */}
                 <View style={styles.field}>
                   <Text style={styles.label}>Confirmar senha</Text>
                   <View style={styles.passwordWrapper}>
                     <TextInput
                       value={confirmarSenha}
-                      onChangeText={setConfirmarSenha}
+                      onChangeText={setConfirmarSenha} // Aceita tudo
                       style={[styles.input, styles.passwordInput]}
                       placeholder="Repita sua senha"
                       placeholderTextColor="#9AA0A6"
@@ -296,21 +344,46 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
                   </View>
                 </View>
 
+                {error ? (
+                  <View
+                    style={{
+                      backgroundColor: '#FDE8EB',
+                      borderRadius: 8,
+                      padding: 10,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: '#B91C2C',
+                        fontSize: 13,
+                        fontWeight: '500',
+                      }}
+                    >
+                      {error}
+                    </Text>
+                  </View>
+                ) : null}
 
+                {/* BOTÃO CADASTRAR */}
                 <Pressable
                   onPress={handleRegister}
+                  disabled={submitting}
                   style={({ pressed }) => [
                     styles.registerButton,
                     pressed && styles.registerButtonPressed,
+                    submitting && { opacity: 0.7 },
                   ]}
                   accessibilityRole="button"
                   accessibilityLabel="Criar conta"
                 >
-                  <Text style={styles.registerButtonText}>Criar conta</Text>
+                  <Text style={styles.registerButtonText}>
+                    {submitting ? 'Criando conta...' : 'Criar conta'}
+                  </Text>
                 </Pressable>
               </View>
 
-
+              {/* LOGIN FOOTER */}
               <View style={styles.loginFooter}>
                 <Text style={styles.loginText}>Já tem uma conta?</Text>
                 <Pressable onPress={handleLogin} hitSlop={8}>
@@ -326,9 +399,9 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
   );
 }
 
-
-
-
+/* ============================================================ */
+/* ÍCONE DO OLHO */
+/* ============================================================ */
 
 interface PasswordEyeProps {
   visible: boolean;

@@ -4,6 +4,7 @@ import Animated, { FadeIn, FadeOut, SlideInLeft } from 'react-native-reanimated'
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Box, Text } from '../../theme';
+import { version as appVersion } from '../../../package.json';
 
 export type SideMenuAction =
   | 'home'
@@ -40,17 +41,30 @@ function ChevronRight({ color }: { color: string }) {
 const ICON_COLOR = '#0071DF';
 const ICON_COLOR_NEUTRAL = '#69757C';
 
+function flattenFragments(children: React.ReactNode): React.ReactNode[] {
+  return React.Children.toArray(children).flatMap((child) => {
+    if (!React.isValidElement<{ children?: React.ReactNode }>(child)) {
+      return [child];
+    }
+    return child.type === React.Fragment
+      ? flattenFragments(child.props.children)
+      : [child];
+  });
+}
+
 function makeIcon(path: React.ReactNode) {
   return function Icon({ active }: { active?: boolean }) {
     const color = active ? ICON_COLOR : ICON_COLOR_NEUTRAL;
     return (
       <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-        {React.Children.map(path, child => {
-          if (React.isValidElement(child) && child.type !== React.Fragment) {
-            return React.cloneElement(child as React.ReactElement<any>, { stroke: color });
-          }
-          return child;
-        })}
+        {flattenFragments(path).map((child, index) =>
+          React.isValidElement(child)
+            ? React.cloneElement(
+                child as React.ReactElement<{ stroke?: string }>,
+                { key: child.key ?? index, stroke: color },
+              )
+            : child,
+        )}
       </Svg>
     );
   };
@@ -120,15 +134,13 @@ const GearIcon = makeIcon(
     <Path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" strokeWidth={1.5} />
   </>,
 );
-function LogoutIcon({ color = '#EF5067' }: { color?: string }) {
-  return (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Path d="M9 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
-      <Path d="M16 17l5-5-5-5" stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" />
-      <Path d="M21 12H10" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
-    </Svg>
-  );
-}
+const LogoutIcon = makeIcon(
+  <>
+    <Path d="M9 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4" strokeWidth={1.7} strokeLinecap="round" />
+    <Path d="M16 17l5-5-5-5" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" />
+    <Path d="M21 12H10" strokeWidth={1.7} strokeLinecap="round" />
+  </>,
+);
 
 interface MenuItem {
   id: SideMenuAction;
@@ -160,7 +172,7 @@ export function SideMenu({
           { id: 'home', label: 'Início', Icon: HomeIcon },
           { id: 'groups', label: 'Grupos', Icon: GroupsIcon },
           { id: 'commitments', label: 'Despesas', Icon: PayIcon },
-          { id: 'payments', label: 'Pagamentos', Icon: PayIcon },
+          //{ id: 'payments', label: 'Pagamentos', Icon: PayIcon },
           { id: 'reports', label: 'Relatórios', Icon: ReportsIcon },
           { id: 'alerts', label: 'Notificações', Icon: BellIcon },
         ],
@@ -220,7 +232,7 @@ export function SideMenu({
         }}
       >
         <Box flex={1}>
-          <Box bg="primary" px="lg" style={{ paddingTop: insets.top + 12 }} pb="lg">
+          <Box bg="primary" px="lg" pb="lg" style={{ paddingTop: insets.top + 12 }}>
             <Box flexDirection="row" alignItems="center" gap="sm">
               <Box
                 width={52}
@@ -327,12 +339,14 @@ export function SideMenu({
                     px="md"
                     py="md"
                     borderRadius="md"
-                    bg={pressed ? 'danger' : 'danger'}
+                    borderWidth={1}
+                    borderColor="border"
+                    bg={pressed ? 'dangerLight' : 'surface'}
                   >
                     <Box width={24} alignItems="center" mr="sm">
-                      <LogoutIcon color="white" />
+                      <LogoutIcon />
                     </Box>
-                    <Text variant="bodyStrong" color="white">Sair</Text>
+                    <Text variant="bodyStrong" color="danger">Sair</Text>
                   </Box>
                 )}
               </Pressable>
@@ -357,7 +371,7 @@ export function SideMenu({
               </Svg>
               <Text variant="captionStrong" color="primary">TribeWallet</Text>
             </View>
-            <Text variant="caption" color="textMuted">v1.0.0 · build 100</Text>
+            <Text variant="caption" color="textMuted">v{appVersion}</Text>
           </Box>
         </Box>
       </Animated.View>

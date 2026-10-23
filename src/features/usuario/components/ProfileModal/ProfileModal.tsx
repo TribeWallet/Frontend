@@ -1,58 +1,118 @@
-import React, { useEffect, useState } from 'react';
-import { ScrollView } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Image, ScrollView } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Modal } from '../../../../components/Modal';
 import { Input } from '../../../../components/Input';
 import { Button } from '../../../../components/Button';
-import { Box, Text } from '../../../../theme';
+import { Box, Text, PressableBox } from '../../../../theme';
+import { getErrorMessage } from '../../../../services/api/apiClient';
+import { isValidEmail } from '../../../../utils/formatters';
+import type { AttachedFile } from '../../../../types/file';
+
+const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg'];
+
+export interface ProfileSaveData {
+  initials: string;
+  name: string;
+  email: string;
+  imagem?: AttachedFile;
+}
 
 interface ProfileModalProps {
   visible: boolean;
   initials: string;
   name: string;
+  imageUrl?: string | null;
   email: string;
   stats: { value: string; label: string }[];
   onClose: () => void;
-  onSave?: (data: { initials: string; name: string; email: string }) => void;
+  onSave?: (data: ProfileSaveData) => void | Promise<void>;
   onLogout?: () => void;
+  emailEditable?: boolean;
 }
 
 export function ProfileModal({
   visible,
   initials: initialInitials,
   name: initialName,
+  imageUrl: initialImageUrl,
   email: initialEmail,
   stats,
   onClose,
   onSave,
   onLogout,
+  emailEditable = true,
 }: ProfileModalProps) {
   const [initials, setInitials] = useState(initialInitials);
+  const [imageUrl, setImageUrl] = useState<string | null | undefined>(undefined);
   const [name, setName] = useState(initialName);
   const [email, setEmail] = useState(initialEmail);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [imagem, setImagem] = useState<AttachedFile | null>(null);
 
   useEffect(() => {
     setInitials(initialInitials);
     setName(initialName);
+    setImageUrl(initialImageUrl);
     setEmail(initialEmail);
-  }, [initialInitials, initialName, initialEmail, visible]);
+    setImagem(null);
+  }, [initialInitials, initialName, initialEmail, initialImageUrl, visible]);
 
-  const handleSave = () => {
+  const pickImagem = useCallback(async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: false,
+      quality: 0.8,
+    });
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    const extension = (asset.fileName ?? asset.uri).split('.').pop()?.toLowerCase() ?? '';
+    const mimeType = asset.mimeType ?? 'image/jpeg';
+    const allowed =
+      IMAGE_EXTENSIONS.includes(extension) || ['image/png', 'image/jpeg'].includes(mimeType);
+    if (!allowed) {
+      setError('A imagem deve ser PNG, JPG ou JPEG.');
+      return;
+    }
+    setError(null);
+    setImagem({
+      uri: asset.uri,
+      name: asset.fileName ?? `imagem.${extension || 'jpg'}`,
+      type: mimeType,
+    });
+  }, []);
+
+  const handleSave = async () => {
     if (name.trim().length < 3) {
       setError('Informe um nome com pelo menos 3 caracteres.');
       return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!isValidEmail(email)) {
       setError('Informe um e-mail válido.');
       return;
     }
-    onSave?.({
-      initials: initials.trim() || 'NV',
-      name: name.trim(),
-      email: email.trim(),
-    });
-    setError(null);
+    setSaving(true);
+    try {
+      await onSave?.({
+        initials: initials.trim() || 'NV',
+        name: name.trim(),
+        email: email.trim(),
+        imagem: imagem ?? undefined,
+      });
+      setError(null);
+    } catch (saveError) {
+      setError(getErrorMessage(saveError));
+    } finally {
+      setSaving(false);
+    }
   };
+
+  const avatarSource = imagem
+    ? { uri: imagem.uri }
+    : imageUrl
+      ? { uri: imageUrl }
+      : null;
 
   return (
     <Modal
@@ -63,7 +123,7 @@ export function ProfileModal({
       showCloseButton
       footer={
         <Box gap="sm">
-          <Button title="Salvar alterações" onPress={handleSave} fullWidth />
+          <Button title="Salvar alterações" onPress={handleSave} loading={saving} fullWidth />
           {onLogout ? (
             <Button title="Sair" onPress={onLogout} variant="danger" fullWidth />
           ) : null}
@@ -83,8 +143,27 @@ export function ProfileModal({
             bg="primary"
             alignItems="center"
             justifyContent="center"
+            overflow="hidden"
           >
-            <Text variant="h2" color="white">{initials}</Text>
+            {avatarSource ? (
+              <Image source={avatarSource} style={{ width: 80, height: 80 }} />
+            ) : (
+              <Text variant="h2" color="white">{initials}</Text>
+            )}
+          </Box>
+
+          <Box flexDirection="row" gap="xs" alignItems="center">
+            <Button
+              title={imagem ? 'Trocar foto' : 'Escolher foto'}
+              variant="outline"
+              size="sm"
+              onPress={pickImagem}
+            />
+            {imagem ? (
+              <PressableBox onPress={() => setImagem(null)} hitSlop={8}>
+                <Text variant="captionStrong" color="danger">Remover</Text>
+              </PressableBox>
+            ) : null}
           </Box>
 
           <Box width="100%" gap="sm">
@@ -107,6 +186,8 @@ export function ProfileModal({
               placeholder="email@exemplo.com"
               keyboardType="email-address"
               autoCapitalize="none"
+              editable={emailEditable}
+              helperText={emailEditable ? undefined : 'O e-mail não pode ser alterado.'}
             />
           </Box>
           {error ? (

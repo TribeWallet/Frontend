@@ -1,12 +1,19 @@
 import React from 'react';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { Box, Text } from '../../../../theme';
-import { statusLabel, statusPalette } from '../../../../types/transactionStatus';
-import type { DashboardOverviewData } from '../../hooks/useDashboardOverview';
+import { CommitmentAvatar } from '../CommitmentAvatar/CommitmentAvatar';
 
 type TransactionStatus = 'paid' | 'partial' | 'pending';
 
-type DashboardTransaction = DashboardOverviewData['transactions'][number];
+interface DashboardTransaction {
+  id: string;
+  imageUrl: string | null;
+  initials: string;
+  name: string;
+  group: string;
+  value: string;
+  status: TransactionStatus;
+}
 
 interface TransactionItemProps {
   transaction: DashboardTransaction;
@@ -37,9 +44,14 @@ function renderStatusIcon(status: TransactionStatus, color: string) {
     case 'pending':
       return (
         <Svg width={12} height={12} viewBox="0 0 12 12" fill="none">
-          <Circle cx={6} cy={6} r={4.2} stroke={color} strokeWidth={1.3} />
-          <Path d="M6 3.6V6.2" stroke={color} strokeWidth={1.3} strokeLinecap="round" />
-          <Circle cx={6} cy={8.4} r={0.65} fill={color} />
+          <Path
+            d="M6 1.4 11 10.3H1L6 1.4Z"
+            stroke={color}
+            strokeWidth={1.15}
+            strokeLinejoin="round"
+          />
+          <Path d="M6 4.1v2.5" stroke={color} strokeWidth={1.2} strokeLinecap="round" />
+          <Circle cx={6} cy={8.3} r={0.55} fill={color} />
         </Svg>
       );
   }
@@ -49,48 +61,28 @@ export function TransactionItem({
   transaction,
   showDivider = false,
 }: TransactionItemProps) {
-  const palette = statusPalette[transaction.status];
-  const label = statusLabel[transaction.status];
+  const status = {
+    paid: { color: '#16AF7E', label: 'Pago' },
+    partial: { color: '#E8A924', label: 'Pago parcial' },
+    pending: { color: '#EF586D', label: 'Pendente' },
+  }[transaction.status];
 
   return (
     <Box>
       {showDivider && <Box height={1} bg="border" mb="md" />}
       <Box flexDirection="row" alignItems="center" py="sm">
-        <Box
-          width={40}
-          height={40}
-          borderRadius="full"
-          bg="primaryLight"
-          alignItems="center"
-          justifyContent="center"
-        >
-          <Text variant="bodySmallStrong" color="primary">
-            {transaction.initials}
-          </Text>
-        </Box>
+        <CommitmentAvatar
+          imageUrl={transaction.imageUrl}
+          initials={transaction.initials}
+        />
 
         <Box flex={1} px="md">
-          <Text variant="bodyStrong" numberOfLines={1}>
+          <Text variant="h3" numberOfLines={1}>
             {transaction.name}
           </Text>
-          <Box flexDirection="row" alignItems="center" gap="xs" mt="xxs" flexWrap="wrap">
-            <Text variant="caption" color="textSecondary" numberOfLines={1}>
-              {transaction.group}
-            </Text>
-            <Box
-              bg="border"
-              px="xs"
-              py="xxs"
-              borderRadius="full"
-            >
-              <Text variant="caption" color="textSecondary">
-                {transaction.category}
-              </Text>
-            </Box>
-            <Text variant="caption" color="textMuted">
-              {transaction.date}
-            </Text>
-          </Box>
+          <Text variant="caption" color="textSecondary" numberOfLines={1} mt="xxs">
+            {transaction.group}
+          </Text>
         </Box>
 
         <Box alignItems="flex-end">
@@ -99,15 +91,15 @@ export function TransactionItem({
             flexDirection="row"
             alignItems="center"
             gap="xxs"
-            px="xs"
-            py="xxs"
-            borderRadius="full"
             mt="xxs"
-            style={{ backgroundColor: palette.background }}
+            paddingVertical="xxs"
+            paddingHorizontal="xs"
+            borderRadius="full"
+            style={{ backgroundColor: status.color + '35' }}
           >
-            {renderStatusIcon(transaction.status, palette.color)}
-            <Text variant="caption" style={{ color: palette.color, fontWeight: '600' }}>
-              {label}
+            {renderStatusIcon(transaction.status, status.color)}
+            <Text variant="caption" style={{ color: status.color, fontWeight: '600' }}>
+              {status.label}
             </Text>
           </Box>
         </Box>

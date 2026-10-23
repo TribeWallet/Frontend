@@ -1,10 +1,12 @@
-import React from 'react';
-import { Pressable, View } from 'react-native';
+import React, { useEffect } from 'react';
+import { Image, Pressable, View } from 'react-native';
 import { Pill } from '../../../../components/Pill';
 import { Box, Text } from '../../../../theme';
 import type { Commitment } from '../../types/Commitment';
 import { summarizeCommitment } from '../../services/split';
 import { formatCurrency } from '../../../../utils/currency';
+import { diffDays } from '../../../../utils/date';
+import { environment } from '../../../../config/environment';
 
 interface CommitmentCardProps {
   commitment: Commitment;
@@ -15,12 +17,14 @@ const statusPalette = {
   paid: { background: '#E7F8F2', color: '#16AF7E', border: '#B6E7D6' },
   partial: { background: '#FFF6E2', color: '#E8A924', border: '#F2DAA6' },
   pending: { background: '#EDF5FF', color: '#3089EF', border: '#BDD7FB' },
+  overdue: { background: '#FDE8EB', color: '#EF5067', border: '#F5C1CB' },
 };
 
 const statusLabel = {
   paid: 'Pago',
   partial: 'Parcial',
   pending: 'Pendente',
+  overdue: 'Vencido',
 };
 
 const avatarColors = {
@@ -30,7 +34,10 @@ const avatarColors = {
 };
 
 export function CommitmentCard({ commitment, onPress }: CommitmentCardProps) {
-  const palette = statusPalette[commitment.status];
+  const daysToDue = diffDays(commitment.dueDate);
+  const isOverdue = commitment.status !== 'paid' && daysToDue !== null && daysToDue < 0;
+  const effectiveStatus = isOverdue ? 'overdue' : commitment.status;
+  const palette = statusPalette[effectiveStatus];
   const summary = summarizeCommitment(commitment);
 
   return (
@@ -42,8 +49,8 @@ export function CommitmentCard({ commitment, onPress }: CommitmentCardProps) {
       <Box
         bg="surface"
         borderRadius="md"
-        borderWidth={1}
-        borderColor="cardBorder"
+        borderWidth={isOverdue ? 2 : 1}
+        borderColor={isOverdue ? 'danger' : 'cardBorder'}
         p="md"
         mb="md"
       >
@@ -58,9 +65,16 @@ export function CommitmentCard({ commitment, onPress }: CommitmentCardProps) {
               justifyContent: 'center',
             }}
           >
-            <Text variant="bodyStrong" color="white" style={{ fontSize: 16 }}>
+            {commitment.imagem ? (
+              <Image
+                source={{ uri: `${environment.mediaUrl}/${commitment.imagem}` }}
+                style={{ width: 44, height: 44, borderRadius: 9999 }}
+              />
+            ) : (
+              <Text variant="bodyStrong" color="white" style={{ fontSize: 16 }}>
               {commitment.initials}
             </Text>
+            )}
           </View>
 
           <Box flex={1}>
@@ -97,15 +111,13 @@ export function CommitmentCard({ commitment, onPress }: CommitmentCardProps) {
           </View>
         </Box>
 
-        <Text variant="bodySmall" color="textSecondary" numberOfLines={2}>
-          {commitment.description}
-        </Text>
-
-        <Box flexDirection="row" flexWrap="wrap" gap="xs" mt="sm">
+        <Box flexDirection="row" flexWrap="wrap" gap="xs">
           <Pill label={commitment.category} tone="neutral" size="sm" />
-          {commitment.dueDate ? (
+          {isOverdue ? (
+            <Pill label={`Vencido em ${commitment.dueDate}`} tone="danger" size="sm" />
+          ) : (
             <Pill label={`Vence ${commitment.dueDate}`} tone="primary" size="sm" />
-          ) : null}
+          )}
           <Pill
             label={
               commitment.splitMode === 'equal'

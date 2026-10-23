@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView } from 'react-native';
+import { Alert, ScrollView } from 'react-native';
 import { Modal } from '../../../../components/Modal';
 import { Button } from '../../../../components/Button';
 import { Pill } from '../../../../components/Pill';
@@ -7,12 +7,9 @@ import { Box, Text, PressableBox } from '../../../../theme';
 import { PaymentCard } from '../../../pagamentos/components/PaymentCard/PaymentCard';
 import { NewPaymentModal } from '../../../pagamentos/components/NewPaymentModal/NewPaymentModal';
 import { EditPaymentModal } from '../../../pagamentos/components/EditPaymentModal/EditPaymentModal';
-import {
-  useAppCommitments,
-  useAppGroups,
-  useAppPayments,
-} from '../../../../contexts/AppContext';
-import { applySplitPaid, summarizeCommitment } from '../../services/split';
+import { useAppCommitments, useAppGroups } from '../../../../contexts/AppContext';
+import { getErrorMessage } from '../../../../services/api/apiClient';
+import { commitmentPayments, summarizeCommitment } from '../../services/split';
 import type { Commitment } from '../../types/Commitment';
 import type { Payment } from '../../../pagamentos/types/Payment';
 import { formatCurrency } from '../../../../utils/currency';
@@ -33,40 +30,97 @@ export function CommitmentDetailModal({
   onEdit,
   onDeleted,
 }: CommitmentDetailModalProps) {
+  const { deleteCommitment, addCommitmentMembers, removeCommitmentMember } =
+    useAppCommitments();
   const { getGroup } = useAppGroups();
-  const { payments } = useAppPayments();
-  const { updateCommitment, deleteCommitment } = useAppCommitments();
 
-  const [paying, setPaying] = useState(false);
+  const [payingShareId, setPayingShareId] = useState<string | null>(null);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
+  const [busy, setBusy] = useState(false);
 
   if (!commitment) return null;
 
   const group = getGroup(commitment.groupId);
-  const relatedPayments = payments.filter(
-    (payment) => payment.commitmentId === commitment.id,
+  // Integrantes do grupo que ainda não entraram nesta divisão.
+  const missingMembers = (group?.members ?? []).filter(
+    (member) =>
+      !commitment.splits.some((split) => split.integranteToken === member.integranteToken),
   );
+  const relatedPayments = commitmentPayments(commitment);
   const summary = summarizeCommitment(commitment);
   const due = diffDays(commitment.dueDate);
-
-  const toggleMemberPaid = (memberId: string) => {
-    const memberSplit = commitment.splits.find(
-      (split) => split.memberId === memberId,
-    );
-    if (!memberSplit) return;
-    updateCommitment(commitment.id, {
-      splits: applySplitPaid(commitment.splits, memberId, !memberSplit.paid),
-    });
-  };
+  const settledCount = commitment.splits.filter((split) => split.paid).length;
 
   const handleDelete = () => {
-    deleteCommitment(commitment.id);
-    onDeleted?.();
-    onClose();
+    Alert.alert('Excluir compromisso', `Excluir "${commitment.name}"?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Excluir',
+        style: 'destructive',
+        onPress: async () => {
+          setBusy(true);
+          try {
+            await deleteCommitment(commitment.id);
+            // Quem passa onDeleted já decide para onde ir; sem ele, só fecha.
+            if (onDeleted) onDeleted();
+            else onClose();
+          } catch (error) {
+            Alert.alert('Erro', getErrorMessage(error));
+          } finally {
+            setBusy(false);
+          }
+        },
+      },
+    ]);
   };
 
-  const memberName = (id: string) =>
-    group?.members.find((member) => member.id === id)?.name ?? id;
+  const handleAddShare = (integranteToken: string, name: string) => {
+    const share = commitment.splits.length
+      ? commitment.amount / (commitment.splits.length + 1)
+      : commitment.amount;
+    Alert.alert(
+      'Incluir na divisão',
+      `Incluir ${name} com ${formatCurrency(share)}?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Incluir',
+          onPress: async () => {
+            setBusy(true);
+            try {
+              await addCommitmentMembers(commitment.id, [
+                { integranteToken, amount: Number(share.toFixed(2)) },
+              ]);
+            } catch (error) {
+              Alert.alert('Erro', getErrorMessage(error));
+            } finally {
+              setBusy(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleRemoveShare = (shareId: string, name: string) => {
+    Alert.alert('Remover da divisão', `Remover ${name} deste compromisso?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Remover',
+        style: 'destructive',
+        onPress: async () => {
+          setBusy(true);
+          try {
+            await removeCommitmentMember(shareId);
+          } catch (error) {
+            Alert.alert('Erro', getErrorMessage(error));
+          } finally {
+            setBusy(false);
+          }
+        },
+      },
+    ]);
+  };
 
   return (
     <Modal
@@ -82,9 +136,7 @@ export function CommitmentDetailModal({
               title="Editar"
               variant="outline"
               fullWidth
-              onPress={() => {
-                onEdit?.(commitment);
-              }}
+              onPress={() => onEdit?.(commitment)}
             />
           </Box>
           <Box flex={1}>
@@ -92,6 +144,7 @@ export function CommitmentDetailModal({
               title="Excluir"
               variant="danger"
               fullWidth
+              loading={busy}
               onPress={handleDelete}
             />
           </Box>
@@ -114,23 +167,23 @@ export function CommitmentDetailModal({
           >
             <Box flex={1}>
               <Text variant="captionStrong" color="primary">TOTAL</Text>
-              <Text variant="display" color="primary">{formatCurrency(commitment.amount)}</Text>
+              <Text variant="display" color="primary">
+                {formatCurrency(commitment.amount)}
+              </Text>
               <Text variant="caption" color="textSecondary">
                 Pago: {formatCurrency(summary.paid)} • Restante:{' '}
                 {formatCurrency(summary.remaining)}
               </Text>
             </Box>
             <Box alignItems="flex-end">
-              {commitment.dueDate ? (
-                <Pill
-                  label={
-                    due !== null && due < 0
-                      ? `Venceu em ${commitment.dueDate}`
-                      : `Vence em ${commitment.dueDate}`
-                  }
-                  tone={due !== null && due < 0 ? 'danger' : 'primary'}
-                />
-              ) : null}
+              <Pill
+                label={
+                  due !== null && due < 0
+                    ? `Venceu em ${commitment.dueDate}`
+                    : `Vence em ${commitment.dueDate}`
+                }
+                tone={due !== null && due < 0 ? 'danger' : 'primary'}
+              />
             </Box>
           </Box>
 
@@ -138,18 +191,10 @@ export function CommitmentDetailModal({
             <Pill label={commitment.groupName} tone="neutral" />
             <Pill label={commitment.category} tone="neutral" />
             <Pill
-              label={
-                commitment.splitMode === 'equal'
-                  ? 'Divisão igual'
-                  : 'Divisão personalizada'
-              }
+              label={commitment.splitMode === 'equal' ? 'Divisão igual' : 'Valor exato'}
               tone="primary"
             />
           </Box>
-
-          <Text variant="bodySmall" color="textSecondary">
-            {commitment.description}
-          </Text>
 
           <Box
             bg="surface"
@@ -161,16 +206,17 @@ export function CommitmentDetailModal({
             <Box flexDirection="row" alignItems="center" justifyContent="space-between">
               <Text variant="bodyStrong">Integrantes</Text>
               <Text variant="caption" color="textSecondary">
-                {commitment.splits.filter((s) => s.paid).length}/{commitment.splits.length} pagos
+                {settledCount}/{commitment.splits.length} quitados
               </Text>
             </Box>
-            {commitment.splits.map((split) => (
-              <PressableBox
-                key={split.memberId}
-                onPress={() => toggleMemberPaid(split.memberId)}
-                accessibilityRole="button"
-              >
+            {commitment.splits.length === 0 ? (
+              <Text variant="caption" color="textSecondary" mt="sm">
+                Nenhum integrante nesta divisão.
+              </Text>
+            ) : (
+              commitment.splits.map((split) => (
                 <Box
+                  key={split.shareId}
                   flexDirection="row"
                   alignItems="center"
                   justifyContent="space-between"
@@ -178,7 +224,7 @@ export function CommitmentDetailModal({
                   borderTopWidth={1}
                   borderColor="border"
                 >
-                  <Box flexDirection="row" alignItems="center" gap="sm">
+                  <Box flexDirection="row" alignItems="center" gap="sm" flex={1}>
                     <Box
                       width={28}
                       height={28}
@@ -191,15 +237,70 @@ export function CommitmentDetailModal({
                         {split.paid ? '✓' : '•'}
                       </Text>
                     </Box>
-                    <Text variant="body">{memberName(split.memberId)}</Text>
+                    <Box flex={1}>
+                      <Text variant="body">{split.name}</Text>
+                      <Text variant="caption" color="textSecondary">
+                        Pago {formatCurrency(split.paidAmount)} de{' '}
+                        {formatCurrency(split.amount)}
+                      </Text>
+                    </Box>
                   </Box>
-                  <Text variant="bodyStrong">
-                    {formatCurrency(split.amount)}
-                  </Text>
+                  <Box alignItems="flex-end" gap="xxs">
+                    {split.paid ? (
+                      <Text variant="captionStrong" color="success">Quitado</Text>
+                    ) : (
+                      <PressableBox
+                        onPress={() => setPayingShareId(split.shareId)}
+                        accessibilityRole="button"
+                        hitSlop={4}
+                      >
+                        <Text variant="captionStrong" color="primary">Registrar</Text>
+                      </PressableBox>
+                    )}
+                    <PressableBox
+                      onPress={() => handleRemoveShare(split.shareId, split.name)}
+                      accessibilityRole="button"
+                      hitSlop={4}
+                    >
+                      <Text variant="caption" color="danger">Remover</Text>
+                    </PressableBox>
+                  </Box>
                 </Box>
-              </PressableBox>
-            ))}
+              ))
+            )}
           </Box>
+
+          {missingMembers.length > 0 ? (
+            <Box
+              bg="surface"
+              borderRadius="md"
+              borderWidth={1}
+              borderColor="cardBorder"
+              p="md"
+            >
+              <Text variant="bodyStrong">Fora da divisão</Text>
+              {missingMembers.map((member, index) => (
+                <Box
+                  key={member.integranteToken}
+                  flexDirection="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  py="sm"
+                  borderTopWidth={index === 0 ? 0 : 1}
+                  borderColor="border"
+                >
+                  <Text variant="body" flex={1}>{member.name}</Text>
+                  <PressableBox
+                    onPress={() => handleAddShare(member.integranteToken, member.name)}
+                    accessibilityRole="button"
+                    hitSlop={4}
+                  >
+                    <Text variant="captionStrong" color="primary">Incluir</Text>
+                  </PressableBox>
+                </Box>
+              ))}
+            </Box>
+          ) : null}
 
           <Box flexDirection="row" alignItems="center" justifyContent="space-between">
             <Text variant="bodyStrong">Pagamentos ({relatedPayments.length})</Text>
@@ -207,7 +308,7 @@ export function CommitmentDetailModal({
               title="Registrar pagamento"
               variant="outline"
               size="sm"
-              onPress={() => setPaying(true)}
+              onPress={() => setPayingShareId('')}
             />
           </Box>
           {relatedPayments.length === 0 ? (
@@ -226,9 +327,10 @@ export function CommitmentDetailModal({
         </Box>
       </ScrollView>
       <NewPaymentModal
-        visible={paying}
-        onClose={() => setPaying(false)}
+        visible={payingShareId !== null}
+        onClose={() => setPayingShareId(null)}
         commitmentId={commitment.id}
+        shareId={payingShareId || undefined}
       />
       <EditPaymentModal
         visible={editingPayment !== null}

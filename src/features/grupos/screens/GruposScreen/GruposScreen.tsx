@@ -8,6 +8,7 @@ import { Button } from '../../../../components/Button';
 import { ScreenHeader } from '../../../../components/ScreenHeader';
 import { TopBar } from '../../../../components/TopBar';
 import { EmptyState } from '../../../../components/EmptyState';
+import { Loading } from '../../../../components/Loading';
 import { Select, SelectOption } from '../../../../components/Select';
 import { GroupCard } from '../../components/GroupCard/GroupCard';
 import { Box } from '../../../../theme';
@@ -28,7 +29,7 @@ const TONE_FILTERS: SelectOption[] = [
 
 export function GruposScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { groups } = useGroups();
+  const { groups, groupsLoading, groupsError, refetchGroups } = useGroups();
   const { unreadCount } = useNotifications();
   const profile = useUserStore((state) => state.profile);
   const topBar = useTopBarActions();
@@ -51,7 +52,7 @@ export function GruposScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFB' }} edges={['top']}>
       <Box flex={1} width="100%" maxWidth={430} alignSelf="center" bg="background">
         <TopBar
-          initials={profile?.initials ?? 'G'}
+          initials={profile?.initials ?? ''}
           notificationCount={unreadCount}
           onOpenMenu={topBar.openMenu}
           onOpenNotifications={topBar.openNotifications}
@@ -103,7 +104,16 @@ export function GruposScreen() {
               />
             </Box>
 
-            {filteredGroups.length === 0 ? (
+            {groupsLoading ? (
+              <Loading label="Carregando grupos..." />
+            ) : groupsError ? (
+              <EmptyState
+                title="Não foi possível carregar os grupos"
+                description={groupsError}
+                actionLabel="Tentar novamente"
+                onAction={refetchGroups}
+              />
+            ) : filteredGroups.length === 0 ? (
               <EmptyState
                 title="Nenhum grupo encontrado"
                 description="Ajuste a busca ou crie um novo grupo."
@@ -111,16 +121,13 @@ export function GruposScreen() {
                 onAction={handleCreate}
               />
             ) : (
-                <Box flexDirection="column" >
-                {filteredGroups.map((group) => (
-                  <Box width="100%" mb="md" key={group.id}>
-                    <GroupCard
-                      group={group}
-                      onPress={() => navigation.navigate('GroupDetail', { id: group.id })}
-                    />
-                  </Box>
-                ))}
-                </Box>
+              filteredGroups.map((group) => (
+                <GroupCard
+                  key={group.id}
+                  group={group}
+                  onPress={(id) => navigation.navigate('GroupDetail', { id })}
+                />
+              ))
             )}
           </Box>
         </ScrollView>

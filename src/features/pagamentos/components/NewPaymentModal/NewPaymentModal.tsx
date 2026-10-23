@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import * as DocumentPicker from 'expo-document-picker';
 import { Modal } from '../../../../components/Modal';
 import { Input } from '../../../../components/Input';
 import { Button } from '../../../../components/Button';
@@ -11,34 +12,26 @@ import {
   useAppGroups,
   useAppPayments,
 } from '../../../../contexts/AppContext';
-import { useUserStore } from '../../../usuario/stores/userStore';
-import type { Payment, PaymentDraft } from '../../types/Payment';
-import type { Commitment } from '../../../compromissos/types/Commitment';
-import {
-  paymentCategoryOptionsMock,
-  paymentMethodsMock,
-  paymentCardBrandsMock,
-  paymentRecurrenceMock,
-} from '../../services/paymentOptions';
+import { getErrorMessage } from '../../../../services/api/apiClient';
+import { formatCurrency } from '../../../../utils/currency';
+import { todayBR } from '../../../../utils/date';
+import { maskDateBR, maskMoney, parseMoney } from '../../../../utils/masks';
+import { useAuthStore } from '../../../auth/stores/authStore';
+import type { AttachedFile } from '../../../../types/file';
+import { paymentMethodOptions } from '../../services/paymentOptions';
+import type { PaymentMethod } from '../../types/Payment';
 import {
   defaultPaymentFormValues,
-  paymentDraftSchema,
+  paymentFormSchema,
   type PaymentFormValues,
 } from '../../validations/paymentSchema';
 
 interface NewPaymentModalProps {
   visible: boolean;
   onClose: () => void;
-  onCreated?: (payment: Payment) => void;
+  onCreated?: () => void;
   commitmentId?: string;
-}
-
-function resolveMemberName(commitment: Commitment | null | undefined, memberId: string): string {
-  if (commitment) {
-    const split = commitment.splits.find((s) => s.memberId === memberId);
-    if (split) return memberId;
-  }
-  return memberId;
+  shareId?: string;
 }
 
 export function NewPaymentModal({
@@ -46,14 +39,19 @@ export function NewPaymentModal({
   onClose,
   onCreated,
   commitmentId,
+  shareId,
 }: NewPaymentModalProps) {
   const { groups } = useAppGroups();
   const { commitments } = useAppCommitments();
   const { addPayment } = useAppPayments();
-  const profile = useUserStore((state) => state.profile);
+  const user = useAuthStore((state) => state.user);
+
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [comprovante, setComprovante] = useState<AttachedFile | null>(null);
 
   const initialCommitment = useMemo(
-    () => commitments.find((c) => c.id === commitmentId) ?? null,
+    () => commitments.find((commitment) => commitment.id === commitmentId) ?? null,
     [commitments, commitmentId],
   );
 
@@ -65,148 +63,127 @@ export function NewPaymentModal({
     watch,
     setValue,
   } = useForm<PaymentFormValues>({
-    resolver: zodResolver(paymentDraftSchema) as any,
-    defaultValues: {
-      ...defaultPaymentFormValues,
-      groupId: initialCommitment?.groupId ?? '',
-      commitmentId: initialCommitment?.id ?? '',
-      payerId: profile?.id ?? 'ana-lima',
-      payerName: profile?.name ?? 'Gabriel',
-      date: new Date().toLocaleDateString('pt-BR'),
-    },
+    resolver: zodResolver(paymentFormSchema) as any,
+    defaultValues: defaultPaymentFormValues,
     mode: 'onChange',
   });
 
   useEffect(() => {
     if (!visible) return;
+    setSubmitError(null);
+    setComprovante(null);
     reset({
       ...defaultPaymentFormValues,
       groupId: initialCommitment?.groupId ?? '',
       commitmentId: initialCommitment?.id ?? '',
-      payerId: profile?.id ?? 'ana-lima',
-      payerName: profile?.name ?? 'Gabriel',
-      date: new Date().toLocaleDateString('pt-BR'),
+      amount: '',
+      date: todayBR(),
     });
-  }, [visible, initialCommitment, profile, reset]);
+  }, [visible, initialCommitment, reset]);
 
   const handleClose = useCallback(() => {
-    reset();
+    reset(defaultPaymentFormValues);
+    setSubmitError(null);
+    setComprovante(null);
     onClose();
   }, [reset, onClose]);
 
   const watched = watch();
-  const selectedGroup = groups.find((group) => group.id === watched.groupId);
-  const availableCommitments = commitments.filter(
-    (commitment) => !watched.groupId || commitment.groupId === watched.groupId,
+
+  const availableCommitments = useMemo(
+    () =>
+      commitments.filter(
+        (commitment) => !watched.groupId || commitment.groupId === watched.groupId,
+      ),
+    [commitments, watched.groupId],
   );
-  const availableMembers = useMemo(
-    () => selectedGroup?.members ?? [],
-    [selectedGroup],
-  );
+
   const selectedCommitment = commitments.find(
-    (c) => c.id === watched.commitmentId,
+    (commitment) => commitment.id === watched.commitmentId,
   );
+
+  const fixedShare = useMemo(
+    () =>
+      shareId
+        ? commitments
+            .find((commitment) => commitment.id === (commitmentId ?? watched.commitmentId))
+            ?.splits.find((split) => split.shareId === shareId)
+        : undefined,
+    [commitments, shareId, commitmentId, watched.commitmentId],
+  );
+
+  const activeShare = useMemo(() => {
+    if (fixedShare) return fixedShare;
+    if (!selectedCommitment || !user) return undefined;
+    return selectedCommitment.splits.find((split) => split.memberId === user.id);
+  }, [fixedShare, selectedCommitment, user]);
+
+  const remainingAmount = activeShare
+    ? Math.max(0, activeShare.amount - activeShare.paidAmount)
+    : 0;
 
   const groupOptions = useMemo<SelectOption[]>(
     () => groups.map((group) => ({ id: group.id, label: group.name })),
     [groups],
   );
 
-  const commitmentOptions = useMemo<SelectOption[]>(() => {
-    const base: SelectOption[] = [{ id: '', label: 'Sem compromisso' }];
-    return [
-      ...base,
-      ...availableCommitments.map((commitment) => ({
+  const commitmentOptions = useMemo<SelectOption[]>(
+    () =>
+      availableCommitments.map((commitment) => ({
         id: commitment.id,
         label: commitment.name,
-        description: formatDue(commitment.dueDate),
+        description: `Vence ${commitment.dueDate} • ${formatCurrency(commitment.amount)}`,
       })),
-    ];
-  }, [availableCommitments]);
-
-  const payerOptions = useMemo<SelectOption[]>(
-    () => availableMembers.map((member) => ({
-      id: member.id,
-      label: member.name,
-      description: member.email,
-      leading: (
-        <Box
-          width={22}
-          height={22}
-          borderRadius="full"
-          bg="primary"
-          alignItems="center"
-          justifyContent="center"
-        >
-          <Text variant="captionStrong" color="white" style={{ fontSize: 10 }}>
-            {member.initials}
-          </Text>
-        </Box>
-      ),
-    })),
-    [availableMembers],
+    [availableCommitments],
   );
 
-  const categoryOptions = useMemo<SelectOption[]>(
-    () => paymentCategoryOptionsMock.map((option) => ({
-      id: option.id,
-      label: option.label,
-    })),
-    [],
-  );
+  const pickComprovante = useCallback(async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: 'application/pdf',
+      copyToCacheDirectory: true,
+    });
+    if (result.canceled) return;
+    const file = result.assets[0];
+    setComprovante({
+      uri: file.uri,
+      name: file.name || 'comprovante.pdf',
+      type: file.mimeType || 'application/pdf',
+    });
+  }, []);
 
-  const methodOptions = useMemo<SelectOption[]>(
-    () => paymentMethodsMock.map((option) => ({ id: option.id, label: option.label })),
-    [],
-  );
-
-  const cardBrandOptions = useMemo<SelectOption[]>(
-    () => paymentCardBrandsMock.map((option) => ({ id: option.id, label: option.label })),
-    [],
-  );
-
-  const recurrenceOptions = useMemo<SelectOption[]>(
-    () => paymentRecurrenceMock.map((option) => ({ id: option.id, label: option.label })),
-    [],
-  );
-
-  const onValidSubmit = handleSubmit((values) => {
-    const amount = Number(values.amount.replace(',', '.')) || 0;
-    const group = groups.find((g) => g.id === values.groupId);
-    const commitment = commitments.find((c) => c.id === values.commitmentId);
-    if (!group) return;
-
-    const draft: PaymentDraft = {
-      description: values.description.trim(),
-      amount,
-      groupId: group.id,
-      groupName: group.name,
-      commitmentId: commitment?.id,
-      commitmentName: commitment?.name,
-      payerId: values.payerId ?? '',
-      payerName:
-        (resolveMemberName(commitment ?? null, values.payerId ?? '') ?? values.payerId ?? ''),
-      category:
-        paymentCategoryOptionsMock.find((c) => c.id === values.category)?.label ??
-        'Outros',
-      method: values.method,
-      cardBrand: values.method === 'card' ? values.cardBrand : undefined,
-      otherMethod: values.method === 'other' ? values.otherMethod?.trim() : undefined,
-      recurrence: values.recurrence,
-      date: values.date ?? '',
-      notes: values.notes?.trim() ?? undefined,
-    };
-    const payment = addPayment(draft);
-    onCreated?.(payment);
-    handleClose();
+  const onValidSubmit = handleSubmit(async (values) => {
+    if (!activeShare) {
+      setSubmitError('Você não participa deste compromisso.');
+      return;
+    }
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      await addPayment({
+        shareId: activeShare.shareId,
+        amount: parseMoney(values.amount),
+        date: values.date,
+        method: values.method,
+        comprovante: comprovante ?? undefined,
+      });
+      onCreated?.();
+      handleClose();
+    } catch (error) {
+      setSubmitError(getErrorMessage(error));
+    } finally {
+      setSubmitting(false);
+    }
   });
+
+  const canSubmit =
+    isValid && Boolean(activeShare) && (fixedShare ? true : Boolean(selectedCommitment));
 
   return (
     <Modal
       visible={visible}
       onClose={handleClose}
-      title={commitmentId ? 'Registrar pagamento' : 'Novo pagamento'}
-      subtitle="Adicione os dados do pagamento realizado"
+      title="Registrar pagamento"
+      subtitle="Todo pagamento quita a fatia de um integrante"
       showCloseButton
       footer={
         <Box flexDirection="row" gap="sm">
@@ -217,7 +194,8 @@ export function NewPaymentModal({
             <Button
               title="Registrar"
               onPress={onValidSubmit}
-              disabled={!isValid}
+              loading={submitting}
+              disabled={!canSubmit}
               fullWidth
             />
           </Box>
@@ -227,15 +205,38 @@ export function NewPaymentModal({
       <Box gap="md">
         <Controller
           control={control}
-          name="description"
-          render={({ field: { onChange, value, onBlur } }) => (
-            <Input
-              label="Descrição"
+          name="groupId"
+          render={({ field: { onChange, value } }) => (
+            <Select
+              label="Grupo"
+              placeholder="Selecione um grupo"
               value={value}
-              onChangeText={onChange}
-              onBlur={onBlur}
-              placeholder="Ex: Aluguel Março"
-              error={errors.description?.message}
+              onChange={(next) => {
+                onChange(next);
+                setValue('commitmentId', '', { shouldValidate: true });
+              }}
+              options={groupOptions}
+              emptyText="Nenhum grupo disponível"
+              error={errors.groupId?.message}
+            />
+          )}
+        />
+
+        <Controller
+          control={control}
+          name="commitmentId"
+          render={({ field: { onChange, value } }) => (
+            <Select
+              label="Compromisso"
+              placeholder={
+                watched.groupId ? 'Selecione o compromisso' : 'Selecione um grupo primeiro'
+              }
+              value={value}
+              onChange={onChange}
+              options={commitmentOptions}
+              disabled={!watched.groupId}
+              emptyText="Nenhum compromisso neste grupo"
+              error={errors.commitmentId?.message}
             />
           )}
         />
@@ -249,9 +250,13 @@ export function NewPaymentModal({
                 <Input
                   label="Valor"
                   value={value}
-                  onChangeText={(text) => onChange(text.replace(/[^0-9.,]/g, ''))}
+                  onChangeText={(text) => onChange(maskMoney(text))}
                   onBlur={onBlur}
-                  placeholder="0,00"
+                  placeholder={
+                    activeShare && remainingAmount > 0
+                      ? formatCurrency(remainingAmount)
+                      : '0,00'
+                  }
                   keyboardType="decimal-pad"
                   error={errors.amount?.message}
                 />
@@ -266,95 +271,11 @@ export function NewPaymentModal({
                 <Input
                   label="Data"
                   value={value}
-                  onChangeText={onChange}
+                  onChangeText={(text) => onChange(maskDateBR(text))}
                   onBlur={onBlur}
                   placeholder="DD/MM/AAAA"
                   keyboardType="numeric"
-                />
-              )}
-            />
-          </Box>
-        </Box>
-
-        <Controller
-          control={control}
-          name="groupId"
-          render={({ field: { onChange, value } }) => (
-            <Select
-              label="Grupo"
-              placeholder="Selecione um grupo"
-              value={value}
-              onChange={(next) => {
-                onChange(next);
-                setValue('commitmentId', '', { shouldValidate: true });
-              }}
-              options={groupOptions}
-              error={errors.groupId?.message}
-            />
-          )}
-        />
-
-        {watched.groupId ? (
-          <Controller
-            control={control}
-            name="commitmentId"
-            render={({ field: { onChange, value } }) => (
-              <Select
-                label="Compromisso (opcional)"
-                placeholder="Vincular a um compromisso"
-                value={value}
-                onChange={onChange}
-                options={commitmentOptions}
-              />
-            )}
-          />
-        ) : null}
-
-        <Controller
-          control={control}
-          name="payerId"
-          render={({ field: { onChange, value } }) => (
-            <Select
-              label="Pagador"
-              placeholder={availableMembers.length ? 'Selecione o pagador' : 'Selecione um grupo primeiro'}
-              value={value}
-              onChange={onChange}
-              options={payerOptions}
-              disabled={!watched.groupId}
-              emptyText="Nenhum integrante no grupo selecionado"
-              error={errors.payerId?.message}
-            />
-          )}
-        />
-
-        <Box flexDirection="row" gap="sm">
-          <Box flex={1}>
-            <Controller
-              control={control}
-              name="category"
-              render={({ field: { onChange, value } }) => (
-                <Select
-                  label="Categoria"
-                  placeholder="Selecione"
-                  value={value}
-                  onChange={onChange}
-                  options={categoryOptions}
-                  error={errors.category?.message}
-                />
-              )}
-            />
-          </Box>
-          <Box flex={1}>
-            <Controller
-              control={control}
-              name="recurrence"
-              render={({ field: { onChange, value } }) => (
-                <Select
-                  label="Recorrência"
-                  placeholder="Selecione"
-                  value={value}
-                  onChange={onChange}
-                  options={recurrenceOptions}
+                  error={errors.date?.message}
                 />
               )}
             />
@@ -366,18 +287,14 @@ export function NewPaymentModal({
           name="method"
           render={({ field: { onChange, value } }) => (
             <Box>
-              <Text variant="label" marginBottom="xs">
-                Forma de pagamento
-              </Text>
+              <Text variant="label" marginBottom="xs">Forma de pagamento</Text>
               <Box flexDirection="row" gap="xs" flexWrap="wrap">
-                {methodOptions.map((option) => {
+                {paymentMethodOptions.map((option) => {
                   const active = value === option.id;
                   return (
                     <PressableBox
                       key={option.id}
-                      onPress={() =>
-                        onChange(option.id as PaymentFormValues['method'])
-                      }
+                      onPress={() => onChange(option.id as PaymentMethod)}
                       accessibilityRole="button"
                       accessibilityState={{ selected: active }}
                     >
@@ -389,10 +306,7 @@ export function NewPaymentModal({
                         borderWidth={1}
                         borderColor={active ? 'primary' : 'border'}
                       >
-                        <Text
-                          variant="captionStrong"
-                          color={active ? 'white' : 'text'}
-                        >
+                        <Text variant="captionStrong" color={active ? 'white' : 'text'}>
                           {option.label}
                         </Text>
                       </Box>
@@ -404,108 +318,52 @@ export function NewPaymentModal({
           )}
         />
 
-        {watched.method === 'card' ? (
-          <Controller
-            control={control}
-            name="cardBrand"
-            render={({ field: { onChange, value } }) => (
-              <Box flexDirection="row" gap="xs">
-                {cardBrandOptions.map((option) => {
-                  const active = value === option.id;
-                  return (
-                    <PressableBox
-                      key={option.id}
-                      onPress={() =>
-                        onChange(option.id as PaymentFormValues['cardBrand'])
-                      }
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: active }}
-                      style={{ flex: 1 }}
-                    >
-                      <Box
-                        alignItems="center"
-                        py="sm"
-                        borderRadius="md"
-                        bg={active ? 'primaryLight' : 'surface'}
-                        borderWidth={1}
-                        borderColor={active ? 'primary' : 'border'}
-                      >
-                        <Text
-                          variant="captionStrong"
-                          color={active ? 'primary' : 'textSecondary'}
-                        >
-                          {option.label}
-                        </Text>
-                      </Box>
-                    </PressableBox>
-                  );
-                })}
-              </Box>
-            )}
-          />
-        ) : null}
-
-        {watched.method === 'other' ? (
-          <Controller
-            control={control}
-            name="otherMethod"
-            render={({ field: { onChange, value, onBlur } }) => (
-              <Input
-                label="Especifique a forma de pagamento"
-                value={value ?? ''}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                placeholder="Ex: Débito automático, PicPay..."
-                error={errors.otherMethod?.message}
-              />
-            )}
-          />
-        ) : null}
-
-        <Controller
-          control={control}
-          name="notes"
-          render={({ field: { onChange, value, onBlur } }) => (
-            <Input
-              label="Observações"
-              value={value ?? ''}
-              onChangeText={onChange}
-              onBlur={onBlur}
-              placeholder="Detalhes do pagamento"
+        <Box>
+          <Text variant="label" marginBottom="xs">Comprovante (PDF, opcional)</Text>
+          <Box flexDirection="row" gap="xs" alignItems="center">
+            <Button
+              title={comprovante ? 'Trocar arquivo' : 'Anexar PDF'}
+              variant="outline"
+              size="sm"
+              onPress={pickComprovante}
             />
-          )}
-        />
+            {comprovante ? (
+              <Box flex={1} flexDirection="row" alignItems="center" gap="xs">
+                <Text variant="caption" numberOfLines={1} flex={1} color="primary">
+                  {comprovante.name}
+                </Text>
+                <PressableBox onPress={() => setComprovante(null)} hitSlop={8}>
+                  <Text variant="captionStrong" color="danger">Remover</Text>
+                </PressableBox>
+              </Box>
+            ) : null}
+          </Box>
+        </Box>
 
-        {selectedCommitment ? (
-          <Box
-            bg="background"
-            borderRadius="md"
-            borderWidth={1}
-            borderColor="border"
-            p="md"
-          >
-            <Text variant="captionStrong" color="textSecondary">VINCULADO A</Text>
-            <Text variant="bodyStrong" mt="xxs">{selectedCommitment.name}</Text>
+        {selectedCommitment && !fixedShare && !activeShare ? (
+          <Text variant="caption" color="danger">
+            Você não tem fatia neste compromisso.
+          </Text>
+        ) : null}
+
+        {activeShare ? (
+          <Box bg="background" borderRadius="md" borderWidth={1} borderColor="border" p="md">
+            <Text variant="captionStrong" color="textSecondary">FATIA SELECIONADA</Text>
+            <Text variant="bodyStrong" mt="xxs">{activeShare.name}</Text>
             <Text variant="caption" color="textSecondary">
-              Saldo aberto: R${' '}
-              {(
-                selectedCommitment.amount -
-                selectedCommitment.splits
-                  .filter((s) => s.paid)
-                  .reduce((sum, s) => sum + s.amount, 0)
-              ).toFixed(2)}
+              Em aberto: {formatCurrency(remainingAmount)}
             </Text>
           </Box>
         ) : null}
+
+        {submitError ? (
+          <Text variant="caption" color="danger">
+            {submitError}
+          </Text>
+        ) : null}
       </Box>
-
-
     </Modal>
   );
-}
-
-function formatDue(due?: string): string | undefined {
-  return due ? `Vence ${due}` : undefined;
 }
 
 export default NewPaymentModal;

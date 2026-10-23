@@ -1,5 +1,7 @@
-import React, { useCallback, useMemo, useState, useEffect } from 'react';
-import { SafeAreaView, ScrollView } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Image, ScrollView, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -9,6 +11,7 @@ import { Pill } from '../../../components/Pill';
 import { Box, Text } from '../../../theme';
 import { ProfileModal } from '../components/ProfileModal/ProfileModal';
 import { useUserStore } from '../stores/userStore';
+import { useSaveProfile } from '../hooks/useSaveProfile';
 import { useAuthStore } from '../../auth/stores/authStore';
 import {
   useAppCommitments,
@@ -18,15 +21,16 @@ import {
 import { useTopBarActions } from '../../../hooks/useTopBarActions';
 import type { RootStackParamList } from '../../../navigation/types';
 import { formatCurrency } from '../../../utils/currency';
+import { environment } from '../../../config/environment';
+import { useAppDashboard } from '../../dashboard/hooks/useDashboard';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Profile'>;
 
 export function ProfileScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const profile = useUserStore((state) => state.profile);
-
+  const user = useAuthStore((state) => state.user);
   const setStats = useUserStore((state) => state.setStats);
-  const setProfile = useUserStore((state) => state.setProfile);
+  const saveProfile = useSaveProfile();
   const clearProfile = useUserStore((state) => state.logout);
   const authLogout = useAuthStore((state) => state.logout);
   const { groups } = useAppGroups();
@@ -34,23 +38,21 @@ export function ProfileScreen() {
   const { payments } = useAppPayments();
   const topBar = useTopBarActions();
   const [editing, setEditing] = useState(false);
+  const { data, isLoading, isError: dashboardError, refetch } = useAppDashboard();
 
-  const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
-  const punctuality = commitments.length
-    ? Math.round(
-        (commitments.filter((c) => c.status === 'paid').length / commitments.length) * 100,
-      )
-    : 0;
+  const totalPaid = data?.valorTotalPago ?? payments.reduce((sum, p) => sum + p.amount, 0);
+  const punctuality = data?.taxaDePontualidade? (data.taxaDePontualidade)*100 : 0;
+  const totalGroups = data?.gruposAtivosCount ?? groups.length;
   const dynamicStats = useMemo(
     () => [
-      { value: String(groups.length), label: 'Grupos' },
-      { value: String(payments.length), label: 'Pagamentos' },
-      { value: `${punctuality}%`, label: 'Pontualidade' },
+      { value: String(data?.gruposAtivosCount ?? 0), label: 'Grupos' },
+      { value: String(data?.compromissosCountTotal ?? 0), label: 'Compromissos' },
+      { value: String(data?.pagamentosCountTotal ?? 0), label: 'Pagamentos' },
     ],
     [groups.length, payments.length, punctuality],
   );
 
-  useEffect(() => {
+  React.useEffect(() => {
     setStats(dynamicStats);
   }, [dynamicStats, setStats]);
 
@@ -61,17 +63,11 @@ export function ProfileScreen() {
   }, [clearProfile, authLogout, navigation]);
 
   const handleSave = useCallback(
-    (data: { initials: string; name: string; email: string }) => {
-      setProfile({
-        id: profile?.id ?? 'user-1',
-        initials: data.initials,
-        name: data.name,
-        email: data.email,
-        notificationCount: profile?.notificationCount ?? 0,
-      });
+    async (data: { initials: string; name: string; email: string }) => {
+      await saveProfile(data);
       setEditing(false);
     },
-    [profile, setProfile],
+    [saveProfile],
   );
 
   const handleEdit = () => {
@@ -79,13 +75,14 @@ export function ProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFB' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFB' }} edges={['top']}>
       <Box flex={1} width="100%" maxWidth={430} alignSelf="center" bg="background">
         <TopBar
-          initials={profile?.initials ?? 'G'}
+          initials={user?.initials ?? ''}
           onOpenMenu={topBar.openMenu}
           onOpenNotifications={topBar.openNotifications}
           onOpenProfile={topBar.openProfile}
+          imageUrl={user?.imageUrl ? `${environment.mediaUrl}/${user.imageUrl}` : undefined}
         />
         <ScrollView
           style={{ flex: 1 }}
@@ -100,15 +97,24 @@ export function ProfileScreen() {
               bg="primary"
               alignItems="center"
               justifyContent="center"
+              overflow="hidden"
             >
-              <Text variant="display" color="white">
-                {profile?.initials ?? 'G'}
-              </Text>
+              {user?.imageUrl ? (
+                <Image
+                  source={{ uri: `${environment.mediaUrl}/${user.imageUrl}` }}
+                  resizeMode="cover"
+                  style={{ width: 96, height: 96 }}
+                />
+              ) : (
+                <Text variant="display" color="white">
+                  {user?.initials ?? ''}
+                </Text>
+              )}
             </Box>
             <Box alignItems="center">
-              <Text variant="h2">{profile?.name ?? 'Gabriel'}</Text>
+              <Text variant="h2">{user?.name ?? ''}</Text>
               <Text variant="caption" color="textSecondary">
-                {profile?.email ?? 'dev@dev.com'}
+                {user?.email ?? ''}
               </Text>
             </Box>
 
@@ -154,7 +160,7 @@ export function ProfileScreen() {
               </Box>
               <Box flexDirection="row" alignItems="center" justifyContent="space-between">
                 <Text variant="bodyStrong">Grupos</Text>
-                <Pill label={String(groups.length)} tone="primary" />
+                <Pill label={String(totalGroups)} tone="primary" />
               </Box>
             </Box>
 
@@ -179,11 +185,11 @@ export function ProfileScreen() {
       </Box>
       <ProfileModal
         visible={editing}
-        initials={profile?.initials ?? 'G'}
-        name={profile?.name ?? 'Gabriel'}
-        email={profile?.email ?? 'dev@dev.com'}
+        initials={user?.initials ?? ''}
+        name={user?.name ?? ''}
+        email={user?.email ?? ''}
         stats={dynamicStats}
-
+        emailEditable={false}
         onClose={() => setEditing(false)}
         onSave={handleSave}
       />

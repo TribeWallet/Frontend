@@ -2,30 +2,51 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from 'react';
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { SideMenu, SideMenuAction } from '../components/SideMenu/SideMenu';
 import { NotificationsModal } from '../features/notificacoes/components/NotificationsModal/NotificationsModal';
 import { useUserStore } from '../features/usuario/stores/userStore';
-import { notificationsMock } from '../features/notificacoes/hooks/mockData';
-import { groupsMock } from '../features/grupos/hooks/mockData';
-import { commitmentsMock } from '../features/compromissos/hooks/mockData';
-import { paymentsMock } from '../features/pagamentos/hooks/mockData';
-import { syncDueNotifications } from '../features/notificacoes/services/notificationSync';
+import { buildNotifications } from '../features/notificacoes/services/notificationSync';
+import { useAuthStore } from '../features/auth/stores/authStore';
+import {
+  addIntegrantes,
+  createGrupo,
+  deleteGrupo,
+  listGrupos,
+  removeIntegrante,
+  saveGroupTone,
+  toGroup,
+  updateGrupo,
+} from '../features/grupos/services/grupoService';
+import {
+  addParticipacoes,
+  createCompromisso,
+  deleteCompromisso,
+  listCompromissosByGrupo,
+  removeParticipacao,
+  toCommitment,
+  updateCompromisso,
+} from '../features/compromissos/services/compromissoService';
+import {
+  createPagamento,
+  deletePagamento,
+  updatePagamento,
+} from '../features/pagamentos/services/pagamentoService';
+import { ApiError, getErrorMessage } from '../services/api/apiClient';
+import { formatCurrency } from '../utils/currency';
+import { parseBRDate } from '../utils/date';
 import type { NotificationItem } from '../features/notificacoes/types/Notification';
 import type { NotificationSettings } from '../features/notificacoes/components/NotificationsModal/NotificationsModal';
-import type { Group, GroupMember } from '../features/grupos/types/Group';
-import type {
-  Commitment,
-  CommitmentSplitEntry,
-  SplitMode,
-} from '../features/compromissos/types/Commitment';
-import type {
-  Payment,
-  PaymentDraft,
-} from '../features/pagamentos/types/Payment';
+import type { Group } from '../features/grupos/types/Group';
+import type { Dashboard } from "../features/dashboard/Types/Dashboard";
+import type { Commitment, CommitmentInput } from '../features/compromissos/types/Commitment';
+import type { Payment, PaymentDraft, PaymentPatch } from '../features/pagamentos/types/Payment';
+import {fetchDashboard} from "../features/dashboard/Services/dashboardService";
 
 export interface TopBarActions {
   openMenu: () => void;
@@ -37,20 +58,14 @@ export interface NewGroupInput {
   name: string;
   description: string;
   tone: Group['tone'];
-  members: { name: string; email?: string }[];
+  /** usuarioToken de cada integrante. Quem cria o grupo entra automaticamente. */
+  memberTokens: string[];
 }
 
-export interface NewCommitmentInput {
+export interface UpdateGroupInput {
   name: string;
   description: string;
-  groupId: string;
-  groupName: string;
-  category: string;
-  amount: number;
-  dueDate?: string;
-  status?: Commitment['status'];
-  splitMode: SplitMode;
-  splits: { memberId: string; amount: number }[];
+  tone: Group['tone'];
 }
 
 interface NotificationsContextValue {
@@ -66,27 +81,38 @@ interface NotificationsContextValue {
 
 interface GroupsContextValue {
   groups: Group[];
-  addGroup: (input: NewGroupInput) => Group;
-  updateGroup: (id: string, patch: Partial<Group>) => void;
-  deleteGroup: (id: string) => void;
-  addMember: (groupId: string, member: { name: string; email?: string }) => boolean;
-  removeMember: (groupId: string, memberId: string) => void;
+  groupsLoading: boolean;
+  groupsError: string | null;
+  refetchGroups: () => void;
+  addGroup: (input: NewGroupInput) => Promise<Group>;
+  updateGroup: (id: string, input: UpdateGroupInput) => Promise<void>;
+  deleteGroup: (id: string) => Promise<void>;
+  addGroupMembers: (id: string, usuarioTokens: string[]) => Promise<void>;
+  removeGroupMember: (id: string, integranteToken: string) => Promise<void>;
   getGroup: (id: string) => Group | undefined;
 }
 
 interface CommitmentsContextValue {
   commitments: Commitment[];
-  addCommitment: (input: NewCommitmentInput) => Commitment;
-  updateCommitment: (id: string, patch: Partial<Commitment>) => void;
-  deleteCommitment: (id: string) => void;
+  commitmentsLoading: boolean;
+  commitmentsError: string | null;
+  refetchCommitments: () => void;
+  addCommitment: (input: CommitmentInput) => Promise<Commitment>;
+  updateCommitment: (id: string, input: CommitmentInput) => Promise<void>;
+  deleteCommitment: (id: string) => Promise<void>;
+  addCommitmentMembers: (
+    id: string,
+    participacoes: { integranteToken: string; amount: number }[],
+  ) => Promise<void>;
+  removeCommitmentMember: (shareId: string) => Promise<void>;
   getCommitment: (id: string) => Commitment | undefined;
 }
 
 interface PaymentsContextValue {
   payments: Payment[];
-  addPayment: (draft: PaymentDraft) => Payment;
-  updatePayment: (id: string, patch: Partial<Payment>) => void;
-  deletePayment: (id: string) => void;
+  addPayment: (draft: PaymentDraft) => Promise<void>;
+  updatePayment: (id: string, patch: PaymentPatch) => Promise<void>;
+  deletePayment: (id: string) => Promise<void>;
 }
 
 interface AppContextValue
@@ -95,8 +121,13 @@ interface AppContextValue
     CommitmentsContextValue,
     PaymentsContextValue {
   topBar: TopBarActions;
+  dashboard?: Dashboard;
+  dashboardLoading: boolean;
+  dashboardError: string | null;
+  refetchDashboard: () => void;
 }
 
+// Preferências de notificação não existem na API: ficam só na sessão do app.
 const DEFAULT_SETTINGS: NotificationSettings = {
   pushEnabled: true,
   emailEnabled: false,
@@ -136,11 +167,14 @@ export function useAppGroups(): GroupsContextValue {
   const ctx = useAppContext();
   return {
     groups: ctx.groups,
+    groupsLoading: ctx.groupsLoading,
+    groupsError: ctx.groupsError,
+    refetchGroups: ctx.refetchGroups,
     addGroup: ctx.addGroup,
     updateGroup: ctx.updateGroup,
     deleteGroup: ctx.deleteGroup,
-    addMember: ctx.addMember,
-    removeMember: ctx.removeMember,
+    addGroupMembers: ctx.addGroupMembers,
+    removeGroupMember: ctx.removeGroupMember,
     getGroup: ctx.getGroup,
   };
 }
@@ -149,9 +183,14 @@ export function useAppCommitments(): CommitmentsContextValue {
   const ctx = useAppContext();
   return {
     commitments: ctx.commitments,
+    commitmentsLoading: ctx.commitmentsLoading,
+    commitmentsError: ctx.commitmentsError,
+    refetchCommitments: ctx.refetchCommitments,
     addCommitment: ctx.addCommitment,
     updateCommitment: ctx.updateCommitment,
     deleteCommitment: ctx.deleteCommitment,
+    addCommitmentMembers: ctx.addCommitmentMembers,
+    removeCommitmentMember: ctx.removeCommitmentMember,
     getCommitment: ctx.getCommitment,
   };
 }
@@ -174,340 +213,315 @@ interface AppProviderProps {
   activeTab?: string;
 }
 
-const TONE_KEYWORDS: { tone: Group['tone']; keywords: string[] }[] = [
-  { tone: 'green', keywords: ['viagem', 'travel', 'ferias', 'férias', 'carnaval'] },
-  { tone: 'family', keywords: ['família', 'familia', 'family'] },
-];
-
-function resolveTone(name: string): Group['tone'] {
-  const lowered = name.toLowerCase();
-  const found = TONE_KEYWORDS.find((entry) =>
-    entry.keywords.some((keyword) => lowered.includes(keyword)),
-  );
-  return found?.tone ?? 'blue';
-}
-
-function createId(prefix: string): string {
-  return `${prefix}-${Math.random().toString(36).slice(2, 8)}-${Date.now().toString(36)}`;
-}
-
-function initialsFromName(name: string): string {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .slice(0, 2)
-    .join('') || 'NV';
-}
-
-function buildGroup(input: NewGroupInput): Group {
-  const tone = input.tone ?? resolveTone(input.name);
-  const members: GroupMember[] = input.members
-    .filter((member) => member.name.trim().length > 0)
-    .map((member) => ({
-      id: createId('user'),
-      name: member.name.trim(),
-      email: member.email?.trim() || undefined,
-      initials: initialsFromName(member.name),
-    }));
-  return {
-    id: createId('group'),
-    name: input.name.trim(),
-    description: input.description.trim(),
-    tone,
-    tags: [
-      { label: 'Ativo', tone: 'green' },
-    ],
-    summary: {
-      members: members.length || 1,
-      openValue: 'R$ 0,00',
-      paidValue: 'R$ 0,00',
-    },
-    members,
-    createdAt: new Date().toISOString(),
-  };
-}
-
-function normalizeMethod(method: string): 'pix' | 'card' | 'boleto' | 'other' {
-  if (method === 'pix' || method === 'card' || method === 'boleto' || method === 'other') {
-    return method;
-  }
-  if (method === 'credit' || method === 'debit') return 'card';
-  return 'other';
-}
-
-function buildCommitment(input: NewCommitmentInput): Commitment {
-  const initials = initialsFromName(input.name);
-  const splits: CommitmentSplitEntry[] = input.splits.map((split) => ({
-    memberId: split.memberId,
-    amount: split.amount,
-    paid: false,
-  }));
-  const dueDate = input.dueDate?.trim() || undefined;
-  return {
-    id: createId('commitment'),
-    initials,
-    avatarTone: 'blue',
-    name: input.name.trim(),
-    description: input.description.trim(),
-    groupId: input.groupId,
-    groupName: input.groupName,
-    category: input.category,
-    dueDate,
-    amount: input.amount,
-    splitMode: input.splitMode,
-    splits,
-    status: input.status ?? 'pending',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-}
-
-export function AppProvider({ children, onOpenProfile, onNavigate, onLogout, activeTab }: AppProviderProps) {
+export function AppProvider({
+  children,
+  onOpenProfile,
+  onNavigate,
+  onLogout,
+  activeTab,
+}: AppProviderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(
-    () => notificationsMock.map((item) => ({ ...item })),
+  const [settings, setSettings] = useState<NotificationSettings>(DEFAULT_SETTINGS);
+  // Ler e dispensar aviso é estado de tela: a API não guarda isso.
+  const [readIds, setReadIds] = useState<string[]>([]);
+  const [dismissedIds, setDismissedIds] = useState<string[]>([]);
+
+  const usuarioToken = useAuthStore((state) => state.user?.id);
+  const queryClient = useQueryClient();
+
+  const dashboardQuery = useQuery({
+      queryKey: ['dashboard', usuarioToken],
+      queryFn: () => fetchDashboard(usuarioToken as string),
+      enabled: Boolean(usuarioToken),
+  });
+  const dashboard = dashboardQuery.data;
+  const dashboardLoading = dashboardQuery.isLoading;
+  const dashboardError = dashboardQuery.isError ? getErrorMessage(dashboardQuery.error) : null;
+
+  const groupsQuery = useQuery({
+    queryKey: ['grupos', usuarioToken],
+    queryFn: () => listGrupos(usuarioToken as string),
+    enabled: Boolean(usuarioToken),
+  });
+  const { refetch: refetchGroupsQuery } = groupsQuery;
+  const groupsLoading = groupsQuery.isLoading;
+  const groupsError = groupsQuery.error ? getErrorMessage(groupsQuery.error) : null;
+  const [mappedGroups, setMappedGroups] = useState<Group[]>([]);
+
+
+  useEffect(() => {
+    let active = true;
+    Promise.all((groupsQuery.data ?? []).map((grupo) => toGroup(grupo))).then((nextGroups) => {
+      if (active) setMappedGroups(nextGroups);
+    });
+    return () => {
+      active = false;
+    };
+  }, [groupsQuery.data]);
+
+  const uniqueBaseGroups = useMemo(
+    () => [...new Map(mappedGroups.map((group) => [group.id, group])).values()],
+    [mappedGroups],
   );
-  const [settings, setSettings] =
-    useState<NotificationSettings>(DEFAULT_SETTINGS);
-  const [groups, setGroups] = useState<Group[]>(() =>
-    groupsMock.map((group) => ({
-      ...group,
-      createdAt: group.createdAt ?? new Date().toISOString(),
+
+  // A listagem de grupos não traz as participações; os compromissos vêm por grupo.
+  const commitmentQueries = useQueries({
+    queries: uniqueBaseGroups.map((group) => ({
+      queryKey: ['compromissos', group.id],
+      queryFn: () => listCompromissosByGrupo(group.id),
     })),
+  });
+
+  // Os compromissos dependem da lista de grupos: enquanto ela carrega, ainda não há o que buscar.
+  const commitmentsLoading =
+    groupsLoading || commitmentQueries.some((query) => query.isLoading);
+  const commitmentsError =
+    commitmentQueries.find((query) => query.error)?.error ?? null;
+
+  const commitments = useMemo<Commitment[]>(
+    () =>
+      uniqueBaseGroups.flatMap((group, index) =>
+        (commitmentQueries[index]?.data ?? []).map((dto) =>
+          toCommitment(dto, { id: group.id, name: group.name }),
+        ),
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [uniqueBaseGroups, commitmentQueries.map((query) => query.dataUpdatedAt).join('|')],
   );
-  const [commitments, setCommitments] = useState<Commitment[]>(() =>
-    commitmentsMock.map((commitment) => buildCommitment({
-      name: commitment.name,
-      description: commitment.description,
-      groupId: commitment.groupId,
-      groupName: commitment.groupName,
-      category: commitment.category,
-      amount: commitment.amount,
-      dueDate: commitment.dueDate,
-      status: commitment.status,
-      splitMode: 'equal',
-      splits: [],
-    })),
+
+  // Mais recentes primeiro: as telas mostram "últimos pagamentos".
+  const payments = useMemo<Payment[]>(
+    () =>
+      commitments
+        .flatMap((commitment) => commitment.splits.flatMap((split) => split.payments))
+        .sort(
+          (a, b) =>
+            (parseBRDate(b.date)?.getTime() ?? 0) - (parseBRDate(a.date)?.getTime() ?? 0),
+        ),
+    [commitments],
   );
-  const [payments, setPayments] = useState<Payment[]>(() =>
-    paymentsMock.map((payment) => ({
-      ...payment,
-      method: normalizeMethod(payment.method),
-    })),
+
+  const groups = useMemo<Group[]>(
+    () =>
+      mappedGroups.map((group) => {
+        const groupCommitments = commitments.filter(
+          (commitment) => commitment.groupId === group.id,
+        );
+        const paidAmount = groupCommitments.reduce(
+          (sum, commitment) =>
+            sum + commitment.splits.reduce((inner, split) => inner + split.paidAmount, 0),
+          0,
+        );
+        const openAmount = groupCommitments.reduce(
+          (sum, commitment) =>
+            sum +
+            commitment.splits.reduce(
+              (inner, split) => inner + Math.max(0, split.amount - split.paidAmount),
+              0,
+            ),
+          0,
+        );
+
+        return {
+          ...group,
+          summary: {
+            ...group.summary,
+            openValue: formatCurrency(openAmount),
+            paidValue: formatCurrency(paidAmount),
+          },
+        };
+      }),
+    [mappedGroups, commitments],
   );
 
   const profile = useUserStore((state) => state.profile);
 
+  const notifications = useMemo<NotificationItem[]>(
+    () =>
+      buildNotifications(commitments, payments)
+        .filter((item) => !dismissedIds.includes(item.id))
+        .map((item) =>
+          readIds.includes(item.id) ? { ...item, status: 'paid' as const } : item,
+        ),
+    [commitments, payments, dismissedIds, readIds],
+  );
+
   const unreadCount = useMemo(
-    () => notifications.filter((n) => n.status !== 'paid').length,
+    () => notifications.filter((item) => item.status !== 'paid').length,
     [notifications],
   );
 
+  const invalidateGroups = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: ['grupos'] }),
+    [queryClient],
+  );
+
+  const invalidateCommitments = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: ['compromissos'] }),
+    [queryClient],
+  );
+
+  const refetchGroups = useCallback(() => {
+    refetchGroupsQuery();
+    invalidateCommitments();
+  }, [refetchGroupsQuery, invalidateCommitments]);
+
+  const refetchCommitments = useCallback(() => {
+    invalidateCommitments();
+  }, [invalidateCommitments]);
+
   const markAsRead = useCallback((id: string) => {
-    setNotifications((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, status: 'paid' as const } : item,
-      ),
-    );
+    setReadIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
   }, []);
 
   const markAllAsRead = useCallback(() => {
-    setNotifications((prev) =>
-      prev.map((item) => ({ ...item, status: 'paid' as const })),
-    );
-  }, []);
+    setReadIds(notifications.map((item) => item.id));
+  }, [notifications]);
 
   const deleteNotification = useCallback((id: string) => {
-    setNotifications((prev) => prev.filter((item) => item.id !== id));
+    setDismissedIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
   }, []);
-
-  const refreshDueNotifications = useCallback(() => {
-    setNotifications((prev) => {
-      const generated = syncDueNotifications(commitments, payments);
-      const existing = new Set(prev.map((n) => n.id));
-      const merged = [...prev];
-      generated.forEach((item) => {
-        if (!existing.has(item.id)) merged.unshift(item);
-      });
-      return merged;
-    });
-  }, [commitments, payments]);
 
   const updateSettings = useCallback((next: NotificationSettings) => {
     setSettings(next);
   }, []);
 
-  const addGroup = useCallback((input: NewGroupInput) => {
-    const group = buildGroup(input);
-    setGroups((prev) => [group, ...prev]);
-    return group;
-  }, []);
-
-  const updateGroup = useCallback((id: string, patch: Partial<Group>) => {
-    setGroups((prev) =>
-      prev.map((group) =>
-        group.id === id
-          ? {
-              ...group,
-              ...patch,
-              summary: {
-                ...group.summary,
-                ...(patch.summary ?? {}),
-                members:
-                  patch.members?.length ?? group.summary.members,
-              },
-            }
-          : group,
-      ),
-    );
-  }, []);
-
-  const deleteGroup = useCallback((id: string) => {
-    setGroups((prev) => prev.filter((group) => group.id !== id));
-    setCommitments((prev) =>
-      prev.filter((commitment) => commitment.groupId !== id),
-    );
-    setPayments((prev) => prev.filter((payment) => payment.groupId !== id));
-  }, []);
-
-  const addMember = useCallback(
-    (groupId: string, member: { name: string; email?: string }) => {
-      const trimmedName = member.name.trim();
-      if (!trimmedName) return false;
-      let added = false;
-      setGroups((prev) =>
-        prev.map((group) => {
-          if (group.id !== groupId) return group;
-          const exists = group.members.some(
-            (existing) =>
-              existing.name.toLowerCase() === trimmedName.toLowerCase() ||
-              (member.email &&
-                existing.email?.toLowerCase() === member.email.toLowerCase()),
-          );
-          if (exists) return group;
-          added = true;
-          const newMember: GroupMember = {
-            id: createId('user'),
-            name: trimmedName,
-            email: member.email?.trim() || undefined,
-            initials: initialsFromName(trimmedName),
-          };
-          return {
-            ...group,
-            members: [...group.members, newMember],
-            summary: {
-              ...group.summary,
-              members: group.members.length + 1,
-            },
-          };
-        }),
-      );
-      return added;
+  const addGroup = useCallback(
+    async (input: NewGroupInput) => {
+      if (!usuarioToken) {
+        throw new ApiError('Sua sessão expirou. Entre novamente.', 401);
+      }
+      // A listagem só traz grupos em que o usuário é integrante, então quem cria entra também.
+      const memberTokens = Array.from(new Set([usuarioToken, ...input.memberTokens]));
+      const created = await createGrupo({
+        nome: input.name.trim(),
+        descricao: input.description.trim(),
+        usuarioTokens: memberTokens,
+      });
+      await saveGroupTone(created.grupoToken, input.tone);
+      await invalidateGroups();
+      return toGroup(created);
     },
-    [],
+    [usuarioToken, invalidateGroups],
   );
 
-  const removeMember = useCallback((groupId: string, memberId: string) => {
-    setGroups((prev) =>
-      prev.map((group) => {
-        if (group.id !== groupId) return group;
-        const remaining = group.members.filter((m) => m.id !== memberId);
-        return {
-          ...group,
-          members: remaining,
-          summary: {
-            ...group.summary,
-            members: remaining.length,
-          },
-        };
-      }),
-    );
-    setCommitments((prev) =>
-      prev.map((commitment) =>
-        commitment.groupId === groupId
-          ? {
-              ...commitment,
-              splits: commitment.splits.filter(
-                (split) => split.memberId !== memberId,
-              ),
-            }
-          : commitment,
-      ),
-    );
-    setPayments((prev) =>
-      prev.filter(
-        (payment) => !(payment.groupId === groupId && payment.payerId === memberId),
-      ),
-    );
-  }, []);
+  const updateGroup = useCallback(
+    async (id: string, input: UpdateGroupInput) => {
+      await updateGrupo(id, {
+        nome: input.name.trim(),
+        descricao: input.description.trim(),
+      });
+      await saveGroupTone(id, input.tone);
+      await invalidateGroups();
+    },
+    [invalidateGroups],
+  );
+
+  const deleteGroup = useCallback(
+    async (id: string) => {
+      await deleteGrupo(id);
+      await invalidateGroups();
+      await invalidateCommitments();
+    },
+    [invalidateGroups, invalidateCommitments],
+  );
+
+  const addGroupMembers = useCallback(
+    async (id: string, usuarioTokens: string[]) => {
+      await addIntegrantes(id, usuarioTokens);
+      await invalidateGroups();
+    },
+    [invalidateGroups],
+  );
+
+  const removeGroupMember = useCallback(
+    async (id: string, integranteToken: string) => {
+      await removeIntegrante(id, integranteToken);
+      await invalidateGroups();
+      await invalidateCommitments();
+    },
+    [invalidateGroups, invalidateCommitments],
+  );
 
   const getGroup = useCallback(
     (id: string) => groups.find((group) => group.id === id),
     [groups],
   );
 
-  const addCommitment = useCallback((input: NewCommitmentInput) => {
-    const commitment = buildCommitment(input);
-    setCommitments((prev) => [commitment, ...prev]);
-    return commitment;
-  }, []);
-
-  const updateCommitment = useCallback(
-    (id: string, patch: Partial<Commitment>) => {
-      setCommitments((prev) =>
-        prev.map((commitment) =>
-          commitment.id === id
-            ? {
-                ...commitment,
-                ...patch,
-                updatedAt: new Date().toISOString(),
-              }
-            : commitment,
-        ),
-      );
+  const addCommitment = useCallback(
+    async (input: CommitmentInput) => {
+      const created = await createCompromisso(input);
+      await invalidateCommitments();
+      const group = groups.find((item) => item.id === input.groupId);
+      return toCommitment(created, {
+        id: input.groupId,
+        name: group?.name ?? created.grupo?.nome ?? '',
+      });
     },
-    [],
+    [invalidateCommitments, groups],
   );
 
-  const deleteCommitment = useCallback((id: string) => {
-    setCommitments((prev) => prev.filter((item) => item.id !== id));
-    setPayments((prev) =>
-      prev.filter((payment) => payment.commitmentId !== id),
-    );
-  }, []);
+  const updateCommitment = useCallback(
+    async (id: string, input: CommitmentInput) => {
+      await updateCompromisso(id, input);
+      await invalidateCommitments();
+    },
+    [invalidateCommitments],
+  );
+
+  const deleteCommitment = useCallback(
+    async (id: string) => {
+      await deleteCompromisso(id);
+      await invalidateCommitments();
+    },
+    [invalidateCommitments],
+  );
+
+  const addCommitmentMembers = useCallback(
+    async (id: string, participacoes: { integranteToken: string; amount: number }[]) => {
+      await addParticipacoes(id, participacoes);
+      await invalidateCommitments();
+    },
+    [invalidateCommitments],
+  );
+
+  const removeCommitmentMember = useCallback(
+    async (shareId: string) => {
+      await removeParticipacao(shareId);
+      await invalidateCommitments();
+    },
+    [invalidateCommitments],
+  );
 
   const getCommitment = useCallback(
     (id: string) => commitments.find((item) => item.id === id),
     [commitments],
   );
 
-  const addPayment = useCallback((draft: PaymentDraft) => {
-    const payment: Payment = {
-      ...draft,
-      id: createId('payment'),
-      status: draft.status ?? 'paid',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    setPayments((prev) => [payment, ...prev]);
-    return payment;
-  }, []);
+  const addPayment = useCallback(
+    async (draft: PaymentDraft) => {
+      await createPagamento(draft);
+      await invalidateCommitments();
+    },
+    [invalidateCommitments],
+  );
 
-  const updatePayment = useCallback((id: string, patch: Partial<Payment>) => {
-    setPayments((prev) =>
-      prev.map((payment) =>
-        payment.id === id
-          ? { ...payment, ...patch, updatedAt: new Date().toISOString() }
-          : payment,
-      ),
-    );
-  }, []);
+  const updatePayment = useCallback(
+    async (id: string, patch: PaymentPatch) => {
+      await updatePagamento(id, patch);
+      await invalidateCommitments();
+    },
+    [invalidateCommitments],
+  );
 
-  const deletePayment = useCallback((id: string) => {
-    setPayments((prev) => prev.filter((payment) => payment.id !== id));
-  }, []);
+  const deletePayment = useCallback(
+    async (id: string) => {
+      await deletePagamento(id);
+      await invalidateCommitments();
+    },
+    [invalidateCommitments],
+  );
 
   const topBar = useMemo<TopBarActions>(
     () => ({
@@ -519,33 +533,42 @@ export function AppProvider({ children, onOpenProfile, onNavigate, onLogout, act
   );
 
   const handleCloseMenu = useCallback(() => setMenuOpen(false), []);
-  const handleCloseNotifications = useCallback(
-    () => setNotificationsOpen(false),
-    [],
-  );
+  const handleCloseNotifications = useCallback(() => setNotificationsOpen(false), []);
 
   const value = useMemo<AppContextValue>(
     () => ({
       topBar,
+      dashboard,
+      dashboardLoading,
+      dashboardError,
+      refetchDashboard: dashboardQuery.refetch,
       notifications,
       unreadCount,
       markAsRead,
       markAllAsRead,
       deleteNotification,
-      refreshDueNotifications,
+      refreshDueNotifications: refetchCommitments,
       settings,
       updateSettings,
       groups,
+      groupsLoading,
+      groupsError,
+      refetchGroups,
       addGroup,
       updateGroup,
       deleteGroup,
-      addMember,
-      removeMember,
+      addGroupMembers,
+      removeGroupMember,
       getGroup,
       commitments,
+      commitmentsLoading,
+      commitmentsError: commitmentsError ? getErrorMessage(commitmentsError) : null,
+      refetchCommitments,
       addCommitment,
       updateCommitment,
       deleteCommitment,
+      addCommitmentMembers,
+      removeCommitmentMember,
       getCommitment,
       payments,
       addPayment,
@@ -554,25 +577,36 @@ export function AppProvider({ children, onOpenProfile, onNavigate, onLogout, act
     }),
     [
       topBar,
+      dashboard,
+      dashboardLoading,
+      dashboardError,
+      dashboardQuery.refetch,
       notifications,
       unreadCount,
       markAsRead,
       markAllAsRead,
       deleteNotification,
-      refreshDueNotifications,
       settings,
       updateSettings,
       groups,
+      groupsLoading,
+      groupsError,
+      refetchGroups,
       addGroup,
       updateGroup,
       deleteGroup,
-      addMember,
-      removeMember,
+      addGroupMembers,
+      removeGroupMember,
       getGroup,
       commitments,
+      commitmentsLoading,
+      commitmentsError,
+      refetchCommitments,
       addCommitment,
       updateCommitment,
       deleteCommitment,
+      addCommitmentMembers,
+      removeCommitmentMember,
       getCommitment,
       payments,
       addPayment,
@@ -586,9 +620,9 @@ export function AppProvider({ children, onOpenProfile, onNavigate, onLogout, act
       {children}
       <SideMenu
         visible={menuOpen}
-        userInitials={profile?.initials ?? 'G'}
-        userName={profile?.name ?? 'Gabriel'}
-        userEmail={profile?.email ?? 'dev@dev.com'}
+        userInitials={profile?.initials ?? ''}
+        userName={profile?.name ?? ''}
+        userEmail={profile?.email ?? ''}
         activeTab={activeTab}
         onClose={handleCloseMenu}
         onSelect={(action) => {
@@ -597,6 +631,9 @@ export function AppProvider({ children, onOpenProfile, onNavigate, onLogout, act
             return;
           }
           onNavigate(action);
+          if (action === 'profile') {
+            onOpenProfile();
+          }
         }}
       />
       <NotificationsModal
@@ -604,6 +641,7 @@ export function AppProvider({ children, onOpenProfile, onNavigate, onLogout, act
         onClose={handleCloseNotifications}
         notifications={notifications}
         unreadCount={unreadCount}
+        settings={settings}
         onMarkAllRead={markAllAsRead}
         onMarkRead={markAsRead}
         onDelete={deleteNotification}

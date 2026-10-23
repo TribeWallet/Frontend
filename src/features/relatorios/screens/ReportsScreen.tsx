@@ -19,11 +19,6 @@ import { useTopBarActions } from '../../../hooks/useTopBarActions';
 import { useUserStore } from '../../usuario/stores/userStore';
 import { formatCurrency } from '../../../utils/currency';
 
-const formatOptions = [
-  { id: 'pdf', label: 'Exportar como PDF' },
-  { id: 'docx', label: 'Exportar como DOCX' },
-];
-
 export function ReportsScreen() {
   const { width } = useWindowDimensions();
   const topBar = useTopBarActions();
@@ -62,7 +57,7 @@ export function ReportsScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFB' }} edges={['top']}>
       <Box flex={1} width="100%" maxWidth={430} alignSelf="center" bg="background">
         <TopBar
-          initials={profile?.initials ?? 'G'}
+          initials={profile?.initials ?? ''}
           onOpenMenu={topBar.openMenu}
           onOpenNotifications={topBar.openNotifications}
           onOpenProfile={topBar.openProfile}
@@ -176,9 +171,9 @@ export function ReportsScreen() {
               p="md"
               mb="md"
             >
-              <Text variant="bodyStrong" mb="sm">Próximos vencimentos</Text>
+              <Text variant="bodyStrong" mb="sm">Compromissos em aberto</Text>
               {summary.upcoming.length === 0 ? (
-                <Text variant="caption" color="textSecondary">Sem vencimentos previstos.</Text>
+                <Text variant="caption" color="textSecondary">Nada em aberto.</Text>
               ) : (
                 summary.upcoming.map((item, index) => (
                   <Box
@@ -202,23 +197,38 @@ export function ReportsScreen() {
               )}
             </Box>
 
-            <Box flexDirection="row" gap="sm" mb="md">
-              {formatOptions.map((option) => (
-                <Box key={option.id} flex={1}>
-                  <Button
-                    title={option.label}
-                    variant="outline"
-                    fullWidth
-                    onPress={handleShare}
-                  />
-                </Box>
-              ))}
+            <Box
+              bg="surface"
+              borderRadius="md"
+              borderWidth={1}
+              borderColor="cardBorder"
+              p="md"
+              mb="md"
+            >
+              <Text variant="bodyStrong" mb="sm">Pagamentos por forma</Text>
+              {summary.byMethod.length === 0 ? (
+                <Text variant="caption" color="textSecondary">Nenhum pagamento registrado.</Text>
+              ) : (
+                summary.byMethod.map(({ label, total }) => (
+                  <Box
+                    key={label}
+                    flexDirection="row"
+                    alignItems="center"
+                    justifyContent="space-between"
+                    py="xs"
+                    borderTopWidth={1}
+                    borderColor="border"
+                  >
+                    <Text variant="body">{label}</Text>
+                    <Text variant="bodyStrong">{formatCurrency(total)}</Text>
+                  </Box>
+                ))
+              )}
             </Box>
 
             <Text variant="caption" color="textSecondary" mb="md">
-              O relatório é compartilhado como arquivo HTML/texto via apps
-              instalados (e-mail, mensageria, drive). Você pode salvá-lo como PDF
-              ou DOCX usando o destino de sua preferência.
+              O relatório é compartilhado como arquivo HTML/texto pelos apps
+              instalados (e-mail, mensageria, drive).
             </Text>
           </Box>
         </ScrollView>

@@ -1,0 +1,51 @@
+import { apiClient, ApiError } from '../../../services/api/apiClient';
+import { endpoints } from '../../../config/api';
+import { fullName, initialsFromName } from '../../../utils/formatters';
+import type { LoginResponse, UsuarioResponse } from '../../../types/ApiResponse';
+import type { AuthUser } from '../stores/authStore';
+import type { LoginInput, RegisterInput } from '../types/Auth';
+
+export function toAuthUser(usuario: UsuarioResponse): AuthUser {
+  const name = fullName(usuario.nome, usuario.sobrenome);
+  return {
+    id: usuario.usuarioToken,
+    name,
+    firstName: usuario.nome,
+    lastName: usuario.sobrenome,
+    username: usuario.username,
+    email: usuario.email,
+    imageUrl: usuario.imageUrl ?? null,
+    initials: initialsFromName(name),
+    notificationCount: 0,
+  };
+}
+
+export async function login(input: LoginInput): Promise<{ user: AuthUser; token: string }> {
+  const response = await apiClient.post<LoginResponse>(endpoints.auth.login, input, {
+    auth: false,
+  });
+  // O backend não bloqueia login de conta excluída (soft delete); o app bloqueia.
+  if (response.usuarioResponseDto.deletedAt) {
+    throw new ApiError('Esta conta foi excluída.', 401);
+  }
+  return { user: toAuthUser(response.usuarioResponseDto), token: response.jwtToken };
+}
+
+export async function register(input: RegisterInput): Promise<UsuarioResponse> {
+  const form = new FormData();
+  form.append('Nome', input.nome);
+  form.append('Sobrenome', input.sobrenome);
+  form.append('Username', input.username);
+  form.append('Email', input.email);
+  form.append('Senha', input.senha);
+  try {
+    return await apiClient.postForm<UsuarioResponse>(endpoints.auth.register, form, {
+      auth: false,
+    });
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 400 && error.message.includes('saving the entity')) {
+      throw new ApiError('E-mail ou nome de usuário já cadastrado.', 400);
+    }
+    throw error;
+  }
+}

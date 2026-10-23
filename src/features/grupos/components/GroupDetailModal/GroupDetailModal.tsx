@@ -3,17 +3,12 @@ import { ScrollView, View } from 'react-native';
 import { Modal } from '../../../../components/Modal';
 import { Pill } from '../../../../components/Pill';
 import { Button } from '../../../../components/Button';
-import { Input } from '../../../../components/Input';
-import { Box, Text, PressableBox } from '../../../../theme';
+import { Box, Text } from '../../../../theme';
 import { CommitmentCard } from '../../../../features/compromissos/components/CommitmentCard/CommitmentCard';
 import { CommitmentDetailModal } from '../../../../features/compromissos/components/CommitmentDetailModal/CommitmentDetailModal';
 import { NewGroupModal } from '../NewGroupModal/NewGroupModal';
 import { NewCommitmentModal } from '../../../../features/compromissos/components/NewCommitmentModal/NewCommitmentModal';
-import {
-  useAppCommitments,
-  useAppGroups,
-  useAppPayments,
-} from '../../../../contexts/AppContext';
+import { useAppCommitments } from '../../../../contexts/AppContext';
 import type { Group } from '../../types/Group';
 import type { Commitment } from '../../../../features/compromissos/types/Commitment';
 import { formatCurrency } from '../../../../utils/currency';
@@ -25,41 +20,32 @@ interface GroupDetailModalProps {
 }
 
 export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalProps) {
-  const { addMember, removeMember } = useAppGroups();
   const { commitments } = useAppCommitments();
-  const { payments } = useAppPayments();
 
   const [editing, setEditing] = useState(false);
   const [newCommitment, setNewCommitment] = useState(false);
   const [detailCommitment, setDetailCommitment] = useState<Commitment | null>(null);
-  const [newMemberName, setNewMemberName] = useState('');
-  const [newMemberEmail, setNewMemberEmail] = useState('');
-  const [memberError, setMemberError] = useState<string | null>(null);
+  const [editingCommitment, setEditingCommitment] = useState<Commitment | null>(null);
 
   if (!group) return null;
 
-  const groupCommitments = commitments.filter((c) => c.groupId === group.id);
-  const groupPayments = payments.filter((p) => p.groupId === group.id);
-  const totalOpen = groupCommitments.reduce((sum, c) => {
-    const remaining = c.splits.filter((s) => !s.paid).reduce((s2, s) => s2 + s.amount, 0);
-    return sum + remaining;
-  }, 0);
-  const totalPaid = groupPayments.reduce((sum, p) => sum + p.amount, 0);
-
-  const handleAddMember = () => {
-    if (!newMemberName.trim()) return;
-    const added = addMember(group.id, {
-      name: newMemberName,
-      email: newMemberEmail.trim() || undefined,
-    });
-    if (!added) {
-      setMemberError('Já existe um integrante com esse nome ou e-mail.');
-      return;
-    }
-    setNewMemberName('');
-    setNewMemberEmail('');
-    setMemberError(null);
-  };
+  const groupCommitments = commitments.filter(
+    (commitment) => commitment.groupId === group.id,
+  );
+  const totalPaid = groupCommitments.reduce(
+    (sum, commitment) =>
+      sum + commitment.splits.reduce((inner, split) => inner + split.paidAmount, 0),
+    0,
+  );
+  const totalOpen = groupCommitments.reduce(
+    (sum, commitment) =>
+      sum +
+      commitment.splits.reduce(
+        (inner, split) => inner + Math.max(0, split.amount - split.paidAmount),
+        0,
+      ),
+    0,
+  );
 
   return (
     <Modal
@@ -154,47 +140,9 @@ export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalPr
                     ) : null}
                   </Box>
                 </Box>
-                <PressableBox
-                  onPress={() => removeMember(group.id, member.id)}
-                  accessibilityRole="button"
-                >
-                  <Text variant="captionStrong" color="danger">Remover</Text>
-                </PressableBox>
               </Box>
             ))}
 
-            <Box flexDirection="row" gap="xs" mt="sm">
-              <Box flex={2}>
-                <Input
-                  label="Novo integrante"
-                  value={newMemberName}
-                  onChangeText={setNewMemberName}
-                  placeholder="Nome"
-                />
-              </Box>
-              <Box flex={1.4}>
-                <Input
-                  label="E-mail"
-                  value={newMemberEmail}
-                  onChangeText={setNewMemberEmail}
-                  placeholder="opcional"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-              </Box>
-            </Box>
-            {memberError ? (
-              <Text variant="caption" color="danger" mt="xs">
-                {memberError}
-              </Text>
-            ) : null}
-            <Button
-              title="Adicionar integrante"
-              onPress={handleAddMember}
-              variant="outline"
-              size="sm"
-              fullWidth
-            />
           </Box>
 
           <Box flexDirection="row" alignItems="center" justifyContent="space-between">
@@ -225,19 +173,27 @@ export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalPr
         visible={editing}
         group={group}
         onClose={() => setEditing(false)}
+        onDeleted={onClose}
       />
       <NewCommitmentModal
         visible={newCommitment}
+        lockedGroupId={group.id}
         onClose={() => setNewCommitment(false)}
       />
       <CommitmentDetailModal
         visible={detailCommitment !== null}
         commitment={detailCommitment ?? undefined}
         onClose={() => setDetailCommitment(null)}
-        onEdit={() => {
-          if (!detailCommitment) return;
+        onEdit={(commitment) => {
           setDetailCommitment(null);
+          setEditingCommitment(commitment);
         }}
+        onDeleted={() => setDetailCommitment(null)}
+      />
+      <NewCommitmentModal
+        visible={editingCommitment !== null}
+        commitment={editingCommitment}
+        onClose={() => setEditingCommitment(null)}
       />
     </Modal>
   );

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { ScrollView, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -6,59 +6,136 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { TopBar } from '../../../../components/TopBar';
 import { Button } from '../../../../components/Button';
-import { Pill } from '../../../../components/Pill';
+import { Loading } from '../../../../components/Loading';
 import { Box, Text } from '../../../../theme';
-import { useDashboardOverview } from '../../hooks/useDashboardOverview';
+import { useAppDashboard } from '../../hooks/useDashboard';
 import { StatCard } from '../../components/StatCard/StatCard';
 import { SectionCard } from '../../components/SectionCard/SectionCard';
 import { TransactionItem } from '../../components/TransactionItem/TransactionItem';
 import { UpcomingItem } from '../../components/UpcomingItem/UpcomingItem';
 import { AlertBanner } from '../../components/AlertBanner/AlertBanner';
-import {
-  BarChart,
-  DonutChart,
-  HorizontalBarList,
-  LineChart,
-} from '../../components/DashboardCharts';
 import { useTopBarActions } from '../../../../hooks/useTopBarActions';
 import { useAppNotifications } from '../../../../hooks/useNotifications';
 import { formatCurrency } from '../../../../utils/currency';
+import { isoToBR } from '../../../../utils/date';
+import { initialsFromName } from '../../../../utils/formatters';
+import { environment } from '../../../../config/environment';
+import { useAuthStore } from '../../../auth/stores/authStore';
+import { SituacaoPagamento } from '../../Types/Dashboard';
 import type { RootStackParamList } from '../../../../navigation/types';
 
-type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-const METHOD_LABEL: Record<string, string> = {
-  pix: 'PIX',
-  card: 'Cartão',
-  boleto: 'Boleto',
-  other: 'Outro',
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type TransactionStatus = 'paid' | 'partial' | 'pending';
+
+const transactionStatusByPaymentSituation: Record<SituacaoPagamento, TransactionStatus> = {
+  [SituacaoPagamento.Pendente]: 'pending',
+  [SituacaoPagamento.Pago]: 'paid',
+  [SituacaoPagamento.Parcial]: 'partial',
 };
+
+function resolveCommitmentImageUrl(imageUrl: string | null): string | null {
+  if (!imageUrl) return null;
+  return `${environment.mediaUrl}/${imageUrl}`;
+}
 
 export function DashboardScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { width } = useWindowDimensions();
-  const { data } = useDashboardOverview();
+  const { data, isLoading, isError: dashboardError, refetch } = useAppDashboard();
   const topBar = useTopBarActions();
   const { unreadCount } = useAppNotifications();
+  const user = useAuthStore((state) => state.user);
   const isSmallPhone = width < 360;
 
-  const statCards = useMemo(() => data.stats, [data.stats]);
 
-  const methodChartData = useMemo(
+  const statCards = useMemo(
     () =>
-      data.charts.byMethod.map((item) => ({
-        label: METHOD_LABEL[item.label] ?? item.label,
-        value: item.value,
-      })),
-    [data.charts.byMethod],
+      data
+        ? [
+            {
+              id: 'stat-groups',
+              tone: 'blue' as const,
+              icon: 'groups' as const,
+              label: 'Grupos Ativos',
+              value: String(data.gruposAtivosCount),
+            },
+            {
+              id: 'stat-due-soon',
+              tone: 'yellow' as const,
+              icon: 'clock' as const,
+              label: 'Vencendo em Breve',
+              value: String(data.compromissosAVencerCount),
+            },
+            {
+              id: 'stat-pending-payments',
+              tone: 'blue' as const,
+              icon: 'card' as const,
+              label: 'Pagamentos Pendentes',
+              value: String(data.pagamentosPendentesCount),
+            },
+            {
+              id: 'stat-punctuality',
+              tone: 'green' as const,
+              icon: 'trend' as const,
+              label: 'Taxa de Pontualidade',
+              value: `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(
+                data.taxaDePontualidade * 100,
+              )}%`,
+            },
+          ]
+        : [],
+    [data],
+  );
+
+  const transactions = useMemo(
+    () =>
+      (data?.transacoesEVencimentos ?? [])
+        .slice(0, 5)
+        .map((item) => {
+          return {
+            id: item.integranteCompromissoToken,
+            imageUrl: resolveCommitmentImageUrl(item.imagemCompromissoUrl),
+            initials: initialsFromName(item.nomeCompromisso),
+            name: item.nomeCompromisso,
+            group: item.nomeGrupo,
+            value: formatCurrency(item.valorDevedor),
+            status: transactionStatusByPaymentSituation[item.situacaoPagamento],
+          };
+        }),
+    [data],
+  );
+
+  const upcomingCommitments = useMemo(
+    () =>
+      (data?.transacoesEVencimentos ?? [])
+        .filter((item) => !item.vencido && item.diasParaVencimento >= 0)
+        .map((item) => ({
+          source: item,
+          remaining: Math.max(0, item.valorDevedor - item.valorPago),
+        }))
+        .filter(({ remaining }) => remaining > 0.01)
+        .sort((first, second) => first.source.diasParaVencimento - second.source.diasParaVencimento)
+        .slice(0, 4)
+        .map(({ source }) => ({
+          id: source.integranteCompromissoToken,
+          imageUrl: resolveCommitmentImageUrl(source.imagemCompromissoUrl),
+          initials: initialsFromName(source.nomeCompromisso),
+          name: source.nomeCompromisso,
+          group: source.nomeGrupo,
+          value: formatCurrency(source.valorDevedor),
+          date: isoToBR(source.dataVencimento) || source.dataVencimento,
+          daysToDue: source.diasParaVencimento,
+        })),
+    [data],
   );
 
   const handleNewPayment = useCallback(() => {
     navigation.navigate('NewPayment');
   }, [navigation]);
 
-  const handleViewAlerts = useCallback(() => {
-    navigation.navigate('Main', { screen: 'Alerts' } as never);
+  const handleViewOverdue = useCallback(() => {
+    navigation.navigate('Main', { screen: 'Commitments', params: { filter: 'vencidos' } });
   }, [navigation]);
 
   const greeting = useMemo(() => {
@@ -72,7 +149,8 @@ export function DashboardScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFB' }} edges={['top']}>
       <Box flex={1} width="100%" maxWidth={430} alignSelf="center" bg="background">
         <TopBar
-          initials={data.user.initials}
+          initials={user?.initials ?? ''}
+          imageUrl={user?.imageUrl ? `${environment.mediaUrl}/${user.imageUrl}` : undefined}
           notificationCount={unreadCount}
           onOpenMenu={topBar.openMenu}
           onOpenNotifications={topBar.openNotifications}
@@ -90,29 +168,47 @@ export function DashboardScreen() {
               <Text variant="captionStrong" color="primary">
                 {greeting.toUpperCase()}
               </Text>
-              <Text variant="h1">{data.user.name.split(' ')[0]}</Text>
+              <Text variant="h1">{user?.name?.split(' ')[0] || 'Olá'}</Text>
               <Text variant="bodySmall" color="textSecondary">
                 Sua visão geral financeira em um só lugar.
               </Text>
             </Box>
 
+            {dashboardError ? (
+              <Box bg="dangerLight" borderRadius="md" p="md" mb="md">
+                <Text variant="bodyStrong" color="danger">
+                  Não foi possível carregar seus dados
+                </Text>
+                <Text variant="caption" color="textSecondary" mb="sm">
+                  {dashboardError ?? 'Verifique se a API está rodando.'}
+                </Text>
+                <Button title="Tentar novamente" onPress={refetch} size="sm" />
+              </Box>
+            ) : null}
+
+            {isLoading ? (
+              <Box mb="md">
+                <Loading label="Carregando seus dados..." />
+              </Box>
+            ) : null}
+
             <Box flexDirection="row" flexWrap="wrap" gap="sm" mb="md">
               {statCards.map((stat) => (
-                <Box key={stat.id} width="48.5%">
+                <Box key={stat.id} width="47%">
                   <StatCard stat={stat} />
                 </Box>
               ))}
             </Box>
 
-            {data.alert.id !== 'alert-ok' ? (
+            {data && data.compromissosVencidosCount > 0 ? (
               <Box mb="md">
                 <AlertBanner
-                  title={data.alert.title}
-                  description={data.alert.description}
-                  onPressView={handleViewAlerts}
+                  title={`${data.compromissosVencidosCount} compromisso${data.compromissosVencidosCount === 1 ? '' : 's'} vencido${data.compromissosVencidosCount === 1 ? '' : 's'}`}
+                  description="Regularize os valores em aberto para evitar pendências no grupo."
+                  onPressView={handleViewOverdue}
                 />
               </Box>
-            ) : (
+            ) : data ? (
               <Box
                 bg="successLight"
                 borderRadius="md"
@@ -141,7 +237,7 @@ export function DashboardScreen() {
                   </Text>
                 </Box>
               </Box>
-            )}
+            ) : null}
 
             <Button
               title="Novo pagamento"
@@ -150,128 +246,13 @@ export function DashboardScreen() {
               size="md"
             />
 
-            <Box mt="md" flexDirection="row" gap="sm">
-              <Box flex={1}>
-                <SectionCard title="Pagamentos por mês" headerCenter>
-                  {data.charts.last6Months.length === 0 ? (
-                    <Text variant="caption" color="textSecondary">
-                      Sem pagamentos registrados.
-                    </Text>
-                  ) : (
-                    <LineChart
-                      data={data.charts.last6Months}
-                      formatter={(value) =>
-                        value >= 1000
-                          ? `R$${Math.round(value / 100) / 10}k`
-                          : `R$${Math.round(value)}`
-                      }
-                    />
-                  )}
-                </SectionCard>
-              </Box>
-            </Box>
-
-            <Box mt="md" flexDirection="row" gap="sm">
-              <Box flex={1}>
-                <SectionCard title="Distribuição por categoria">
-                  {data.charts.byCategory.length === 0 ? (
-                    <Text variant="caption" color="textSecondary">
-                      Sem pagamentos para exibir.
-                    </Text>
-                  ) : (
-                    <BarChart
-                      data={data.charts.byCategory.slice(0, 5)}
-                      formatter={(value) =>
-                        value >= 1000
-                          ? `R$${Math.round(value / 100) / 10}k`
-                          : `R$${Math.round(value)}`
-                      }
-                    />
-                  )}
-                </SectionCard>
-              </Box>
-            </Box>
-
-            <Box mt="md" flexDirection="row" gap="sm">
-              <Box flex={1}>
-                <SectionCard title="Forma de pagamento">
-                  {methodChartData.length === 0 ? (
-                    <Text variant="caption" color="textSecondary">
-                      Sem pagamentos para exibir.
-                    </Text>
-                  ) : (
-                    <DonutChart
-                      data={methodChartData}
-                      centerLabel="pagamentos"
-                      centerValue={String(
-                        methodChartData.reduce((s, d) => s + d.value, 0),
-                      )}
-                    />
-                  )}
-                </SectionCard>
-              </Box>
-            </Box>
-
-            <Box mt="md" flexDirection="row" gap="sm">
-              <Box flex={1}>
-                <SectionCard title="Top grupos por gasto">
-                  {data.charts.topGroups.length === 0 ? (
-                    <Text variant="caption" color="textSecondary">
-                      Sem pagamentos para exibir.
-                    </Text>
-                  ) : (
-                    <HorizontalBarList
-                      data={data.charts.topGroups}
-                      formatter={(value) =>
-                        value.toLocaleString('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL',
-                          maximumFractionDigits: 0,
-                        })
-                      }
-                    />
-                  )}
-                </SectionCard>
-              </Box>
-            </Box>
-
-            <Box mt="md" mb="md">
-              <SectionCard title="Insights rápidos">
-                <Box flexDirection="row" flexWrap="wrap" gap="sm">
-                  {data.insights.map((insight) => (
-                    <Box
-                      key={insight.id}
-                      width="48.5%"
-                      bg="background"
-                      borderRadius="md"
-                      p="md"
-                      borderWidth={1}
-                      borderColor="border"
-                    >
-                      <Text variant="captionStrong" color="textSecondary">
-                        {insight.title.toUpperCase()}
-                      </Text>
-                      <Text variant="h3" mt="xxs" numberOfLines={1}>
-                        {insight.value}
-                      </Text>
-                      {insight.meta ? (
-                        <Text variant="caption" color="textSecondary">
-                          {insight.meta}
-                        </Text>
-                      ) : null}
-                    </Box>
-                  ))}
-                </Box>
-              </SectionCard>
-            </Box>
-
-            <SectionCard title="Últimas transações" showViewAll>
-              {data.transactions.length === 0 ? (
+            <SectionCard title="Últimas transações">
+              {transactions.length === 0 ? (
                 <Text variant="caption" color="textSecondary">
-                  Nenhuma transação registrada.
+                  Nenhuma transação para exibir.
                 </Text>
               ) : (
-                data.transactions.map((transaction, index) => (
+                transactions.map((transaction, index) => (
                   <TransactionItem
                     key={transaction.id}
                     transaction={transaction}
@@ -281,49 +262,21 @@ export function DashboardScreen() {
               )}
             </SectionCard>
 
-            <SectionCard title="Próximos vencimentos" headerCenter>
-              {data.upcoming.length === 0 ? (
-                <Text variant="caption" color="textSecondary">
-                  Nada previsto para os próximos dias.
-                </Text>
-              ) : (
-                data.upcoming.map((item, index) => (
-                  <Box key={item.id}>
-                    {index > 0 && (
-                      <Box height={1} bg="border" mb="sm" />
-                    )}
-                    <UpcomingItem upcoming={item} />
-                  </Box>
-                ))
-              )}
-            </SectionCard>
-
-            <Box
-              mt="sm"
-              mb="md"
-              bg="primaryLight"
-              borderRadius="md"
-              p="md"
-              flexDirection="row"
-              alignItems="center"
-              justifyContent="space-between"
-            >
-              <Box flex={1}>
-                <Text variant="captionStrong" color="primary">
-                  RESUMO DO MÊS
-                </Text>
-                <Text variant="bodyStrong" color="primary">
-                  {data.transactions.length} pagamentos •
-                  {' '}
-                  {formatCurrency(
-                    data.charts.byCategory.reduce((sum, item) => sum + item.value, 0),
-                  )}
-                </Text>
-                <Text variant="caption" color="textSecondary">
-                  {data.charts.last6Months.at(-1)?.label ?? '—'} em diante
-                </Text>
-              </Box>
-              <Pill label="Atualizado agora" tone="primary" />
+            <Box mt="md">
+              <SectionCard title="Próximos vencimentos">
+                {upcomingCommitments.length === 0 ? (
+                  <Text variant="caption" color="textSecondary">
+                    Nenhum vencimento próximo.
+                  </Text>
+                ) : (
+                  upcomingCommitments.map((item, index) => (
+                    <Box key={item.id}>
+                      {index > 0 && <Box height={1} bg="border" mb="sm" />}
+                      <UpcomingItem upcoming={item} />
+                    </Box>
+                  ))
+                )}
+              </SectionCard>
             </Box>
           </Box>
         </ScrollView>

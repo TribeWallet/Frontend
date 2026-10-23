@@ -1,50 +1,60 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { Button } from '../../../../components/Button';
 import { EmptyState } from '../../../../components/EmptyState';
 import { ScreenHeader } from '../../../../components/ScreenHeader';
+import { Loading } from '../../../../components/Loading';
 import { Select, SelectOption } from '../../../../components/Select';
 import { TopBar } from '../../../../components/TopBar';
 import { CommitmentCard } from '../../components/CommitmentCard/CommitmentCard';
 import { useCommitments } from '../../../../hooks/useCommitments';
+import { useGroups } from '../../../../hooks/useGroups';
 import { useNotifications } from '../../../../hooks/useNotifications';
 import { useUserStore } from '../../../usuario/stores/userStore';
 import { useTopBarActions } from '../../../../hooks/useTopBarActions';
+import { diffDays } from '../../../../utils/date';
 import type { CommitmentStatus } from '../../types/Commitment';
-import type { RootStackParamList } from '../../../../navigation/types';
+import type { MainTabParamList, RootStackParamList } from '../../../../navigation/types';
 import { Box, Text, PressableBox } from '../../../../theme';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type CommitmentsRoute = RouteProp<MainTabParamList, 'Commitments'>;
 
-type FilterKey = 'todos' | CommitmentStatus;
+type FilterKey = 'todos' | CommitmentStatus | 'vencidos';
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'todos', label: 'Todos' },
   { key: 'pending', label: 'Pendentes' },
   { key: 'partial', label: 'Parcial' },
   { key: 'paid', label: 'Pagos' },
+  { key: 'vencidos', label: 'Vencidos' },
 ];
 
 export function CompromissosScreen() {
   const navigation = useNavigation<NavigationProp>();
-  const { commitments } = useCommitments();
+  const route = useRoute<CommitmentsRoute>();
+  const { commitments, commitmentsLoading, commitmentsError, refetchCommitments } =
+    useCommitments();
+  const { groups } = useGroups();
   const { unreadCount } = useNotifications();
   const profile = useUserStore((state) => state.profile);
   const topBar = useTopBarActions();
   const { width } = useWindowDimensions();
   const isSmallPhone = width < 360;
-  const [filter, setFilter] = useState<FilterKey>('todos');
+  const [filter, setFilter] = useState<FilterKey>(
+    route.params?.filter === 'vencidos' ? 'vencidos' : 'todos',
+  );
   const [groupFilter, setGroupFilter] = useState<string>('all');
 
-  const groups = useMemo(() => {
-    const set = new Map<string, string>();
-    commitments.forEach((c) => set.set(c.groupId, c.groupName));
-    return Array.from(set.entries()).map(([id, name]) => ({ id, name }));
-  }, [commitments]);
+  useEffect(() => {
+    if (route.params?.filter === 'vencidos') {
+      setFilter('vencidos');
+    }
+  }, [route.params?.filter]);
 
   const groupOptions = useMemo<SelectOption[]>(
     () => [
@@ -54,13 +64,30 @@ export function CompromissosScreen() {
     [groups],
   );
 
+  const isVencido = useCallback(
+    (commitment: (typeof commitments)[number]) => {
+      const days = diffDays(commitment.dueDate);
+      return (
+        commitment.status !== 'paid' && days !== null && days < 0
+      );
+    },
+    [],
+  );
+
   const filtered = useMemo(() => {
     return commitments.filter((c) => {
-      const matchesStatus = filter === 'todos' || c.status === filter;
+      const matchesStatus =
+        filter === 'todos' ||
+        (filter === 'vencidos' ? isVencido(c) : c.status === filter);
       const matchesGroup = groupFilter === 'all' || c.groupId === groupFilter;
       return matchesStatus && matchesGroup;
     });
-  }, [commitments, filter, groupFilter]);
+  }, [commitments, filter, groupFilter, isVencido]);
+
+  const overdueCount = useMemo(
+    () => commitments.filter((c) => isVencido(c)).length,
+    [commitments, isVencido],
+  );
 
   const handleNew = useCallback(() => {
     navigation.navigate('NewCommitment');
@@ -70,7 +97,7 @@ export function CompromissosScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFB' }} edges={['top']}>
       <Box flex={1} width="100%" maxWidth={430} alignSelf="center" bg="background">
         <TopBar
-          initials={profile?.initials ?? 'G'}
+          initials={profile?.initials ?? ''}
           notificationCount={unreadCount}
           onOpenMenu={topBar.openMenu}
           onOpenNotifications={topBar.openNotifications}
@@ -95,9 +122,11 @@ export function CompromissosScreen() {
               />
             </ScreenHeader>
 
-            <Box flexDirection="row" gap="xs" mb="sm" flexWrap="wrap">
+            <Box flexDirection="row" gap="xs" mb="sm" flexWrap="wrap" alignItems="center">
               {FILTERS.map((option) => {
                 const active = option.key === filter;
+                const isOverdueChip = option.key === 'vencidos';
+                const showCount = isOverdueChip && overdueCount > 0;
                 return (
                   <PressableBox
                     key={option.key}
@@ -109,12 +138,30 @@ export function CompromissosScreen() {
                       px="md"
                       py="xs"
                       borderRadius="full"
-                      bg={active ? 'primary' : 'surface'}
+                      bg={active ? (isOverdueChip ? 'danger' : 'primary') : 'surface'}
                       borderWidth={1}
-                      borderColor={active ? 'primary' : 'border'}
+                      borderColor={
+                        active
+                          ? isOverdueChip
+                            ? 'danger'
+                            : 'primary'
+                          : isOverdueChip && showCount
+                            ? 'danger'
+                            : 'border'
+                      }
                     >
-                      <Text variant="captionStrong" color={active ? 'white' : 'textSecondary'}>
+                      <Text
+                        variant="captionStrong"
+                        color={
+                          active
+                            ? 'white'
+                            : isOverdueChip && showCount
+                              ? 'danger'
+                              : 'textSecondary'
+                        }
+                      >
                         {option.label}
+                        {showCount ? ` (${overdueCount})` : ''}
                       </Text>
                     </Box>
                   </PressableBox>
@@ -130,24 +177,34 @@ export function CompromissosScreen() {
               options={groupOptions}
             />
 
-            {filtered.length === 0 ? (
+            {commitmentsLoading ? (
+              <Loading label="Carregando compromissos..." />
+            ) : commitmentsError ? (
               <EmptyState
-                title="Nenhum compromisso"
-                description="Crie o primeiro compromisso para começar a dividir."
+                title="Não foi possível carregar os compromissos"
+                description={commitmentsError}
+                actionLabel="Tentar novamente"
+                onAction={refetchCommitments}
+              />
+            ) : filtered.length === 0 ? (
+              <EmptyState
+                title={filter === 'vencidos' ? 'Nenhum compromisso vencido' : 'Nenhum compromisso'}
+                description={
+                  filter === 'vencidos'
+                    ? 'Tudo em dia: nenhum compromisso passou da data sem estar quitado.'
+                    : 'Crie o primeiro compromisso para começar a dividir.'
+                }
                 actionLabel="Criar compromisso"
                 onAction={handleNew}
               />
             ) : (
-              <Box flexDirection="column" >
-                {filtered.map((commitment) => (
-                  <Box width="100%" mb="md" key={commitment.id}>
-                    <CommitmentCard
-                      commitment={commitment}
-                      onPress={(id) => navigation.navigate('CommitmentDetail', { id })}
-                    />
-                  </Box>
-                ))}
-              </Box>
+              filtered.map((commitment) => (
+                <CommitmentCard
+                  key={commitment.id}
+                  commitment={commitment}
+                  onPress={(id) => navigation.navigate('CommitmentDetail', { id })}
+                />
+              ))
             )}
           </Box>
         </ScrollView>

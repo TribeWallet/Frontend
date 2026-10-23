@@ -1,32 +1,30 @@
 import React, { useCallback, useState } from 'react';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StatusBar, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 import { styles } from './LoginScreen.styles';
 import { TribeWalletLogo } from '../../components/TribeWalletLogo';
 import { useAuthStore } from '../../stores/authStore';
-import type { AuthUser } from '../../stores/authStore';
-
+import * as authService from '../../services/authService';
+import { getErrorMessage } from '../../../../services/api/apiClient';
 
 export interface LoginScreenProps {
   onCreateAccount: () => void;
   onForgotPassword: () => void;
   onLogin?: () => void;
-}
-
-const DEV_EMAIL = 'dev@dev.com';
-const DEV_PASSWORD = 'admin';
-
-function initialsFromName(name: string): string {
-  return (
-    name
-      .split(' ')
-      .filter(Boolean)
-      .map((part) => part[0]?.toUpperCase() ?? '')
-      .slice(0, 2)
-      .join('') || 'NV'
-  );
 }
 
 export function LoginScreen({
@@ -35,8 +33,17 @@ export function LoginScreen({
   onLogin,
 }: LoginScreenProps) {
   const { width, height } = useWindowDimensions();
-  const isTablet = width >= 768;
-  const isSmallPhone = width < 350;
+  const login = useAuthStore((state) => state.login);
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const isSmallPhone: boolean = width < 360;
+  const isTablet: boolean = width >= 768;
+
   const horizontalPadding: number = isTablet
     ? 32
     : isSmallPhone
@@ -56,46 +63,35 @@ export function LoginScreen({
           ? 68
           : 90;
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [passwordVisible, setPasswordVisible] = useState(false);
-  const login = useAuthStore((state) => state.login);
-
-  const handleLogin = useCallback((): void => {
+  const handleLogin = useCallback(async (): Promise<void> => {
     if (submitting) return;
     const normalizedEmail = email.trim().toLowerCase();
-    const normalizedPassword = password.trim();
 
-    if (!normalizedEmail || !normalizedPassword) {
+    if (!normalizedEmail || !password) {
       setError('Preencha e-mail e senha para continuar.');
-      return;
-    }
-    if (
-      normalizedEmail !== DEV_EMAIL.toLowerCase() ||
-      normalizedPassword !== DEV_PASSWORD
-    ) {
-      setError('E-mail ou senha inválidos.');
       return;
     }
 
     setError(null);
     setSubmitting(true);
-
-    const user: AuthUser = {
-      id: 'user-dev',
-      name: 'Gabriel',
-      email: DEV_EMAIL,
-      initials: initialsFromName('Gabriel'),
-      notificationCount: 0,
-    };
-
-    login(user);
-    onLogin?.();
+    try {
+      const session = await authService.login({
+        email: normalizedEmail,
+        senha: password,
+      });
+      login(session.user, session.token);
+      onLogin?.();
+    } catch (loginError) {
+      setError(getErrorMessage(loginError));
+      setSubmitting(false);
+    }
   }, [email, password, submitting, login, onLogin]);
 
   const handleForgotPassword = useCallback((): void => {
+    Alert.alert(
+      'Recuperar senha',
+      'Entre em contato com o suporte para redefinir a senha da sua conta.',
+    );
     onForgotPassword();
   }, [onForgotPassword]);
 
@@ -103,8 +99,12 @@ export function LoginScreen({
     onCreateAccount();
   }, [onCreateAccount]);
 
-  const handleTerms = (): void => {};
-  const handlePrivacy = (): void => {};
+  const handleTerms = (): void => {
+    Alert.alert('Termos de Uso', 'Conteúdo em breve.');
+  };
+  const handlePrivacy = (): void => {
+    Alert.alert('Política de Privacidade', 'Conteúdo em breve.');
+  };
 
   const canSubmit = email.trim().length > 0 && password.length > 0;
 
@@ -154,7 +154,7 @@ export function LoginScreen({
                       if (error) setError(null);
                     }}
                     style={styles.input}
-                    placeholder="dev@dev.com"
+                    placeholder="seu@email.com"
                     placeholderTextColor="#9AA0A6"
                     keyboardType="email-address"
                     autoCapitalize="none"

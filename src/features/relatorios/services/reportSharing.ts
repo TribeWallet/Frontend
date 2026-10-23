@@ -36,7 +36,7 @@ export async function shareReport(
     } else {
       await Share.share({ title, message: text });
     }
-  } catch {
+  } catch (error) {
     Alert.alert('Erro', 'Não foi possível compartilhar o relatório.');
   }
 }
