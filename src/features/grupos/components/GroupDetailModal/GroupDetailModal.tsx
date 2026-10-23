@@ -177,6 +177,7 @@ export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalPr
       />
       <NewCommitmentModal
         visible={newCommitment}
+        lockedGroupId={group.id}
         onClose={() => setNewCommitment(false)}
       />
       <CommitmentDetailModal

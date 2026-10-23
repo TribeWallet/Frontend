@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import * as DocumentPicker from 'expo-document-picker';
 import { Modal } from '../../../../components/Modal';
 import { Input } from '../../../../components/Input';
 import { Button } from '../../../../components/Button';
@@ -10,6 +11,8 @@ import { Box, Text, PressableBox } from '../../../../theme';
 import { useAppPayments } from '../../../../contexts/AppContext';
 import { getErrorMessage } from '../../../../services/api/apiClient';
 import { formatCurrency } from '../../../../utils/currency';
+import { maskDateBR, maskMoney, parseMoney } from '../../../../utils/masks';
+import type { AttachedFile } from '../../../../types/file';
 import { paymentMethodOptions } from '../../services/paymentOptions';
 import { paymentMethodSchema } from '../../validations/paymentSchema';
 import type { Payment, PaymentMethod } from '../../types/Payment';
@@ -37,6 +40,7 @@ export function EditPaymentModal({ visible, payment, onClose, onSaved }: EditPay
   const { updatePayment, deletePayment } = useAppPayments();
   const [busy, setBusy] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [comprovante, setComprovante] = useState<AttachedFile | null>(null);
 
   const {
     control,
@@ -52,12 +56,27 @@ export function EditPaymentModal({ visible, payment, onClose, onSaved }: EditPay
   useEffect(() => {
     if (!visible || !payment) return;
     setSubmitError(null);
+    setComprovante(null);
     reset({
       amount: payment.amount.toString().replace('.', ','),
       date: payment.date,
       method: payment.method,
     });
   }, [visible, payment, reset]);
+
+  const pickComprovante = useCallback(async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: 'application/pdf',
+      copyToCacheDirectory: true,
+    });
+    if (result.canceled) return;
+    const file = result.assets[0];
+    setComprovante({
+      uri: file.uri,
+      name: file.name || 'comprovante.pdf',
+      type: file.mimeType || 'application/pdf',
+    });
+  }, []);
 
   const handleClose = useCallback(() => {
     reset();
@@ -71,9 +90,10 @@ export function EditPaymentModal({ visible, payment, onClose, onSaved }: EditPay
     setSubmitError(null);
     try {
       await updatePayment(payment.id, {
-        amount: Number(values.amount.replace(',', '.')) || 0,
+        amount: parseMoney(values.amount),
         date: values.date,
         method: values.method,
+        comprovante: comprovante ?? undefined,
       });
       onSaved?.();
       handleClose();
@@ -160,7 +180,7 @@ export function EditPaymentModal({ visible, payment, onClose, onSaved }: EditPay
                 <Input
                   label="Valor"
                   value={value}
-                  onChangeText={(text) => onChange(text.replace(/[^0-9.,]/g, ''))}
+                  onChangeText={(text) => onChange(maskMoney(text))}
                   onBlur={onBlur}
                   placeholder="0,00"
                   keyboardType="decimal-pad"
@@ -177,7 +197,7 @@ export function EditPaymentModal({ visible, payment, onClose, onSaved }: EditPay
                 <Input
                   label="Data"
                   value={value}
-                  onChangeText={onChange}
+                  onChangeText={(text) => onChange(maskDateBR(text))}
                   onBlur={onBlur}
                   placeholder="DD/MM/AAAA"
                   keyboardType="numeric"
@@ -185,6 +205,32 @@ export function EditPaymentModal({ visible, payment, onClose, onSaved }: EditPay
                 />
               )}
             />
+          </Box>
+        </Box>
+
+        <Box>
+          <Text variant="label" marginBottom="xs">Comprovante (PDF, opcional)</Text>
+          <Box flexDirection="row" gap="xs" alignItems="center">
+            <Button
+              title={comprovante ? 'Trocar arquivo' : 'Anexar PDF'}
+              variant="outline"
+              size="sm"
+              onPress={pickComprovante}
+            />
+            {comprovante ? (
+              <Box flex={1} flexDirection="row" alignItems="center" gap="xs">
+                <Text variant="caption" numberOfLines={1} flex={1} color="primary">
+                  {comprovante.name}
+                </Text>
+                <PressableBox onPress={() => setComprovante(null)} hitSlop={8}>
+                  <Text variant="captionStrong" color="danger">Remover</Text>
+                </PressableBox>
+              </Box>
+            ) : payment?.receiptUrl ? (
+              <Text variant="caption" color="textSecondary" flex={1} numberOfLines={1}>
+                Já existe um comprovante anexado.
+              </Text>
+            ) : null}
           </Box>
         </Box>
 

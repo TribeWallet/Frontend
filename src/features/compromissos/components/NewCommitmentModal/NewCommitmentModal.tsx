@@ -3,6 +3,7 @@ import { ScrollView } from 'react-native';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import * as ImagePicker from 'expo-image-picker';
 import { Modal } from '../../../../components/Modal';
 import { Input } from '../../../../components/Input';
 import { Button } from '../../../../components/Button';
@@ -12,6 +13,8 @@ import { useAppCommitments, useAppGroups } from '../../../../contexts/AppContext
 import { getErrorMessage } from '../../../../services/api/apiClient';
 import { todayBR } from '../../../../utils/date';
 import { formatCurrency } from '../../../../utils/currency';
+import { maskDateBR, maskMoney, maskNumber, parseMoney } from '../../../../utils/masks';
+import type { AttachedFile } from '../../../../types/file';
 import type { Commitment, SplitMode } from '../../types/Commitment';
 import { commitmentCategories } from '../../services/categories';
 import { computeSplits } from '../../services/split';
@@ -21,20 +24,30 @@ const schema = z.object({
   amount: z
     .string()
     .min(1, 'Informe um valor')
-    .regex(/^[0-9]+(?:[,.][0-9]{1,2})?$/, 'Valor inválido'),
+    .regex(/^[0-9]{1,}(?:,[0-9]{1,2})?$/, 'Valor inválido'),
   dueDate: z.string().regex(/^[0-3][0-9]\/[0-1][0-9]\/[0-9]{4}$/, 'Use o formato DD/MM/AAAA'),
   groupId: z.string().min(1, 'Selecione um grupo'),
   category: z.string().min(1, 'Selecione uma categoria'),
   splitMode: z.enum(['equal', 'custom']),
+  parcelas: z
+    .string()
+    .min(1, 'Informe o número de parcelas')
+    .refine((value) => {
+      const parsed = Number(value);
+      return Number.isInteger(parsed) && parsed >= 1 && parsed <= 24;
+    }, 'Parcelas entre 1 e 24'),
 });
 
 type FormValues = z.infer<typeof schema>;
+
+const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg'];
 
 interface NewCommitmentModalProps {
   visible: boolean;
   onClose: () => void;
   onCreated?: (commitment: Commitment) => void;
   commitment?: Commitment | null;
+  lockedGroupId?: string;
 }
 
 export function NewCommitmentModal({
@@ -42,6 +55,7 @@ export function NewCommitmentModal({
   onClose,
   onCreated,
   commitment,
+  lockedGroupId,
 }: NewCommitmentModalProps) {
   const { groups } = useAppGroups();
   const { addCommitment, updateCommitment } = useAppCommitments();
@@ -52,6 +66,7 @@ export function NewCommitmentModal({
   >([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [imagem, setImagem] = useState<AttachedFile | null>(null);
 
   const {
     control,
@@ -69,6 +84,7 @@ export function NewCommitmentModal({
       groupId: '',
       category: '',
       splitMode: 'equal',
+      parcelas: '1',
     },
     mode: 'onChange',
   });
@@ -76,9 +92,11 @@ export function NewCommitmentModal({
   useEffect(() => {
     if (!visible) {
       setCustomSplits([]);
+      setImagem(null);
       return;
     }
     setSubmitError(null);
+    setImagem(null);
     if (commitment) {
       reset({
         name: commitment.name,
@@ -87,6 +105,7 @@ export function NewCommitmentModal({
         groupId: commitment.groupId,
         category: commitment.category,
         splitMode: commitment.splitMode,
+        parcelas: '1',
       });
       setCustomSplits(
         commitment.splits.map((split) => ({
@@ -99,35 +118,90 @@ export function NewCommitmentModal({
         name: '',
         amount: '',
         dueDate: todayBR(),
-        groupId: '',
+        groupId: lockedGroupId ?? '',
         category: '',
         splitMode: 'equal',
+        parcelas: '1',
       });
       setCustomSplits([]);
     }
-  }, [visible, commitment, reset]);
+  }, [visible, commitment, lockedGroupId, reset]);
 
   const watched = watch();
-  const selectedGroup = groups.find((group) => group.id === watched.groupId);
+  const activeGroupId = lockedGroupId ?? watched.groupId;
+  const selectedGroup = groups.find((group) => group.id === activeGroupId);
   const members = useMemo(() => selectedGroup?.members ?? [], [selectedGroup]);
+  const parcelas = Math.max(1, Number(watched.parcelas) || 1);
+
+  const totalAmount = parseMoney(watched.amount);
+  const perParcela = parcelas > 1 ? totalAmount / parcelas : totalAmount;
 
   const splitResult = useMemo(() => {
-    const amount = Number(watched.amount.replace(',', '.')) || 0;
-    return computeSplits(amount, members, watched.splitMode as SplitMode, customSplits);
-  }, [watched.amount, watched.splitMode, customSplits, members]);
+    return computeSplits(totalAmount, members, watched.splitMode as SplitMode, customSplits);
+  }, [totalAmount, watched.splitMode, customSplits, members]);
+
+  const perParcelaSplits = useMemo(
+    () => computeSplits(perParcela, members, 'equal', []),
+    [perParcela, members],
+  );
 
   const totalMatches = splitResult.balanced;
+
+  const applyEqualDefaultsToCustom = useCallback(() => {
+    const equal = computeSplits(totalAmount, members, 'equal', []);
+    setCustomSplits(equal.entries.map((entry) => ({ ...entry })));
+  }, [totalAmount, members]);
+
+  const handleSplitModeChange = useCallback(
+    (mode: SplitMode) => {
+      if (mode === 'custom' && parcelas > 1) return;
+      if (mode === 'custom' && customSplits.every((split) => split.amount === 0)) {
+        applyEqualDefaultsToCustom();
+      }
+      setValue('splitMode', mode, { shouldValidate: true });
+    },
+    [parcelas, customSplits, applyEqualDefaultsToCustom, setValue],
+  );
 
   const handleClose = useCallback(() => {
     reset();
     setCustomSplits([]);
+    setImagem(null);
     setSubmitError(null);
     onClose();
   }, [reset, onClose]);
 
+  const pickImagem = useCallback(async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: false,
+      quality: 0.8,
+    });
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    const extension = (asset.fileName ?? asset.uri).split('.').pop()?.toLowerCase() ?? '';
+    const mimeType = asset.mimeType ?? 'image/jpeg';
+    const allowed =
+      IMAGE_EXTENSIONS.includes(extension) || ['image/png', 'image/jpeg'].includes(mimeType);
+    if (!allowed) {
+      setSubmitError('A imagem deve ser PNG, JPG ou JPEG.');
+      return;
+    }
+    setSubmitError(null);
+    setImagem({
+      uri: asset.uri,
+      name: asset.fileName ?? `imagem.${extension || 'jpg'}`,
+      type: mimeType,
+    });
+  }, []);
+
   const onValidSubmit = handleSubmit(async (values) => {
-    const group = groups.find((item) => item.id === values.groupId);
+    const group = groups.find((item) => item.id === (lockedGroupId ?? values.groupId));
     if (!group) return;
+    if (values.splitMode === 'custom' && !totalMatches) {
+      setSubmitError('A soma dos valores exatos precisa igualar o valor total.');
+      return;
+    }
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -135,10 +209,12 @@ export function NewCommitmentModal({
         name: values.name.trim(),
         groupId: group.id,
         category: values.category,
-        amount: Number(values.amount.replace(',', '.')) || 0,
+        amount: parseMoney(values.amount),
         dueDate: values.dueDate,
         splitMode: values.splitMode,
         splits: splitResult.entries,
+        imagem: imagem ?? undefined,
+        parcelas: isEdit ? 1 : parcelas,
       };
       if (commitment) {
         await updateCommitment(commitment.id, input);
@@ -154,6 +230,8 @@ export function NewCommitmentModal({
       setSubmitting(false);
     }
   });
+
+  const groupSelectValue = lockedGroupId ?? watched.groupId;
 
   return (
     <Modal
@@ -215,7 +293,7 @@ export function NewCommitmentModal({
                   <Input
                     label="Valor total"
                     value={value}
-                    onChangeText={(text) => onChange(text.replace(/[^0-9.,]/g, ''))}
+                    onChangeText={(text) => onChange(maskMoney(text))}
                     onBlur={onBlur}
                     placeholder="0,00"
                     keyboardType="decimal-pad"
@@ -232,7 +310,7 @@ export function NewCommitmentModal({
                   <Input
                     label="Data"
                     value={value}
-                    onChangeText={onChange}
+                    onChangeText={(text) => onChange(maskDateBR(text))}
                     onBlur={onBlur}
                     placeholder="DD/MM/AAAA"
                     keyboardType="numeric"
@@ -243,10 +321,46 @@ export function NewCommitmentModal({
             </Box>
           </Box>
 
+          {!isEdit ? (
+            <Box flexDirection="row" gap="sm">
+              <Box flex={1}>
+                <Controller
+                  control={control}
+                  name="parcelas"
+                  render={({ field: { onChange, value, onBlur } }) => (
+                    <Input
+                      label="Parcelas (mensais)"
+                      value={value}
+                      onChangeText={(text) => {
+                        const masked = maskNumber(text, 2);
+                        onChange(masked);
+                        if ((Number(masked) || 1) > 1 && watched.splitMode === 'custom') {
+                          setValue('splitMode', 'equal', { shouldValidate: true });
+                        }
+                      }}
+                      onBlur={onBlur}
+                      placeholder="1"
+                      keyboardType="numeric"
+                      error={errors.parcelas?.message}
+                    />
+                  )}
+                />
+              </Box>
+              <Box flex={2} justifyContent="center">
+                {parcelas > 1 && totalAmount > 0 ? (
+                  <Text variant="caption" color="textSecondary">
+                    Serão criados {parcelas} compromissos de {formatCurrency(perParcela)}, vencendo
+                    um por mês.
+                  </Text>
+                ) : null}
+              </Box>
+            </Box>
+          ) : null}
+
           <Select
             label="Grupo"
-            placeholder="Selecione um grupo"
-            value={watched.groupId}
+            placeholder={lockedGroupId ? selectedGroup?.name ?? '' : 'Selecione um grupo'}
+            value={groupSelectValue}
             onChange={(value) => setValue('groupId', value, { shouldValidate: true })}
             options={groups.map<SelectOption>((group) => ({
               id: group.id,
@@ -255,7 +369,7 @@ export function NewCommitmentModal({
             }))}
             emptyText="Crie um grupo antes de lançar compromissos"
             error={errors.groupId?.message}
-            disabled={isEdit}
+            disabled={isEdit || Boolean(lockedGroupId)}
           />
 
           <Select
@@ -270,18 +384,41 @@ export function NewCommitmentModal({
             error={errors.category?.message}
           />
 
-          {watched.groupId ? (
+          <Box>
+            <Text variant="label" marginBottom="xs">Imagem da nota (PNG, JPG ou JPEG)</Text>
+            <Box flexDirection="row" gap="xs" alignItems="center">
+              <Button
+                title={imagem ? 'Trocar imagem' : 'Anexar imagem'}
+                variant="outline"
+                size="sm"
+                onPress={pickImagem}
+              />
+              {imagem ? (
+                <Box flex={1} flexDirection="row" alignItems="center" gap="xs">
+                  <Text variant="caption" numberOfLines={1} flex={1} color="primary">
+                    {imagem.name}
+                  </Text>
+                  <PressableBox onPress={() => setImagem(null)} hitSlop={8}>
+                    <Text variant="captionStrong" color="danger">Remover</Text>
+                  </PressableBox>
+                </Box>
+              ) : null}
+            </Box>
+          </Box>
+
+          {activeGroupId ? (
             <Box>
               <Text variant="label" marginBottom="xs">Divisão de custos</Text>
               <Box flexDirection="row" gap="xs">
                 {(['equal', 'custom'] as SplitMode[]).map((mode) => {
                   const active = watched.splitMode === mode;
+                  const blocked = mode === 'custom' && parcelas > 1 && !isEdit;
                   return (
                     <PressableBox
                       key={mode}
-                      onPress={() => setValue('splitMode', mode, { shouldValidate: true })}
+                      onPress={() => !blocked && handleSplitModeChange(mode)}
                       accessibilityRole="button"
-                      accessibilityState={{ selected: active }}
+                      accessibilityState={{ selected: active, disabled: blocked }}
                       style={{ flex: 1 }}
                     >
                       <Box
@@ -291,6 +428,7 @@ export function NewCommitmentModal({
                         borderWidth={1}
                         borderColor={active ? 'primary' : 'border'}
                         alignItems="center"
+                        opacity={blocked ? 0.5 : 1}
                       >
                         <Text variant="captionStrong" color={active ? 'white' : 'textSecondary'}>
                           {mode === 'equal' ? 'Igual entre todos' : 'Valor exato'}
@@ -308,9 +446,14 @@ export function NewCommitmentModal({
               ) : watched.splitMode === 'equal' ? (
                 <Box mt="sm">
                   {members.map((member) => {
-                    const split = splitResult.entries.find(
-                      (entry) => entry.integranteToken === member.integranteToken,
-                    );
+                    const split =
+                      parcelas > 1
+                        ? perParcelaSplits.entries.find(
+                            (entry) => entry.integranteToken === member.integranteToken,
+                          )
+                        : splitResult.entries.find(
+                            (entry) => entry.integranteToken === member.integranteToken,
+                          );
                     return (
                       <Box
                         key={member.integranteToken}
@@ -328,7 +471,7 @@ export function NewCommitmentModal({
               ) : (
                 <Box mt="sm" gap="xs">
                   {members.map((member) => {
-                    const value =
+                    const current =
                       customSplits.find(
                         (entry) => entry.integranteToken === member.integranteToken,
                       )?.amount ?? 0;
@@ -338,10 +481,9 @@ export function NewCommitmentModal({
                           {member.name}
                         </Text>
                         <Input
-                          value={value.toString().replace('.', ',')}
+                          value={maskMoney((current * 100).toFixed(0))}
                           onChangeText={(text) => {
-                            const numeric =
-                              Number(text.replace(/[^0-9,]/g, '').replace(',', '.')) || 0;
+                            const numeric = parseMoney(text);
                             setCustomSplits((prev) => [
                               ...prev.filter(
                                 (entry) => entry.integranteToken !== member.integranteToken,
@@ -357,7 +499,7 @@ export function NewCommitmentModal({
                   })}
                   <Text variant="caption" color={totalMatches ? 'success' : 'danger'} mt="xs">
                     Soma atual: {formatCurrency(splitResult.total)}{' '}
-                    {totalMatches ? '· bate com o total' : '· precisa igualar ao valor total'}
+                    {totalMatches ? '· bate com o valor total' : '· precisa igualar ao valor total'}
                   </Text>
                 </Box>
               )}

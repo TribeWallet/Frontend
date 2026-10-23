@@ -135,7 +135,7 @@ export function DashboardScreen() {
   }, [navigation]);
 
   const handleViewOverdue = useCallback(() => {
-    navigation.navigate('Main', { screen: 'Commitments' });
+    navigation.navigate('Main', { screen: 'Commitments', params: { filter: 'vencidos' } });
   }, [navigation]);
 
   const greeting = useMemo(() => {

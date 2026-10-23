@@ -52,8 +52,9 @@ export interface CommitmentInput {
   groupId: string;
   category: string;
   amount: number;
-  /** DD/MM/AAAA. */
   dueDate: string;
   splitMode: SplitMode;
   splits: { integranteToken: string; amount: number }[];
+  imagem?: import('../../../types/file').AttachedFile;
+  parcelas?: number;
 }

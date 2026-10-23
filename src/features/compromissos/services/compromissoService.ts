@@ -3,7 +3,8 @@ import { endpoints } from '../../../config/api';
 import { TipoDivisao } from '../../../types/ApiResponse';
 import type { CompromissoResponse } from '../../../types/ApiResponse';
 import type { TransactionStatus } from '../../../types/transactionStatus';
-import { brToISO, isoToBR } from '../../../utils/date';
+import type { AttachedFile } from '../../../types/file';
+import { brToISO, isoToBR, formatBR, parseBRDate } from '../../../utils/date';
 import { fullName, initialsFromName } from '../../../utils/formatters';
 import { toPayment } from '../../pagamentos/services/pagamentoService';
 import type {
@@ -135,35 +136,102 @@ function toParticipacoesPayload(input: CommitmentInput) {
   }));
 }
 
-export function createCompromisso(input: CommitmentInput): Promise<CompromissoResponse> {
-  return apiClient.post<CompromissoResponse>(
+function appendFormFile(form: FormData, field: string, file?: AttachedFile) {
+  if (!file) return;
+  form.append(field, { uri: file.uri, name: file.name, type: file.type } as never);
+}
+
+function splitAmountEqually(total: number, parts: number): number[] {
+  if (parts <= 0) return [];
+  const cents = Math.round(total * 100);
+  const base = Math.floor(cents / parts);
+  const remainder = cents - base * parts;
+  return Array.from({ length: parts }, (_, index) => (base + (index < remainder ? 1 : 0)) / 100);
+}
+
+function addMonths(date: Date, months: number): Date {
+  const result = new Date(date.getFullYear(), date.getMonth() + months, date.getDate());
+  return result;
+}
+
+async function createSingleCompromisso(
+  input: CommitmentInput,
+  titulo: string,
+  valorTotal: number,
+  dueDateBR: string,
+): Promise<CompromissoResponse> {
+  const form = new FormData();
+  form.append('Titulo', titulo);
+  form.append('ValorTotal', String(valorTotal));
+  form.append('Data', brToISO(dueDateBR));
+  form.append('TipoDivisao', String(SPLIT_MODE_TO_API[input.splitMode]));
+  form.append('Categoria', input.category);
+  appendFormFile(form, 'Imagem', input.imagem);
+
+  const created = await apiClient.postForm<CompromissoResponse>(
     endpoints.compromissos.byGrupo(input.groupId),
-    {
-      titulo: input.name,
-      valorTotal: input.amount,
-      data: brToISO(input.dueDate),
-      tipoDivisao: SPLIT_MODE_TO_API[input.splitMode],
-      categoria: input.category,
-      participacoes: toParticipacoesPayload(input),
-    },
+    form,
+  );
+
+  if (input.splits.length === 0) return created;
+
+  return apiClient.post<CompromissoResponse>(
+    endpoints.compromissos.participacoes(created.compromissoFinanceiroToken),
+    toParticipacoesPayload(input),
   );
 }
 
-export function updateCompromisso(
+export async function createCompromisso(input: CommitmentInput): Promise<CompromissoResponse> {
+  const parcelas = Math.max(1, Math.min(24, input.parcelas ?? 1));
+
+  if (parcelas === 1) {
+    return createSingleCompromisso(input, input.name, input.amount, input.dueDate);
+  }
+
+  const valores = splitAmountEqually(input.amount, parcelas);
+  const baseDate = parseBRDate(input.dueDate) ?? new Date();
+
+  let first: CompromissoResponse | null = null;
+  for (let index = 0; index < parcelas; index++) {
+    const fatias = splitAmountEqually(valores[index], input.splits.length);
+    const parcelaInput: CommitmentInput = {
+      ...input,
+      splits: input.splits.map((split, splitIndex) => ({
+        integranteToken: split.integranteToken,
+        amount: fatias[splitIndex],
+      })),
+    };
+    const created = await createSingleCompromisso(
+      parcelaInput,
+      `${input.name} (${index + 1}/${parcelas})`,
+      valores[index],
+      formatBR(addMonths(baseDate, index)),
+    );
+    if (!first) first = created;
+  }
+
+  return first as CompromissoResponse;
+}
+
+export async function updateCompromisso(
   compromissoToken: string,
   input: CommitmentInput,
 ): Promise<CompromissoResponse> {
-  return apiClient.put<CompromissoResponse>(
-    endpoints.compromissos.byToken(compromissoToken),
-    {
-      titulo: input.name,
-      valorTotal: input.amount,
-      data: brToISO(input.dueDate),
-      tipoDivisao: SPLIT_MODE_TO_API[input.splitMode],
-      categoria: input.category,
-      participacoes: toParticipacoesPayload(input),
-    },
-  );
+  const form = new FormData();
+  form.append('Titulo', input.name);
+  form.append('ValorTotal', String(input.amount));
+  form.append('Data', brToISO(input.dueDate));
+  form.append('TipoDivisao', String(SPLIT_MODE_TO_API[input.splitMode]));
+  form.append('Categoria', input.category);
+  appendFormFile(form, 'Imagem', input.imagem);
+
+  toParticipacoesPayload(input).forEach((participacao, index) => {
+    form.append(`Participacoes[${index}].IntegranteToken`, participacao.integranteToken);
+    form.append(`Participacoes[${index}].ValorDevedor`, String(participacao.valorDevedor));
+    form.append(`Participacoes[${index}].ValorPago`, String(participacao.valorPago));
+  });
+
+  return apiClient.putForm<CompromissoResponse>(endpoints.compromissos.byToken(compromissoToken), form);
 }
 
 export function deleteCompromisso(compromissoToken: string): Promise<void> {

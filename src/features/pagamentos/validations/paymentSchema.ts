@@ -15,8 +15,6 @@ export const paymentMethodSchema = z.enum([
 export const paymentFormSchema = z.object({
   groupId: z.string().min(1, 'Selecione um grupo'),
   commitmentId: z.string().min(1, 'Selecione um compromisso'),
-  /** integranteCompromissoToken da fatia que está sendo quitada. */
-  shareId: z.string().min(1, 'Selecione o integrante'),
   amount: z
     .string()
     .min(1, 'Informe um valor')
@@ -31,7 +29,6 @@ export type PaymentFormValues = z.infer<typeof paymentFormSchema>;
 export const defaultPaymentFormValues: PaymentFormValues = {
   groupId: '',
   commitmentId: '',
-  shareId: '',
   amount: '',
   date: '',
   method: 'pix',

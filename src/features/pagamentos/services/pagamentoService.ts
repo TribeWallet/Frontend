@@ -53,25 +53,37 @@ export function toPayment(dto: PagamentoResponse, context: PaymentContext): Paym
 }
 
 export function createPagamento(draft: PaymentDraft): Promise<PagamentoResponse> {
-  return apiClient.post<PagamentoResponse>(endpoints.pagamentos.create, {
-    integranteCompromissoToken: draft.shareId,
-    valor: draft.amount,
-    data: brToISO(draft.date),
-    comprovanteBase64: draft.receiptBase64 ?? null,
-    metodo: METHOD_TO_API[draft.method],
-  });
+  const form = new FormData();
+  form.append('IntegranteCompromissoToken', draft.shareId);
+  form.append('Valor', String(draft.amount));
+  form.append('Data', brToISO(draft.date));
+  form.append('Metodo', String(METHOD_TO_API[draft.method]));
+  if (draft.comprovante) {
+    form.append('Comprovante', {
+      uri: draft.comprovante.uri,
+      name: draft.comprovante.name,
+      type: draft.comprovante.type,
+    } as never);
+  }
+  return apiClient.postForm<PagamentoResponse>(endpoints.pagamentos.create, form);
 }
 
 export function updatePagamento(
   pagamentoToken: string,
   patch: PaymentPatch,
 ): Promise<PagamentoResponse> {
-  return apiClient.put<PagamentoResponse>(endpoints.pagamentos.byToken(pagamentoToken), {
-    valor: patch.amount ?? null,
-    data: patch.date ? brToISO(patch.date) : null,
-    comprovanteBase64: patch.receiptBase64 ?? null,
-    metodo: patch.method ? METHOD_TO_API[patch.method] : null,
-  });
+  const form = new FormData();
+  if (patch.amount !== undefined) form.append('Valor', String(patch.amount));
+  if (patch.date) form.append('Data', brToISO(patch.date));
+  if (patch.method) form.append('Metodo', String(METHOD_TO_API[patch.method]));
+  if (patch.comprovante) {
+    form.append('Comprovante', {
+      uri: patch.comprovante.uri,
+      name: patch.comprovante.name,
+      type: patch.comprovante.type,
+    } as never);
+  }
+  return apiClient.putForm<PagamentoResponse>(endpoints.pagamentos.byToken(pagamentoToken), form);
 }
 
 export function deletePagamento(pagamentoToken: string): Promise<void> {

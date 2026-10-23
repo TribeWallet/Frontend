@@ -89,6 +89,7 @@ function RootNavigator() {
         initials: user.initials,
         name: user.name,
         email: user.email,
+        imageUrl: user.imageUrl ?? null,
         notificationCount: user.notificationCount ?? 0,
       });
     }
