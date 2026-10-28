@@ -106,7 +106,7 @@ export function CommitmentCard({ commitment, onPress }: CommitmentCardProps) {
               }}
             />
             <Text style={{ color: palette.color, fontSize: 12, fontWeight: '600' }}>
-              {statusLabel[commitment.status]}
+              {statusLabel[effectiveStatus]}
             </Text>
           </View>
         </Box>

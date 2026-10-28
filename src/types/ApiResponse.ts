@@ -32,6 +32,39 @@ export interface GrupoResponse {
   compromissos: CompromissoResponse[];
 }
 
+export interface GrupoUsuarioIntegranteResponse {
+  integranteToken: string;
+  usuarioToken?: string;
+  nome: string;
+  sobrenome: string;
+  email: string;
+  imagemUrl: string | null;
+  deletedAt: string | null;
+}
+
+export interface GrupoUsuarioCompromissoResponse {
+  compromissoFinanceiroToken: string;
+  titulo: string;
+  imagemUrl: string;
+  categoria: string | null;
+  valorTotal: number;
+  data: string;
+  deletedAt: string | null;
+}
+
+export interface GrupoUsuarioResponse {
+  grupoToken: string;
+  nome: string;
+  descricao: string | null;
+  integrantesCount: number;
+  compromissosCount: number;
+  totalEmAberto: number;
+  totalPago: number;
+  deletedAt: string | null;
+  integrantes: GrupoUsuarioIntegranteResponse[];
+  compromissos: GrupoUsuarioCompromissoResponse[];
+}
+
 /** TipoDivisao do backend (Domain/Entities/Enums.cs). */
 export const TipoDivisao = {
   igual: 1,
