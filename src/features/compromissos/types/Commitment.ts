@@ -47,6 +47,26 @@ export interface Commitment {
   splits: CommitmentSplitEntry[];
 }
 
+export interface CommitmentSummary {
+  id: string;
+  initials: string;
+  imagem: string | null;
+  avatarTone: 'blue' | 'teal' | 'indigo';
+  name: string;
+  status: CommitmentStatus;
+  groupId: string;
+  groupName: string;
+  category: string;
+  dueDate: string;
+  date: string;
+  amount: number;
+  paidAmount: number;
+  remainingAmount: number;
+  progress: number;
+  overdue: boolean;
+  splitMode: SplitMode;
+}
+
 export interface CommitmentInput {
   name: string;
   groupId: string;

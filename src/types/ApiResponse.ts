@@ -113,3 +113,41 @@ export interface CompromissoResponse {
   grupo: GrupoResponse | null;
   participacoes: IntegranteCompromissoResumoResponse[];
 }
+
+export interface CompromissoUsuarioIntegranteResponse {
+  integranteToken: string;
+  usuarioToken: string;
+  nome: string;
+  sobrenome: string;
+  email: string;
+  imagemUrl: string | null;
+  valorPago: number;
+  valorDevedor: number;
+  valorRestante: number;
+  somaPagamentosPorMetodo: Record<string, number>;
+  quitado: boolean;
+  deletedAt: string | null;
+}
+
+export interface CompromissoUsuarioResponse {
+  compromissoFinanceiroToken: string;
+  grupoToken: string;
+  titulo: string;
+  imagem: string | null;
+  situacaoPagamento: number;
+  dataVencimento: string;
+  diasParaVencimento: number;
+  vencido: boolean;
+  tipoDivisao: number;
+  valorTotal: number;
+  valorPagoTotal: number;
+  valorRestanteTotal: number;
+  progressoPagamentos: number;
+  categoria: string | null;
+  nomeGrupo: string;
+  integrantesQuitadosCount: number;
+  integrantesDevendoCount: number;
+  integrantesTotalCount: number;
+  integrantes: CompromissoUsuarioIntegranteResponse[];
+  deletedAt: string | null;
+}

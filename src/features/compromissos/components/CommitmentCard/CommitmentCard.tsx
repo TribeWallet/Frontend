@@ -2,14 +2,14 @@ import React, { useEffect } from 'react';
 import { Image, Pressable, View } from 'react-native';
 import { Pill } from '../../../../components/Pill';
 import { Box, Text } from '../../../../theme';
-import type { Commitment } from '../../types/Commitment';
+import type { Commitment, CommitmentSummary } from '../../types/Commitment';
 import { summarizeCommitment } from '../../services/split';
 import { formatCurrency } from '../../../../utils/currency';
 import { diffDays } from '../../../../utils/date';
 import { environment } from '../../../../config/environment';
 
 interface CommitmentCardProps {
-  commitment: Commitment;
+  commitment: Commitment | CommitmentSummary;
   onPress?: (id: string) => void;
 }
 
@@ -35,10 +35,20 @@ const avatarColors = {
 
 export function CommitmentCard({ commitment, onPress }: CommitmentCardProps) {
   const daysToDue = diffDays(commitment.dueDate);
-  const isOverdue = commitment.status !== 'paid' && daysToDue !== null && daysToDue < 0;
+  const isOverdue =
+    commitment.status !== 'paid' &&
+    ('overdue' in commitment ? commitment.overdue : daysToDue !== null && daysToDue < 0);
   const effectiveStatus = isOverdue ? 'overdue' : commitment.status;
   const palette = statusPalette[effectiveStatus];
-  const summary = summarizeCommitment(commitment);
+  const summary =
+    'splits' in commitment
+      ? summarizeCommitment(commitment)
+      : { progress: commitment.progress, remaining: commitment.remainingAmount };
+  const imageUri = commitment.imagem
+    ? /^https?:\/\//i.test(commitment.imagem)
+      ? commitment.imagem
+      : `${environment.mediaUrl}/${commitment.imagem}`
+    : null;
 
   return (
     <Pressable
@@ -65,9 +75,9 @@ export function CommitmentCard({ commitment, onPress }: CommitmentCardProps) {
               justifyContent: 'center',
             }}
           >
-            {commitment.imagem ? (
+            {imageUri ? (
               <Image
-                source={{ uri: `${environment.mediaUrl}/${commitment.imagem}` }}
+                source={{ uri: imageUri }}
                 style={{ width: 44, height: 44, borderRadius: 9999 }}
               />
             ) : (

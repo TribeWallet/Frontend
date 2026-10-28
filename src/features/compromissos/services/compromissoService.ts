@@ -1,7 +1,10 @@
 import { apiClient } from '../../../services/api/apiClient';
 import { endpoints } from '../../../config/api';
 import { TipoDivisao } from '../../../types/ApiResponse';
-import type { CompromissoResponse } from '../../../types/ApiResponse';
+import type {
+  CompromissoResponse,
+  CompromissoUsuarioResponse,
+} from '../../../types/ApiResponse';
 import type { TransactionStatus } from '../../../types/transactionStatus';
 import type { AttachedFile } from '../../../types/file';
 import { brToISO, isoToBR, formatBR, parseBRDate } from '../../../utils/date';
@@ -11,6 +14,7 @@ import type {
   Commitment,
   CommitmentInput,
   CommitmentSplitEntry,
+  CommitmentSummary,
   SplitMode,
 } from '../types/Commitment';
 
@@ -30,6 +34,29 @@ const AVATAR_TONES = ['blue', 'teal', 'indigo'] as const;
 function resolveTone(titulo: string): Commitment['avatarTone'] {
   const sum = Array.from(titulo).reduce((acc, char) => acc + char.charCodeAt(0), 0);
   return AVATAR_TONES[sum % AVATAR_TONES.length];
+}
+
+export function toCommitmentSummary(dto: CompromissoUsuarioResponse): CommitmentSummary {
+  const name = dto.titulo;
+  return {
+    id: dto.compromissoFinanceiroToken,
+    initials: initialsFromName(name),
+    imagem: dto.imagem,
+    avatarTone: resolveTone(name),
+    name,
+    status: resolveStatus([{ amount: dto.valorTotal, paidAmount: dto.valorPagoTotal }]),
+    groupId: dto.grupoToken,
+    groupName: dto.nomeGrupo,
+    category: dto.categoria ?? 'Outros',
+    dueDate: isoToBR(dto.dataVencimento),
+    date: dto.dataVencimento,
+    amount: dto.valorTotal,
+    paidAmount: dto.valorPagoTotal,
+    remainingAmount: dto.valorRestanteTotal,
+    progress: Math.round(dto.progressoPagamentos * 100),
+    overdue: dto.vencido,
+    splitMode: toSplitMode(dto.tipoDivisao),
+  };
 }
 
 function resolveStatus(splits: { amount: number; paidAmount: number }[]): TransactionStatus {
@@ -126,6 +153,23 @@ export async function listCompromissosByGrupo(
   );
   // A exclusão é soft delete: o backend pode devolver registros já excluídos.
   return compromissos.filter((compromisso) => !compromisso.deletedAt);
+}
+
+export function getCompromisso(compromissoToken: string): Promise<CompromissoResponse> {
+  return apiClient.get<CompromissoResponse>(
+    endpoints.compromissos.byToken(compromissoToken),
+  );
+}
+
+export async function listCompromissosByUsuario(
+  usuarioToken: string,
+): Promise<CommitmentSummary[]> {
+  const compromissos = await apiClient.get<CompromissoUsuarioResponse[]>(
+    endpoints.compromissos.byUsuario(usuarioToken),
+  );
+  return compromissos
+    .filter((compromisso) => !compromisso.deletedAt)
+    .map(toCommitmentSummary);
 }
 
 function toParticipacoesPayload(input: CommitmentInput) {
