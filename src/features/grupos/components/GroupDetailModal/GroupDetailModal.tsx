@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { Modal } from '../../../../components/Modal';
 import { Pill } from '../../../../components/Pill';
 import { Button } from '../../../../components/Button';
@@ -63,12 +63,7 @@ export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalPr
         />
       }
     >
-      <ScrollView
-        style={{ maxHeight: 540 }}
-        contentContainerStyle={{ paddingBottom: 12 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <Box gap="md">
+      <Box gap="md">
           <Box
             bg="primaryLight"
             borderRadius="md"
@@ -167,8 +162,7 @@ export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalPr
               />
             ))
           )}
-        </Box>
-      </ScrollView>
+      </Box>
       <NewGroupModal
         visible={editing}
         group={group}

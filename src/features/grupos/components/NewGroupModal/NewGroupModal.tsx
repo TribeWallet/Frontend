@@ -15,7 +15,7 @@ import {
   findUsuarioByEmail,
   searchUsuariosByNome,
 } from '../../../usuario/services/usuarioService';
-import type { Group } from '../../types/Group';
+import type { Group, GroupMember } from '../../types/Group';
 
 const schema = z.object({
   name: z.string().min(2, 'Informe um nome com pelo menos 2 caracteres'),
@@ -95,6 +95,9 @@ export function NewGroupModal({
   }, [visible, group, reset]);
 
   const watched = watch();
+  const isCurrentUserMember = (member: GroupMember) =>
+    member.usuarioToken === currentUser?.id ||
+    member.email?.trim().toLowerCase() === currentUser?.email?.trim().toLowerCase();
 
   /** A API vincula integrantes por usuarioToken: só entra quem já tem conta. */
   const lookupUsuario = async (term: string): Promise<PendingMember | null> => {
@@ -147,7 +150,9 @@ export function NewGroupModal({
       if (!found) return;
 
       const alreadyInGroup = group?.members.some(
-        (member) => member.id === found.usuarioToken,
+        (member) =>
+          member.usuarioToken === found.usuarioToken ||
+          member.email?.trim().toLowerCase() === found.email.trim().toLowerCase(),
       );
       if (alreadyInGroup) {
         setMemberError('Esse integrante já está no grupo.');
@@ -395,7 +400,7 @@ export function NewGroupModal({
                   <Box flex={1}>
                     <Text variant="bodyStrong">
                       {member.name}
-                      {member.id === currentUser?.id ? ' (você)' : ''}
+                      {isCurrentUserMember(member) ? ' (você)' : ''}
                     </Text>
                     {member.email ? (
                       <Text variant="caption" color="textSecondary">
@@ -403,7 +408,7 @@ export function NewGroupModal({
                       </Text>
                     ) : null}
                   </Box>
-                  {member.id === currentUser?.id ? null : (
+                  {isCurrentUserMember(member) ? null : (
                     <PressableBox
                       onPress={() => handleRemoveMember(member.integranteToken, member.name)}
                       accessibilityRole="button"
