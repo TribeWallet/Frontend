@@ -107,7 +107,7 @@ export function CompromissosScreen() {
           <Box width="100%" px={isSmallPhone ? 'sm' : 'md'} pt="md">
             <ScreenHeader
               title="Compromissos"
-              subtitle="Despesas, contas e compromissos do grupo"
+              subtitle="Contas e despesas do grupo"
             >
               <Button
                 title="Novo compromisso"
