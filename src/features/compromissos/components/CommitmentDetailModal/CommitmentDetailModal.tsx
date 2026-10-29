@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, ScrollView } from 'react-native';
+import { Alert } from 'react-native';
 import { Modal } from '../../../../components/Modal';
 import { Button } from '../../../../components/Button';
 import { Pill } from '../../../../components/Pill';
@@ -151,12 +151,7 @@ export function CommitmentDetailModal({
         </Box>
       }
     >
-      <ScrollView
-        style={{ maxHeight: 540 }}
-        contentContainerStyle={{ paddingBottom: 12 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <Box gap="md">
+      <Box gap="md">
           <Box
             flexDirection="row"
             alignItems="center"
@@ -324,8 +319,7 @@ export function CommitmentDetailModal({
               />
             ))
           )}
-        </Box>
-      </ScrollView>
+      </Box>
       <NewPaymentModal
         visible={payingShareId !== null}
         onClose={() => setPayingShareId(null)}

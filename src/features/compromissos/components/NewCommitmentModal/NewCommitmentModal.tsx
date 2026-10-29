@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView } from 'react-native';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -263,12 +262,7 @@ export function NewCommitmentModal({
         </Box>
       }
     >
-      <ScrollView
-        style={{ maxHeight: 520 }}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        <Box gap="md">
+      <Box gap="md">
           <Controller
             control={control}
             name="name"
@@ -511,8 +505,7 @@ export function NewCommitmentModal({
               {submitError}
             </Text>
           ) : null}
-        </Box>
-      </ScrollView>
+      </Box>
     </Modal>
   );
 }

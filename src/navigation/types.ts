@@ -19,7 +19,7 @@ export type RootStackParamList = {
   EditGroup: { id: string };
   GroupDetail: { id: string };
   NewCommitment: { id?: string } | undefined;
-  CommitmentDetail: { id: string };
+  CommitmentDetail: { id: string; groupId?: string; groupName?: string };
   Profile: undefined;
   EditProfile: undefined;
   History: undefined;

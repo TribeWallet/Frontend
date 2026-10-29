@@ -20,6 +20,7 @@ export const endpoints = {
       `/api/grupos/${grupoToken}/integrantes/${integranteToken}`,
   },
   compromissos: {
+    byUsuario: (usuarioToken: string) => `/api/compromissos/usuario/${usuarioToken}`,
     byGrupo: (grupoToken: string) => `/api/compromissos/${grupoToken}`,
     byToken: (compromissoToken: string) => `/api/compromissos/${compromissoToken}`,
     /** Participações de um compromisso. */

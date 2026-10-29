@@ -11,7 +11,7 @@ import { Loading } from '../../../../components/Loading';
 import { Select, SelectOption } from '../../../../components/Select';
 import { TopBar } from '../../../../components/TopBar';
 import { CommitmentCard } from '../../components/CommitmentCard/CommitmentCard';
-import { useCommitments } from '../../../../hooks/useCommitments';
+import { useCommitmentSummaries } from '../../hooks/useCommitmentSummaries';
 import { useGroups } from '../../../../hooks/useGroups';
 import { useNotifications } from '../../../../hooks/useNotifications';
 import { useUserStore } from '../../../usuario/stores/userStore';
@@ -38,7 +38,7 @@ export function CompromissosScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<CommitmentsRoute>();
   const { commitments, commitmentsLoading, commitmentsError, refetchCommitments } =
-    useCommitments();
+    useCommitmentSummaries();
   const { groups } = useGroups();
   const { unreadCount } = useNotifications();
   const profile = useUserStore((state) => state.profile);
@@ -65,12 +65,7 @@ export function CompromissosScreen() {
   );
 
   const isVencido = useCallback(
-    (commitment: (typeof commitments)[number]) => {
-      const days = diffDays(commitment.dueDate);
-      return (
-        commitment.status !== 'paid' && days !== null && days < 0
-      );
-    },
+    (commitment: (typeof commitments)[number]) => commitment.overdue,
     [],
   );
 
@@ -113,7 +108,7 @@ export function CompromissosScreen() {
           <Box width="100%" px={isSmallPhone ? 'sm' : 'md'} pt="md">
             <ScreenHeader
               title="Compromissos"
-              subtitle="Despesas, contas e compromissos do grupo"
+              subtitle="Contas e despesas do grupo"
             >
               <Button
                 title="Novo compromisso"
@@ -202,7 +197,14 @@ export function CompromissosScreen() {
                 <CommitmentCard
                   key={commitment.id}
                   commitment={commitment}
-                  onPress={(id) => navigation.navigate('CommitmentDetail', { id })}
+                  onPress={(id) => {
+                    const selected = commitments.find((item) => item.id === id);
+                    navigation.navigate('CommitmentDetail', {
+                      id,
+                      groupId: selected?.groupId,
+                      groupName: selected?.groupName,
+                    });
+                  }}
                 />
               ))
             )}
