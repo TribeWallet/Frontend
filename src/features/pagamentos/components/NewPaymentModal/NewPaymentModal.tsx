@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as DocumentPicker from 'expo-document-picker';
+import { File as ExpoFile, Paths } from 'expo-file-system';
 import { Modal } from '../../../../components/Modal';
 import { Input } from '../../../../components/Input';
 import { Button } from '../../../../components/Button';
@@ -140,12 +141,14 @@ export function NewPaymentModal({
   const pickComprovante = useCallback(async () => {
     const result = await DocumentPicker.getDocumentAsync({
       type: 'application/pdf',
-      copyToCacheDirectory: true,
+      copyToCacheDirectory: false,
     });
     if (result.canceled) return;
     const file = result.assets[0];
+    const cachedFile = new ExpoFile(Paths.cache, `payment-receipt-${Date.now()}.pdf`);
+    await new ExpoFile(file.uri).copy(cachedFile);
     setComprovante({
-      uri: file.uri,
+      uri: cachedFile.uri,
       name: file.name || 'comprovante.pdf',
       type: file.mimeType || 'application/pdf',
     });

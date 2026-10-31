@@ -1,4 +1,5 @@
 import { environment } from '../../config/environment';
+import { File as ExpoFile } from 'expo-file-system';
 import { getAuthToken, handleUnauthorized } from './interceptors';
 
 export class ApiError extends Error {
@@ -35,6 +36,24 @@ function extractErrorMessage(body: string, status: number): string {
   } catch {
     return body;
   }
+}
+
+function normalizeFormData(form: FormData): FormData {
+  const normalizedForm = new FormData();
+  for (const [field, value] of form.entries()) {
+    if (typeof value === 'object' && value !== null && 'uri' in value) {
+      const filePart = value as { uri: string; name: string; type: string };
+      const file = new ExpoFile(filePart.uri);
+      normalizedForm.append(field, {
+        name: filePart.name,
+        type: filePart.type,
+        bytes: () => file.bytes(),
+      } as unknown as Blob);
+    } else {
+      normalizedForm.append(field, value);
+    }
+  }
+  return normalizedForm;
 }
 
 async function request<T>(
@@ -97,10 +116,15 @@ async function requestForm<T>(
     response = await fetch(`${environment.apiUrl}${path}`, {
       method,
       headers,
-      body: form,
+      body: normalizeFormData(form),
       signal: controller.signal,
     });
-  } catch {
+  } catch (error) {
+    console.error('[upload] fetch failed', {
+      name: error instanceof Error ? error.name : typeof error,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     throw new ApiError(
       'Não foi possível conectar ao servidor. Verifique se a API está rodando: ' + environment.apiUrl,
       0,
