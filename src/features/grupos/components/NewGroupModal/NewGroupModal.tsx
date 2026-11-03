@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -273,6 +273,7 @@ export function NewGroupModal({
         isEdit ? 'Atualize as informações do grupo' : 'Crie um grupo e adicione integrantes'
       }
       showCloseButton
+      keyboardScrollEnabled={Platform.OS === 'android'}
       footer={
         <Box flexDirection="row" gap="sm">
           <Box flex={1}>
