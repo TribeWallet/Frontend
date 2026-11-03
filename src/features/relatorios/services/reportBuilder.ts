@@ -23,41 +23,50 @@ export function buildReport(
   groups: Group[],
   commitments: Commitment[],
   payments: Payment[],
+  usuarioToken: string,
 ): ReportSummary {
-  const totalPaid = payments.reduce((sum, payment) => sum + payment.amount, 0);
-  const totalOpen = commitments.reduce((sum, commitment) => {
-    const paid = commitment.splits.reduce((inner, split) => inner + split.paidAmount, 0);
-    return sum + Math.max(0, commitment.amount - paid);
+  const userCommitments = commitments.filter((commitment) =>
+    commitment.splits.some((split) => split.memberId === usuarioToken),
+  );
+  const userPayments = payments.filter((payment) => payment.payerId === usuarioToken);
+
+  const totalPaid = userPayments.reduce((sum, payment) => sum + payment.amount, 0);
+  const totalOpen = userCommitments.reduce((sum, commitment) => {
+    const userSplit = commitment.splits.find((split) => split.memberId === usuarioToken);
+    if (!userSplit) return sum;
+    return sum + Math.max(0, userSplit.amount - userSplit.paidAmount);
   }, 0);
 
   const categoryMap = new Map<string, number>();
   const groupMap = new Map<string, number>();
   const methodMap = new Map<string, number>();
-  payments.forEach((payment) => {
+  userPayments.forEach((payment) => {
     sumInto(categoryMap, payment.category, payment.amount);
     sumInto(groupMap, payment.groupName, payment.amount);
     sumInto(methodMap, paymentMethodLabels[payment.method], payment.amount);
   });
 
-  const upcoming = commitments
-    .filter((commitment) => {
-      const paid = commitment.splits.reduce((inner, split) => inner + split.paidAmount, 0);
-      return commitment.amount - paid > 0.01;
+  const upcoming = userCommitments
+    .flatMap((commitment) => {
+      const userSplit = commitment.splits.find((split) => split.memberId === usuarioToken);
+      if (!userSplit) return [];
+      const remaining = Math.max(0, userSplit.amount - userSplit.paidAmount);
+      return remaining > 0.01 ? [{ commitment, remaining }] : [];
     })
-    .sort((a, b) => a.date.localeCompare(b.date))
+    .sort((a, b) => a.commitment.date.localeCompare(b.commitment.date))
     .slice(0, 5)
-    .map((commitment) => ({
+    .map(({ commitment, remaining }) => ({
       name: commitment.name,
       dueDate: commitment.dueDate,
-      amount: commitment.amount,
+      amount: remaining,
       groupName: commitment.groupName,
     }));
 
   return {
     totalPaid,
     totalOpen,
-    commitmentsCount: commitments.length,
-    paymentsCount: payments.length,
+    commitmentsCount: userCommitments.length,
+    paymentsCount: userPayments.length,
     groupsCount: groups.length,
     byCategory: Array.from(categoryMap.entries())
       .map(([label, total]) => ({ label, total }))

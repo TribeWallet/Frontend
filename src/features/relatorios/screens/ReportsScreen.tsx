@@ -43,14 +43,19 @@ export function ReportsScreen() {
   const isSmallPhone = width < 360;
 
   const summary = useMemo(() => {
+    if (!usuarioToken) return buildReport([], [], [], '');
+
+    const filteredGroups = groupFilter === 'all'
+      ? groups
+      : groups.filter((group) => group.id === groupFilter);
     const filteredCommitments = groupFilter === 'all'
       ? commitments
       : commitments.filter((c) => c.groupId === groupFilter);
     const filteredPayments = groupFilter === 'all'
       ? payments
       : payments.filter((p) => p.groupId === groupFilter);
-    return buildReport(groups, filteredCommitments, filteredPayments);
-  }, [groupFilter, groups, commitments, payments]);
+    return buildReport(filteredGroups, filteredCommitments, filteredPayments, usuarioToken);
+  }, [groupFilter, groups, commitments, payments, usuarioToken]);
 
   const handleShare = async () => {
     if (!usuarioToken) {
