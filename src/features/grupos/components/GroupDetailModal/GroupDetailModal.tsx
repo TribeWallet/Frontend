@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { Modal } from '../../../../components/Modal';
 import { Pill } from '../../../../components/Pill';
 import { Button } from '../../../../components/Button';
@@ -8,7 +8,8 @@ import { CommitmentCard } from '../../../../features/compromissos/components/Com
 import { CommitmentDetailModal } from '../../../../features/compromissos/components/CommitmentDetailModal/CommitmentDetailModal';
 import { NewGroupModal } from '../NewGroupModal/NewGroupModal';
 import { NewCommitmentModal } from '../../../../features/compromissos/components/NewCommitmentModal/NewCommitmentModal';
-import { useAppCommitments } from '../../../../contexts/AppContext';
+import { useAppCommitments, useAppGroups } from '../../../../contexts/AppContext';
+import { getErrorMessage } from '../../../../services/api/apiClient';
 import type { Group } from '../../types/Group';
 import type { Commitment } from '../../../../features/compromissos/types/Commitment';
 import { formatCurrency } from '../../../../utils/currency';
@@ -21,11 +22,35 @@ interface GroupDetailModalProps {
 
 export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalProps) {
   const { commitments } = useAppCommitments();
+  const { deleteGroup } = useAppGroups();
 
   const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [newCommitment, setNewCommitment] = useState(false);
   const [detailCommitment, setDetailCommitment] = useState<Commitment | null>(null);
   const [editingCommitment, setEditingCommitment] = useState<Commitment | null>(null);
+
+  const handleDelete = () => {
+    if (!group) return;
+    Alert.alert('Excluir grupo', `Tem certeza que deseja excluir "${group.name}"?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Excluir',
+        style: 'destructive',
+        onPress: async () => {
+          setDeleting(true);
+          try {
+            await deleteGroup(group.id);
+            onClose();
+          } catch (error) {
+            Alert.alert('Não foi possível excluir o grupo', getErrorMessage(error));
+          } finally {
+            setDeleting(false);
+          }
+        },
+      },
+    ]);
+  };
 
   if (!group) return null;
 
@@ -55,12 +80,27 @@ export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalPr
       subtitle={group.description}
       showCloseButton
       footer={
-        <Button
-          title="Editar grupo"
-          onPress={() => setEditing(true)}
-          variant="outline"
-          fullWidth
-        />
+        <Box flexDirection="row" gap="sm">
+          <Box flex={1}>
+            <Button
+              title="Editar"
+              onPress={() => setEditing(true)}
+              variant="outline"
+              disabled={deleting}
+              fullWidth
+            />
+          </Box>
+          <Box flex={1}>
+            <Button
+              title="Excluir"
+              onPress={handleDelete}
+              variant="danger"
+              loading={deleting}
+              disabled={deleting}
+              fullWidth
+            />
+          </Box>
+        </Box>
       }
     >
       <Box gap="md">
@@ -167,7 +207,6 @@ export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalPr
         visible={editing}
         group={group}
         onClose={() => setEditing(false)}
-        onDeleted={onClose}
       />
       <NewCommitmentModal
         visible={newCommitment}

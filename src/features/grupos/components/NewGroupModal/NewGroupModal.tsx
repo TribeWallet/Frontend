@@ -35,7 +35,6 @@ interface NewGroupModalProps {
   visible: boolean;
   onClose: () => void;
   onCreated?: (group: Group) => void;
-  onDeleted?: () => void;
   group?: Group | null;
 }
 
@@ -49,10 +48,9 @@ export function NewGroupModal({
   visible,
   onClose,
   onCreated,
-  onDeleted,
   group,
 }: NewGroupModalProps) {
-  const { addGroup, updateGroup, deleteGroup, addGroupMembers, removeGroupMember } =
+  const { addGroup, updateGroup, addGroupMembers, removeGroupMember } =
     useAppGroups();
   const currentUser = useAuthStore((state) => state.user);
   const isEdit = Boolean(group);
@@ -240,30 +238,6 @@ export function NewGroupModal({
     }
   });
 
-  const handleDelete = () => {
-    if (!group) return;
-    Alert.alert('Excluir grupo', `Tem certeza que deseja excluir "${group.name}"?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Excluir',
-        style: 'destructive',
-        onPress: async () => {
-          setSubmitting(true);
-          setSubmitError(null);
-          try {
-            await deleteGroup(group.id);
-            handleClose();
-            onDeleted?.();
-          } catch (error) {
-            setSubmitError(getErrorMessage(error));
-          } finally {
-            setSubmitting(false);
-          }
-        },
-      },
-    ]);
-  };
-
   return (
     <Modal
       visible={visible}
@@ -279,17 +253,6 @@ export function NewGroupModal({
           <Box flex={1}>
             <Button title="Cancelar" onPress={handleClose} variant="outline" fullWidth />
           </Box>
-          {isEdit ? (
-            <Box flex={1}>
-              <Button
-                title="Excluir"
-                onPress={handleDelete}
-                variant="danger"
-                disabled={submitting}
-                fullWidth
-              />
-            </Box>
-          ) : null}
           <Box flex={1}>
             <Button
               title={isEdit ? 'Salvar' : 'Criar grupo'}
