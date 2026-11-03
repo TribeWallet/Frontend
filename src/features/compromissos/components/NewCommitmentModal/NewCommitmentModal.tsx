@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Platform } from 'react-native';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -241,6 +242,7 @@ export function NewCommitmentModal({
         isEdit ? 'Atualize os dados do compromisso' : 'Defina um compromisso para o grupo'
       }
       showCloseButton
+      keyboardScrollEnabled={Platform.OS === 'android'}
       footer={
         <Box flexDirection="row" gap="sm">
           <Box flex={1}>
