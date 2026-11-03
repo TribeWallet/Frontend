@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, useWindowDimensions } from 'react-native';
+import { Alert, ScrollView, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TopBar } from '../../../components/TopBar';
@@ -16,6 +16,7 @@ import {
 import { buildReport } from '../services/reportBuilder';
 import { shareReport } from '../services/reportSharing';
 import { useTopBarActions } from '../../../hooks/useTopBarActions';
+import { useAuthStore } from '../../auth/stores/authStore';
 import { useUserStore } from '../../usuario/stores/userStore';
 import { formatCurrency } from '../../../utils/currency';
 
@@ -23,11 +24,13 @@ export function ReportsScreen() {
   const { width } = useWindowDimensions();
   const topBar = useTopBarActions();
   const profile = useUserStore((state) => state.profile);
+  const usuarioToken = useAuthStore((state) => state.user?.id);
   const groups = useAppGroups().groups;
   const commitments = useAppCommitments().commitments;
   const payments = useAppPayments().payments;
 
   const [groupFilter, setGroupFilter] = useState<string>('all');
+  const [exporting, setExporting] = useState(false);
 
   const groupOptions = useMemo<SelectOption[]>(
     () => [
@@ -49,8 +52,23 @@ export function ReportsScreen() {
     return buildReport(groups, filteredCommitments, filteredPayments);
   }, [groupFilter, groups, commitments, payments]);
 
-  const handleShare = () => {
-    shareReport(summary);
+  const handleShare = async () => {
+    if (!usuarioToken) {
+      Alert.alert('Erro', 'Não foi possível identificar o usuário da sessão.');
+      return;
+    }
+
+    setExporting(true);
+    try {
+      await shareReport(usuarioToken);
+    } catch (error) {
+      Alert.alert(
+        'Erro',
+        error instanceof Error ? error.message : 'Não foi possível exportar o relatório.',
+      );
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -75,6 +93,7 @@ export function ReportsScreen() {
               <Button
                 title="Exportar relatório"
                 onPress={handleShare}
+                loading={exporting}
                 fullWidth
               />
             </ScreenHeader>

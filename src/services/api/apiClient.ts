@@ -1,5 +1,5 @@
 import { environment } from '../../config/environment';
-import { File as ExpoFile } from 'expo-file-system';
+import { File as ExpoFile, Paths } from 'expo-file-system';
 import { getAuthToken, handleUnauthorized } from './interceptors';
 
 export class ApiError extends Error {
@@ -98,6 +98,52 @@ async function request<T>(
   return (text ? JSON.parse(text) : undefined) as T;
 }
 
+async function downloadPdf(path: string, filename: string): Promise<ExpoFile> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = { Accept: 'application/pdf' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), environment.requestTimeoutMs);
+
+  let response: Response;
+  try {
+    response = await fetch(`${environment.apiUrl}${path}`, {
+      method: 'GET',
+      headers,
+      signal: controller.signal,
+    });
+  } catch {
+    throw new ApiError(
+      'Não foi possível conectar ao servidor. Verifique se a API está rodando: ' + environment.apiUrl,
+      0,
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (!response.ok) {
+    const text = await response.text();
+    if (response.status === 401 && token) handleUnauthorized();
+    throw new ApiError(extractErrorMessage(text, response.status), response.status);
+  }
+
+  const contentType = response.headers.get('content-type')?.split(';')[0].trim().toLowerCase();
+  if (contentType !== 'application/pdf' && contentType !== 'application/octet-stream') {
+    throw new ApiError('A API não retornou um arquivo PDF.', 502);
+  }
+
+  const bytes = await response.arrayBuffer();
+  const signature = new Uint8Array(bytes).subarray(0, 5);
+  if (String.fromCharCode(...signature) !== '%PDF-') {
+    throw new ApiError('O arquivo recebido não é um PDF válido.', 502);
+  }
+
+  const file = new ExpoFile(Paths.cache, filename);
+  await file.write(bytes);
+  return file;
+}
+
 async function requestForm<T>(
   method: HttpMethod,
   path: string,
@@ -151,6 +197,7 @@ export const apiClient = {
     request<T>('PUT', path, { ...options, body }),
   delete: <T = void>(path: string, options?: RequestOptions) =>
     request<T>('DELETE', path, options),
+  downloadPdf,
   postForm: <T>(path: string, form: FormData, options?: { auth?: boolean }) =>
     requestForm<T>('POST', path, form, options),
   putForm: <T>(path: string, form: FormData, options?: { auth?: boolean }) =>
