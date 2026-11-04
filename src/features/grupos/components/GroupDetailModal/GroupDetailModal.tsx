@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, View } from 'react-native';
+import { Alert, Share, View } from 'react-native';
 import { Modal } from '../../../../components/Modal';
 import { Pill } from '../../../../components/Pill';
 import { Button } from '../../../../components/Button';
@@ -10,6 +10,7 @@ import { NewGroupModal } from '../NewGroupModal/NewGroupModal';
 import { NewCommitmentModal } from '../../../../features/compromissos/components/NewCommitmentModal/NewCommitmentModal';
 import { useAppCommitments, useAppGroups } from '../../../../contexts/AppContext';
 import { getErrorMessage } from '../../../../services/api/apiClient';
+import { createConvite } from '../../services/conviteService';
 import type { Group } from '../../types/Group';
 import type { Commitment } from '../../../../features/compromissos/types/Commitment';
 import { formatCurrency } from '../../../../utils/currency';
@@ -26,6 +27,7 @@ export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalPr
 
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [inviting, setInviting] = useState(false);
   const [newCommitment, setNewCommitment] = useState(false);
   const [detailCommitment, setDetailCommitment] = useState<Commitment | null>(null);
   const [editingCommitment, setEditingCommitment] = useState<Commitment | null>(null);
@@ -50,6 +52,21 @@ export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalPr
         },
       },
     ]);
+  };
+
+  const handleInvite = async () => {
+    if (!group) return;
+    setInviting(true);
+    try {
+      const convite = await createConvite(group.id);
+      await Share.share({
+        message: `Entre no grupo "${group.name}" no Tribe Wallet: ${convite.link}`,
+      });
+    } catch (error) {
+      Alert.alert('Não foi possível gerar o link', getErrorMessage(error));
+    } finally {
+      setInviting(false);
+    }
   };
 
   if (!group) return null;
@@ -137,9 +154,14 @@ export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalPr
           >
             <Box flexDirection="row" alignItems="center" justifyContent="space-between">
               <Text variant="bodyStrong">Integrantes</Text>
-              <Text variant="caption" color="textSecondary">
-                {group.members.length} {group.members.length === 1 ? 'pessoa' : 'pessoas'}
-              </Text>
+              <Button
+                title="Convidar por link"
+                variant="outline"
+                size="sm"
+                onPress={handleInvite}
+                loading={inviting}
+                disabled={inviting}
+              />
             </Box>
             {group.members.map((member) => (
               <Box

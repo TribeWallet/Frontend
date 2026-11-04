@@ -18,6 +18,12 @@ export const endpoints = {
     integrantes: (grupoToken: string) => `/api/grupos/${grupoToken}/integrantes`,
     integrante: (grupoToken: string, integranteToken: string) =>
       `/api/grupos/${grupoToken}/integrantes/${integranteToken}`,
+    convites: (grupoToken: string) => `/api/grupos/${grupoToken}/convites`,
+  },
+  convites: {
+    byToken: (conviteToken: string) => `/api/convites/${encodeURIComponent(conviteToken)}`,
+    aceitar: (conviteToken: string) =>
+      `/api/convites/${encodeURIComponent(conviteToken)}/aceitar`,
   },
   compromissos: {
     byUsuario: (usuarioToken: string) => `/api/compromissos/usuario/${usuarioToken}`,
