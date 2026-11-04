@@ -5,8 +5,9 @@ export type GroupTone = 'blue' | 'green' | 'family';
 export type GroupTagTone = PillTone | 'blue' | 'green';
 
 export interface GroupMember {
-  /** usuarioToken. */
+  /** usuarioToken quando fornecido pela API; caso contrário, integranteToken. */
   id: string;
+  usuarioToken?: string;
   /** integranteToken: o vínculo com este grupo, usado nos compromissos. */
   integranteToken: string;
   name: string;

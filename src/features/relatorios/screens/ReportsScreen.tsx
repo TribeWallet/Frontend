@@ -1,56 +1,92 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, useWindowDimensions } from 'react-native';
+import { Alert, ScrollView, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useQuery } from '@tanstack/react-query';
 
 import { TopBar } from '../../../components/TopBar';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { Pill } from '../../../components/Pill';
 import { Select, SelectOption } from '../../../components/Select';
 import { Button } from '../../../components/Button';
+import { Loading } from '../../../components/Loading';
 import { Box, Text } from '../../../theme';
-import {
-  useAppCommitments,
-  useAppGroups,
-  useAppPayments,
-} from '../../../contexts/AppContext';
-import { buildReport } from '../services/reportBuilder';
+import { getErrorMessage } from '../../../services/api/apiClient';
+import { MetodoPagamento } from '../../../types/ApiResponse';
+import { paymentMethodLabels } from '../../pagamentos/types/Payment';
 import { shareReport } from '../services/reportSharing';
+import { getGroupReport, getUserReport } from '../services/reportService';
 import { useTopBarActions } from '../../../hooks/useTopBarActions';
+import { useAuthStore } from '../../auth/stores/authStore';
 import { useUserStore } from '../../usuario/stores/userStore';
 import { formatCurrency } from '../../../utils/currency';
+import { isoToBR } from '../../../utils/date';
+
+const paymentMethodLabelsById: Record<number, string> = {
+  [MetodoPagamento.pix]: paymentMethodLabels.pix,
+  [MetodoPagamento.dinheiro]: paymentMethodLabels.dinheiro,
+  [MetodoPagamento.cartaoCredito]: paymentMethodLabels.credito,
+  [MetodoPagamento.cartaoDebito]: paymentMethodLabels.debito,
+  [MetodoPagamento.transferenciaBancaria]: paymentMethodLabels.transferencia,
+  [MetodoPagamento.boleto]: paymentMethodLabels.boleto,
+};
 
 export function ReportsScreen() {
   const { width } = useWindowDimensions();
   const topBar = useTopBarActions();
   const profile = useUserStore((state) => state.profile);
-  const groups = useAppGroups().groups;
-  const commitments = useAppCommitments().commitments;
-  const payments = useAppPayments().payments;
+  const usuarioToken = useAuthStore((state) => state.user?.id);
 
   const [groupFilter, setGroupFilter] = useState<string>('all');
+  const [exporting, setExporting] = useState(false);
+
+  const userReportQuery = useQuery({
+    queryKey: ['relatorio', 'usuario', usuarioToken],
+    queryFn: () => getUserReport(usuarioToken as string),
+    enabled: Boolean(usuarioToken),
+  });
+  const groupReportQuery = useQuery({
+    queryKey: ['relatorio', 'usuario', usuarioToken, 'grupo', groupFilter],
+    queryFn: () => getGroupReport(usuarioToken as string, groupFilter),
+    enabled: Boolean(usuarioToken) && groupFilter !== 'all',
+  });
 
   const groupOptions = useMemo<SelectOption[]>(
     () => [
       { id: 'all', label: 'Todos os grupos' },
-      ...groups.map((group) => ({ id: group.id, label: group.name })),
+      ...(userReportQuery.data?.grupos ?? []).map((group) => ({
+        id: group.grupoToken,
+        label: group.nomeGrupo,
+      })),
     ],
-    [groups],
+    [userReportQuery.data?.grupos],
   );
 
   const isSmallPhone = width < 360;
+  const report = groupFilter === 'all' ? userReportQuery.data : groupReportQuery.data;
+  const reportLoading = groupFilter === 'all'
+    ? userReportQuery.isLoading
+    : groupReportQuery.isLoading;
+  const reportError = groupFilter === 'all'
+    ? userReportQuery.error
+    : groupReportQuery.error;
 
-  const summary = useMemo(() => {
-    const filteredCommitments = groupFilter === 'all'
-      ? commitments
-      : commitments.filter((c) => c.groupId === groupFilter);
-    const filteredPayments = groupFilter === 'all'
-      ? payments
-      : payments.filter((p) => p.groupId === groupFilter);
-    return buildReport(groups, filteredCommitments, filteredPayments);
-  }, [groupFilter, groups, commitments, payments]);
+  const handleShare = async () => {
+    if (!usuarioToken) {
+      Alert.alert('Erro', 'Não foi possível identificar o usuário da sessão.');
+      return;
+    }
 
-  const handleShare = () => {
-    shareReport(summary);
+    setExporting(true);
+    try {
+      await shareReport(usuarioToken, groupFilter === 'all' ? undefined : groupFilter);
+    } catch (error) {
+      Alert.alert(
+        'Erro',
+        error instanceof Error ? error.message : 'Não foi possível exportar o relatório.',
+      );
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -75,6 +111,7 @@ export function ReportsScreen() {
               <Button
                 title="Exportar relatório"
                 onPress={handleShare}
+                loading={exporting}
                 fullWidth
               />
             </ScreenHeader>
@@ -87,6 +124,16 @@ export function ReportsScreen() {
               options={groupOptions}
             />
 
+            {reportLoading ? (
+              <Box alignItems="center" py="xl">
+                <Loading label="Carregando relatório..." />
+              </Box>
+            ) : reportError ? (
+              <Text variant="caption" color="danger" mb="md">
+                {getErrorMessage(reportError)}
+              </Text>
+            ) : report ? (
+              <>
             <Box
               flexDirection="row"
               justifyContent="space-between"
@@ -97,11 +144,11 @@ export function ReportsScreen() {
             >
               <Box>
                 <Text variant="captionStrong" color="primary">PAGO</Text>
-                <Text variant="h2" color="primary">{formatCurrency(summary.totalPaid)}</Text>
+                <Text variant="h2" color="primary">{formatCurrency(report.totalPago)}</Text>
               </Box>
               <Box alignItems="flex-end">
                 <Text variant="captionStrong" color="danger">EM ABERTO</Text>
-                <Text variant="h2" color="danger">{formatCurrency(summary.totalOpen)}</Text>
+                <Text variant="h2" color="danger">{formatCurrency(report.totalDevido)}</Text>
               </Box>
             </Box>
 
@@ -114,12 +161,12 @@ export function ReportsScreen() {
               mb="md"
             >
               <Text variant="bodyStrong" mb="sm">Pagamentos por categoria</Text>
-              {summary.byCategory.length === 0 ? (
+              {report.totaisPagosPorCategorias.length === 0 ? (
                 <Text variant="caption" color="textSecondary">Nenhum pagamento registrado.</Text>
               ) : (
-                summary.byCategory.map(({ label, total }) => (
+                report.totaisPagosPorCategorias.map(({ categoria, valorPagoTotal }) => (
                   <Box
-                    key={label}
+                    key={categoria}
                     flexDirection="row"
                     alignItems="center"
                     justifyContent="space-between"
@@ -127,13 +174,14 @@ export function ReportsScreen() {
                     borderTopWidth={1}
                     borderColor="border"
                   >
-                    <Text variant="body">{label}</Text>
-                    <Text variant="bodyStrong">{formatCurrency(total)}</Text>
+                    <Text variant="body">{categoria}</Text>
+                    <Text variant="bodyStrong">{formatCurrency(valorPagoTotal)}</Text>
                   </Box>
                 ))
               )}
             </Box>
 
+            {groupFilter === 'all' ? (
             <Box
               bg="surface"
               borderRadius="md"
@@ -143,12 +191,12 @@ export function ReportsScreen() {
               mb="md"
             >
               <Text variant="bodyStrong" mb="sm">Pagamentos por grupo</Text>
-              {summary.byGroup.length === 0 ? (
+              {(userReportQuery.data?.grupos.length ?? 0) === 0 ? (
                 <Text variant="caption" color="textSecondary">Nenhum pagamento registrado.</Text>
               ) : (
-                summary.byGroup.map(({ groupName, total }) => (
+                userReportQuery.data?.grupos.map(({ grupoToken, nomeGrupo, totalPago }) => (
                   <Box
-                    key={groupName}
+                    key={grupoToken}
                     flexDirection="row"
                     alignItems="center"
                     justifyContent="space-between"
@@ -156,12 +204,13 @@ export function ReportsScreen() {
                     borderTopWidth={1}
                     borderColor="border"
                   >
-                    <Text variant="body">{groupName}</Text>
-                    <Text variant="bodyStrong">{formatCurrency(total)}</Text>
+                    <Text variant="body">{nomeGrupo}</Text>
+                    <Text variant="bodyStrong">{formatCurrency(totalPago)}</Text>
                   </Box>
                 ))
               )}
             </Box>
+            ) : null}
 
             <Box
               bg="surface"
@@ -172,12 +221,12 @@ export function ReportsScreen() {
               mb="md"
             >
               <Text variant="bodyStrong" mb="sm">Compromissos em aberto</Text>
-              {summary.upcoming.length === 0 ? (
+              {report.compromissosEmAberto.length === 0 ? (
                 <Text variant="caption" color="textSecondary">Nada em aberto.</Text>
               ) : (
-                summary.upcoming.map((item, index) => (
+                report.compromissosEmAberto.map((item, index) => (
                   <Box
-                    key={`${item.name}-${index}`}
+                    key={`${item.nome}-${index}`}
                     flexDirection="row"
                     alignItems="center"
                     justifyContent="space-between"
@@ -186,12 +235,12 @@ export function ReportsScreen() {
                     borderColor="border"
                   >
                     <Box flex={1} pr="sm">
-                      <Text variant="bodyStrong">{item.name}</Text>
+                      <Text variant="bodyStrong">{item.nome}</Text>
                       <Text variant="caption" color="textSecondary">
-                        {item.groupName} • {item.dueDate}
+                        {item.nomeGrupo} • {isoToBR(item.dataVencimento)}
                       </Text>
                     </Box>
-                    <Pill label={formatCurrency(item.amount)} tone="primary" />
+                    <Pill label={formatCurrency(item.valorEmAberto)} tone="primary" />
                   </Box>
                 ))
               )}
@@ -206,12 +255,12 @@ export function ReportsScreen() {
               mb="md"
             >
               <Text variant="bodyStrong" mb="sm">Pagamentos por forma</Text>
-              {summary.byMethod.length === 0 ? (
+              {report.totaisPagosPorMetodos.length === 0 ? (
                 <Text variant="caption" color="textSecondary">Nenhum pagamento registrado.</Text>
               ) : (
-                summary.byMethod.map(({ label, total }) => (
+                report.totaisPagosPorMetodos.map(({ metodoPagamento, totalPago }) => (
                   <Box
-                    key={label}
+                    key={metodoPagamento}
                     flexDirection="row"
                     alignItems="center"
                     justifyContent="space-between"
@@ -219,17 +268,21 @@ export function ReportsScreen() {
                     borderTopWidth={1}
                     borderColor="border"
                   >
-                    <Text variant="body">{label}</Text>
-                    <Text variant="bodyStrong">{formatCurrency(total)}</Text>
+                    <Text variant="body">
+                      {paymentMethodLabelsById[metodoPagamento] ?? `Método ${metodoPagamento}`}
+                    </Text>
+                    <Text variant="bodyStrong">{formatCurrency(totalPago)}</Text>
                   </Box>
                 ))
               )}
             </Box>
 
             <Text variant="caption" color="textSecondary" mb="md">
-              O relatório é compartilhado como arquivo HTML/texto pelos apps
+              O relatório é compartilhado como arquivo PDF pelos apps
               instalados (e-mail, mensageria, drive).
             </Text>
+              </>
+            ) : null}
           </Box>
         </ScrollView>
       </Box>

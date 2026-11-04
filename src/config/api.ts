@@ -20,6 +20,7 @@ export const endpoints = {
       `/api/grupos/${grupoToken}/integrantes/${integranteToken}`,
   },
   compromissos: {
+    byUsuario: (usuarioToken: string) => `/api/compromissos/usuario/${usuarioToken}`,
     byGrupo: (grupoToken: string) => `/api/compromissos/${grupoToken}`,
     byToken: (compromissoToken: string) => `/api/compromissos/${compromissoToken}`,
     /** Participações de um compromisso. */
@@ -27,6 +28,16 @@ export const endpoints = {
       `/api/compromissos/${compromissoToken}/integrantes`,
     participacao: (integranteCompromissoToken: string) =>
       `/api/compromissos/integrantes/${integranteCompromissoToken}`,
+  },
+  relatorios: {
+    byUsuario: (usuarioToken: string) =>
+      `/api/relatorios/usuario/${encodeURIComponent(usuarioToken)}`,
+    pdfByUsuario: (usuarioToken: string) =>
+      `/api/relatorios/usuario/${encodeURIComponent(usuarioToken)}/pdf`,
+    byGrupo: (usuarioToken: string, grupoToken: string) =>
+      `/api/relatorios/usuario/${encodeURIComponent(usuarioToken)}/grupo/${encodeURIComponent(grupoToken)}`,
+    pdfByGrupo: (usuarioToken: string, grupoToken: string) =>
+      `/api/relatorios/usuario/${encodeURIComponent(usuarioToken)}/grupo/${encodeURIComponent(grupoToken)}/pdf`,
   },
   // O controller usa a rota padrão api/[controller], por isso o nome no singular e capitalizado.
   pagamentos: {

@@ -32,6 +32,39 @@ export interface GrupoResponse {
   compromissos: CompromissoResponse[];
 }
 
+export interface GrupoUsuarioIntegranteResponse {
+  integranteToken: string;
+  usuarioToken?: string;
+  nome: string;
+  sobrenome: string;
+  email: string;
+  imagemUrl: string | null;
+  deletedAt: string | null;
+}
+
+export interface GrupoUsuarioCompromissoResponse {
+  compromissoFinanceiroToken: string;
+  titulo: string;
+  imagemUrl: string;
+  categoria: string | null;
+  valorTotal: number;
+  data: string;
+  deletedAt: string | null;
+}
+
+export interface GrupoUsuarioResponse {
+  grupoToken: string;
+  nome: string;
+  descricao: string | null;
+  integrantesCount: number;
+  compromissosCount: number;
+  totalEmAberto: number;
+  totalPago: number;
+  deletedAt: string | null;
+  integrantes: GrupoUsuarioIntegranteResponse[];
+  compromissos: GrupoUsuarioCompromissoResponse[];
+}
+
 /** TipoDivisao do backend (Domain/Entities/Enums.cs). */
 export const TipoDivisao = {
   igual: 1,
@@ -79,4 +112,42 @@ export interface CompromissoResponse {
   deletedAt: string | null;
   grupo: GrupoResponse | null;
   participacoes: IntegranteCompromissoResumoResponse[];
+}
+
+export interface CompromissoUsuarioIntegranteResponse {
+  integranteToken: string;
+  usuarioToken: string;
+  nome: string;
+  sobrenome: string;
+  email: string;
+  imagemUrl: string | null;
+  valorPago: number;
+  valorDevedor: number;
+  valorRestante: number;
+  somaPagamentosPorMetodo: Record<string, number>;
+  quitado: boolean;
+  deletedAt: string | null;
+}
+
+export interface CompromissoUsuarioResponse {
+  compromissoFinanceiroToken: string;
+  grupoToken: string;
+  titulo: string;
+  imagem: string | null;
+  situacaoPagamento: number;
+  dataVencimento: string;
+  diasParaVencimento: number;
+  vencido: boolean;
+  tipoDivisao: number;
+  valorTotal: number;
+  valorPagoTotal: number;
+  valorRestanteTotal: number;
+  progressoPagamentos: number;
+  categoria: string | null;
+  nomeGrupo: string;
+  integrantesQuitadosCount: number;
+  integrantesDevendoCount: number;
+  integrantesTotalCount: number;
+  integrantes: CompromissoUsuarioIntegranteResponse[];
+  deletedAt: string | null;
 }

@@ -171,7 +171,7 @@ export function SideMenu({
         items: [
           { id: 'home', label: 'Início', Icon: HomeIcon },
           { id: 'groups', label: 'Grupos', Icon: GroupsIcon },
-          { id: 'commitments', label: 'Despesas', Icon: PayIcon },
+          { id: 'commitments', label: 'Compromissos', Icon: PayIcon },
           //{ id: 'payments', label: 'Pagamentos', Icon: PayIcon },
           { id: 'reports', label: 'Relatórios', Icon: ReportsIcon },
           { id: 'alerts', label: 'Notificações', Icon: BellIcon },

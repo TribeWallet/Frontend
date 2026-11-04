@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  Keyboard,
   Modal as RNModal,
   Pressable,
   KeyboardAvoidingView,
@@ -7,9 +8,11 @@ import {
   ScrollView,
   StyleProp,
   StyleSheet,
+  UIManager,
   View,
   ViewStyle,
 } from 'react-native';
+import type { HostInstance } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -31,6 +34,7 @@ export interface ModalProps {
   showCloseButton?: boolean;
   contentStyle?: StyleProp<ViewStyle>;
   scrollable?: boolean;
+  keyboardScrollEnabled?: boolean;
   /** Action bar pinned at the bottom (e.g. [Cancel, Save]). */
   footer?: React.ReactNode;
   /** If true, dismiss on tap outside (default true). */
@@ -70,10 +74,79 @@ export function Modal({
   showCloseButton = true,
   contentStyle,
   scrollable = true,
+  keyboardScrollEnabled = false,
   footer,
   dismissOnBackdrop = true,
 }: ModalProps) {
   const insets = useSafeAreaInsets();
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const scrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
+  const focusedInput = useRef<number | HostInstance | null>(null);
+  const keyboardScreenY = useRef<number | null>(null);
+  const scrollOffset = useRef(0);
+  const scrollFocusedInputAfterLayout = useRef(false);
+
+  const scrollFocusedInputIntoView = () => {
+    const target = focusedInput.current;
+    const screenY = keyboardScreenY.current;
+    const scrollView = scrollRef.current;
+    if (target == null || screenY == null || !scrollView) return;
+
+    const onInputMeasured = (
+      _x: number,
+      inputY: number,
+      _width: number,
+      inputHeight: number,
+    ) => {
+      scrollView.measureInWindow((_scrollX, scrollY, _scrollWidth, scrollHeight) => {
+        const visibleTop = scrollY + 12;
+        const visibleBottom = Math.min(scrollY + scrollHeight, screenY) - 12;
+        const inputBottom = inputY + inputHeight;
+        const adjustment =
+          inputBottom > visibleBottom
+            ? inputBottom - visibleBottom
+            : inputY < visibleTop
+              ? inputY - visibleTop
+              : 0;
+
+        if (adjustment === 0) return;
+        scrollView.scrollTo({
+          y: Math.max(0, scrollOffset.current + adjustment),
+          animated: true,
+        });
+      });
+    };
+
+    if (typeof target === 'number') {
+      UIManager.measureInWindow(target, onInputMeasured);
+    } else {
+      target.measureInWindow(onInputMeasured);
+    }
+  };
+
+  useEffect(() => {
+    if (!visible || !keyboardScrollEnabled || Platform.OS !== 'android') {
+      keyboardScreenY.current = null;
+      setKeyboardHeight(0);
+      return;
+    }
+
+    const showSubscription = Keyboard.addListener('keyboardDidShow', (event) => {
+      keyboardScreenY.current = event.endCoordinates.screenY;
+      scrollFocusedInputAfterLayout.current = true;
+      setKeyboardHeight(event.endCoordinates.height);
+    });
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+      keyboardScreenY.current = null;
+      scrollFocusedInputAfterLayout.current = false;
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [keyboardScrollEnabled, visible]);
 
   return (
     <RNModal
@@ -204,13 +277,35 @@ export function Modal({
             >
               {scrollable ? (
                 <ScrollView
+                  ref={scrollRef}
                   style={scrollStyle.scroll}
                   contentContainerStyle={[
                     scrollStyle.content,
-                    footer ? { paddingBottom: 16 } : null,
+                    {
+                      paddingBottom:
+                        scrollStyle.content.paddingBottom +
+                        (footer ? 16 : 0) +
+                        (keyboardScrollEnabled ? keyboardHeight : 0),
+                    },
                   ]}
                   showsVerticalScrollIndicator={false}
                   keyboardShouldPersistTaps="handled"
+                  scrollEventThrottle={16}
+                  onScroll={(event) => {
+                    scrollOffset.current = event.nativeEvent.contentOffset.y;
+                  }}
+                  onContentSizeChange={() => {
+                    if (!scrollFocusedInputAfterLayout.current) return;
+                    scrollFocusedInputAfterLayout.current = false;
+                    requestAnimationFrame(scrollFocusedInputIntoView);
+                  }}
+                  onFocusCapture={(event) => {
+                    if (!keyboardScrollEnabled || Platform.OS !== 'android') return;
+                    focusedInput.current = event.nativeEvent.target ?? null;
+                    if (keyboardScreenY.current !== null) {
+                      requestAnimationFrame(scrollFocusedInputIntoView);
+                    }
+                  }}
                 >
                   {children}
                 </ScrollView>

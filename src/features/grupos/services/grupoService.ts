@@ -3,7 +3,7 @@ import { endpoints } from '../../../config/api';
 import { getStoredValue, setStoredValue, StorageKeys } from '../../../services/storage';
 import { formatCurrency } from '../../../utils/currency';
 import { fullName, initialsFromName } from '../../../utils/formatters';
-import type { GrupoResponse } from '../../../types/ApiResponse';
+import type { GrupoResponse, GrupoUsuarioResponse } from '../../../types/ApiResponse';
 import type { Group, GroupMember, GroupTone } from '../types/Group';
 
 export interface CreateGrupoInput {
@@ -17,13 +17,13 @@ export interface UpdateGrupoInput {
   descricao: string;
 }
 
-export async function listGrupos(usuarioToken: string): Promise<GrupoResponse[]> {
-  const grupos = await apiClient.get<GrupoResponse[]>(
-    `${endpoints.grupos.byUsuario(usuarioToken)}?deleted=false`,
+export async function listGrupos(usuarioToken: string): Promise<GrupoUsuarioResponse[]> {
+  const grupos = await apiClient.get<GrupoUsuarioResponse[]>(
+    endpoints.grupos.byUsuario(usuarioToken),
   );
   // A exclusão é soft delete: filtra o que já foi excluído.
   const activeGroups = grupos.filter((grupo) => !grupo.deletedAt);
-  const uniqueGroups = new Map<string, GrupoResponse>();
+  const uniqueGroups = new Map<string, GrupoUsuarioResponse>();
   activeGroups.forEach((grupo) => uniqueGroups.set(grupo.grupoToken, grupo));
   return [...uniqueGroups.values()];
 }
@@ -101,25 +101,43 @@ function resolveTone(name: string): GroupTone {
   return found?.tone ?? 'blue';
 }
 
-export async function toGroup(grupo: GrupoResponse): Promise<Group> {
+export async function toGroup(grupo: GrupoResponse | GrupoUsuarioResponse): Promise<Group> {
   const tone =
     (await getStoredValue<ToneMap>(StorageKeys.groupTones))?.[grupo.grupoToken] ??
     resolveTone(grupo.nome);
 
-  const members: GroupMember[] = (grupo.integrantes ?? [])
-    .filter((integrante) => !integrante.deletedAt && !integrante.usuario.deletedAt)
-    .map((integrante) => {
-      const { usuario } = integrante;
+  const members: GroupMember[] = (grupo.integrantes ?? []).flatMap((integrante) => {
+    if (!integrante || integrante.deletedAt) return [];
+
+    if ('usuario' in integrante) {
+      const usuario = integrante.usuario;
+      if (!usuario || usuario.deletedAt) return [];
       const name = fullName(usuario.nome, usuario.sobrenome);
-      // O id do integrante é o usuarioToken, o mesmo id que o app usa para o usuário logado.
-      return {
+      return [{
         id: usuario.usuarioToken,
+        usuarioToken: usuario.usuarioToken,
         integranteToken: integrante.integranteToken,
         name,
         email: usuario.email,
         initials: initialsFromName(name),
-      };
-    });
+      }];
+    }
+
+    const name = fullName(integrante.nome, integrante.sobrenome);
+    const id = integrante.usuarioToken ?? integrante.integranteToken;
+    return [{
+      id,
+      usuarioToken: integrante.usuarioToken,
+      integranteToken: integrante.integranteToken,
+      name,
+      email: integrante.email,
+      initials: initialsFromName(name),
+    }];
+  });
+
+  const memberCount = 'integrantesCount' in grupo ? grupo.integrantesCount : members.length;
+  const openValue = 'totalEmAberto' in grupo ? grupo.totalEmAberto : 0;
+  const paidValue = 'totalPago' in grupo ? grupo.totalPago : 0;
 
   return {
     id: grupo.grupoToken,
@@ -128,9 +146,9 @@ export async function toGroup(grupo: GrupoResponse): Promise<Group> {
     description: grupo.descricao ?? '',
     tags: [{ label: TONE_LABELS[tone], tone: 'neutral' }],
     summary: {
-      members: members.length,
-      openValue: formatCurrency(0),
-      paidValue: formatCurrency(0),
+      members: memberCount,
+      openValue: formatCurrency(openValue),
+      paidValue: formatCurrency(paidValue),
     },
     members,
   };

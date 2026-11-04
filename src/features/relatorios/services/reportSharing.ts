@@ -1,53 +1,22 @@
-import { Alert, Platform, Share } from 'react-native';
+import * as Sharing from 'expo-sharing';
+import { apiClient } from '../../../services/api/apiClient';
+import { endpoints } from '../../../config/api';
 
-import type { ReportSummary } from './reportBuilder';
-import {
-  reportToHtml,
-  reportToText,
-} from './reportBuilder';
-
-export interface ShareOptions {
-  message?: string;
-}
-
-declare const Buffer: { from(value: string, encoding: string): { toString(encoding: string): string } } | undefined;
-
-export async function shareReport(
-  summary: ReportSummary,
-  options: ShareOptions = {},
-): Promise<void> {
-  try {
-    const html = reportToHtml(summary);
-    const text = reportToText(summary);
-    const title = options.message ?? 'Relatório Financeiro - TribeWallet';
-    const dataUrl = `data:text/html;base64,${toBase64(html)}`;
-    if (Platform.OS === 'ios' || Platform.OS === 'android') {
-      await Share.share(
-        {
-          title,
-          message: text,
-          url: dataUrl,
-        },
-        {
-          dialogTitle: title,
-          subject: title,
-        },
-      );
-    } else {
-      await Share.share({ title, message: text });
-    }
-  } catch (error) {
-    Alert.alert('Erro', 'Não foi possível compartilhar o relatório.');
+export async function shareReport(usuarioToken: string, grupoToken?: string): Promise<void> {
+  if (!(await Sharing.isAvailableAsync())) {
+    throw new Error('O compartilhamento de arquivos não está disponível neste dispositivo.');
   }
-}
 
-function toBase64(value: string): string {
-  const g = globalThis as unknown as { btoa?: (value: string) => string };
-  if (typeof g.btoa === 'function') {
-    return g.btoa(unescape(encodeURIComponent(value)));
-  }
-  if (typeof Buffer !== 'undefined') {
-    return Buffer.from(value, 'utf-8').toString('base64');
-  }
-  return value;
+  const file = await apiClient.downloadPdf(
+    grupoToken
+      ? endpoints.relatorios.pdfByGrupo(usuarioToken, grupoToken)
+      : endpoints.relatorios.pdfByUsuario(usuarioToken),
+    `tribewallet-relatorio-${Date.now()}.pdf`,
+  );
+
+  await Sharing.shareAsync(file.uri, {
+    mimeType: 'application/pdf',
+    UTI: 'com.adobe.pdf',
+    dialogTitle: 'Relatório Financeiro - TribeWallet',
+  });
 }

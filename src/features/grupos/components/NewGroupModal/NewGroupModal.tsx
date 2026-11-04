@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, ScrollView } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -15,7 +15,7 @@ import {
   findUsuarioByEmail,
   searchUsuariosByNome,
 } from '../../../usuario/services/usuarioService';
-import type { Group } from '../../types/Group';
+import type { Group, GroupMember } from '../../types/Group';
 
 const schema = z.object({
   name: z.string().min(2, 'Informe um nome com pelo menos 2 caracteres'),
@@ -35,7 +35,6 @@ interface NewGroupModalProps {
   visible: boolean;
   onClose: () => void;
   onCreated?: (group: Group) => void;
-  onDeleted?: () => void;
   group?: Group | null;
 }
 
@@ -49,10 +48,9 @@ export function NewGroupModal({
   visible,
   onClose,
   onCreated,
-  onDeleted,
   group,
 }: NewGroupModalProps) {
-  const { addGroup, updateGroup, deleteGroup, addGroupMembers, removeGroupMember } =
+  const { addGroup, updateGroup, addGroupMembers, removeGroupMember } =
     useAppGroups();
   const currentUser = useAuthStore((state) => state.user);
   const isEdit = Boolean(group);
@@ -95,6 +93,9 @@ export function NewGroupModal({
   }, [visible, group, reset]);
 
   const watched = watch();
+  const isCurrentUserMember = (member: GroupMember) =>
+    member.usuarioToken === currentUser?.id ||
+    member.email?.trim().toLowerCase() === currentUser?.email?.trim().toLowerCase();
 
   /** A API vincula integrantes por usuarioToken: só entra quem já tem conta. */
   const lookupUsuario = async (term: string): Promise<PendingMember | null> => {
@@ -147,7 +148,9 @@ export function NewGroupModal({
       if (!found) return;
 
       const alreadyInGroup = group?.members.some(
-        (member) => member.id === found.usuarioToken,
+        (member) =>
+          member.usuarioToken === found.usuarioToken ||
+          member.email?.trim().toLowerCase() === found.email.trim().toLowerCase(),
       );
       if (alreadyInGroup) {
         setMemberError('Esse integrante já está no grupo.');
@@ -235,30 +238,6 @@ export function NewGroupModal({
     }
   });
 
-  const handleDelete = () => {
-    if (!group) return;
-    Alert.alert('Excluir grupo', `Tem certeza que deseja excluir "${group.name}"?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Excluir',
-        style: 'destructive',
-        onPress: async () => {
-          setSubmitting(true);
-          setSubmitError(null);
-          try {
-            await deleteGroup(group.id);
-            handleClose();
-            onDeleted?.();
-          } catch (error) {
-            setSubmitError(getErrorMessage(error));
-          } finally {
-            setSubmitting(false);
-          }
-        },
-      },
-    ]);
-  };
-
   return (
     <Modal
       visible={visible}
@@ -268,22 +247,12 @@ export function NewGroupModal({
         isEdit ? 'Atualize as informações do grupo' : 'Crie um grupo e adicione integrantes'
       }
       showCloseButton
+      keyboardScrollEnabled={Platform.OS === 'android'}
       footer={
         <Box flexDirection="row" gap="sm">
           <Box flex={1}>
             <Button title="Cancelar" onPress={handleClose} variant="outline" fullWidth />
           </Box>
-          {isEdit ? (
-            <Box flex={1}>
-              <Button
-                title="Excluir"
-                onPress={handleDelete}
-                variant="danger"
-                disabled={submitting}
-                fullWidth
-              />
-            </Box>
-          ) : null}
           <Box flex={1}>
             <Button
               title={isEdit ? 'Salvar' : 'Criar grupo'}
@@ -296,12 +265,7 @@ export function NewGroupModal({
         </Box>
       }
     >
-      <ScrollView
-        style={{ maxHeight: 520 }}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        <Box gap="md">
+      <Box gap="md">
           <Controller
             control={control}
             name="name"
@@ -395,7 +359,7 @@ export function NewGroupModal({
                   <Box flex={1}>
                     <Text variant="bodyStrong">
                       {member.name}
-                      {member.id === currentUser?.id ? ' (você)' : ''}
+                      {isCurrentUserMember(member) ? ' (você)' : ''}
                     </Text>
                     {member.email ? (
                       <Text variant="caption" color="textSecondary">
@@ -403,7 +367,7 @@ export function NewGroupModal({
                       </Text>
                     ) : null}
                   </Box>
-                  {member.id === currentUser?.id ? null : (
+                  {isCurrentUserMember(member) ? null : (
                     <PressableBox
                       onPress={() => handleRemoveMember(member.integranteToken, member.name)}
                       accessibilityRole="button"
@@ -482,8 +446,7 @@ export function NewGroupModal({
               {submitError}
             </Text>
           ) : null}
-        </Box>
-      </ScrollView>
+      </Box>
     </Modal>
   );
 }
