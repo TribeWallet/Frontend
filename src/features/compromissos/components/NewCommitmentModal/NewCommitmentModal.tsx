@@ -64,6 +64,7 @@ export function NewCommitmentModal({
   const [customSplits, setCustomSplits] = useState<
     { integranteToken: string; amount: number }[]
   >([]);
+  const [customSplitInputs, setCustomSplitInputs] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [imagem, setImagem] = useState<AttachedFile | null>(null);
@@ -92,6 +93,7 @@ export function NewCommitmentModal({
   useEffect(() => {
     if (!visible) {
       setCustomSplits([]);
+      setCustomSplitInputs({});
       setImagem(null);
       return;
     }
@@ -113,6 +115,14 @@ export function NewCommitmentModal({
           amount: split.amount,
         })),
       );
+      setCustomSplitInputs(
+        Object.fromEntries(
+          commitment.splits.map((split) => [
+            split.integranteToken,
+            maskMoney((split.amount * 100).toFixed(0)),
+          ]),
+        ),
+      );
     } else {
       reset({
         name: '',
@@ -124,6 +134,7 @@ export function NewCommitmentModal({
         parcelas: '1',
       });
       setCustomSplits([]);
+      setCustomSplitInputs({});
     }
   }, [visible, commitment, lockedGroupId, reset]);
 
@@ -149,7 +160,16 @@ export function NewCommitmentModal({
 
   const applyEqualDefaultsToCustom = useCallback(() => {
     const equal = computeSplits(totalAmount, members, 'equal', []);
-    setCustomSplits(equal.entries.map((entry) => ({ ...entry })));
+    const entries = equal.entries.map((entry) => ({ ...entry }));
+    setCustomSplits(entries);
+    setCustomSplitInputs(
+      Object.fromEntries(
+        entries.map((entry) => [
+          entry.integranteToken,
+          maskMoney((entry.amount * 100).toFixed(0)),
+        ]),
+      ),
+    );
   }, [totalAmount, members]);
 
   const handleSplitModeChange = useCallback(
@@ -166,6 +186,7 @@ export function NewCommitmentModal({
   const handleClose = useCallback(() => {
     reset();
     setCustomSplits([]);
+    setCustomSplitInputs({});
     setImagem(null);
     setSubmitError(null);
     onClose();
@@ -477,9 +498,18 @@ export function NewCommitmentModal({
                           {member.name}
                         </Text>
                         <Input
-                          value={maskMoney((current * 100).toFixed(0))}
+                          value={
+                            customSplitInputs[member.integranteToken] ??
+                            maskMoney((current * 100).toFixed(0))
+                          }
                           onChangeText={(text) => {
-                            const numeric = parseMoney(text);
+                            const masked = maskMoney(text);
+                            const inputValue = parseMoney(masked) === 0 ? '' : masked;
+                            const numeric = parseMoney(inputValue);
+                            setCustomSplitInputs((prev) => ({
+                              ...prev,
+                              [member.integranteToken]: inputValue,
+                            }));
                             setCustomSplits((prev) => [
                               ...prev.filter(
                                 (entry) => entry.integranteToken !== member.integranteToken,
