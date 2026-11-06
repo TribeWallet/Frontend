@@ -13,6 +13,7 @@ import {
 import AppNavigator, { navTheme } from './src/navigation/AppNavigator';
 import AuthNavigator from './src/navigation/AuthNavigator';
 import { AppProvider } from './src/contexts/AppContext';
+import { ConviteLinkHandler } from './src/features/grupos/components/ConviteLinkHandler/ConviteLinkHandler';
 import { Loading } from './src/components/Loading';
 import { useUserStore } from './src/features/usuario/stores/userStore';
 import { useAuthStore } from './src/features/auth/stores/authStore';
@@ -97,10 +98,11 @@ function RootNavigator() {
 
   if (!storesHydrated) return <Loading fullScreen />;
 
-  return isAuthenticated ? (
-    <AppNavigator />
-  ) : (
-    <AuthNavigator />
+  return (
+    <>
+      {isAuthenticated ? <AppNavigator /> : <AuthNavigator />}
+      <ConviteLinkHandler isAuthenticated={isAuthenticated} />
+    </>
   );
 }
 
