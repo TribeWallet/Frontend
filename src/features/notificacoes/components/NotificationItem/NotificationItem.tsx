@@ -63,7 +63,7 @@ export function NotificationItemView({
   onCheck,
   onDelete,
 }: NotificationItemProps) {
-  const isOverdue = item.type === 'overdue_commitment';
+  const isOverdue = item.type === 'pending_charge';
 
   return (
     <Box
@@ -99,31 +99,35 @@ export function NotificationItemView({
           {item.description}
         </Text>
 
-        <Box mt="xs">
-          <Text variant="caption" color="textSecondary">{item.group}</Text>
-        </Box>
+        {item.origin ? (
+          <Box mt="xs">
+            <Text variant="caption" color="textSecondary">{item.origin}</Text>
+          </Box>
+        ) : null}
 
         <Box flexDirection="row" gap="xs" mt="sm">
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Marcar como lida"
-            onPress={() => onCheck?.(item.id)}
-            hitSlop={4}
-          >
-            {({ pressed }) => (
-              <Box
-                width={32}
-                height={32}
-                borderRadius="full"
-                bg="successLight"
-                alignItems="center"
-                justifyContent="center"
-                opacity={pressed ? 0.6 : 1}
-              >
-                <CheckIcon color="#16AF7E" />
-              </Box>
-            )}
-          </Pressable>
+          {!item.read && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Marcar como lida"
+              onPress={() => onCheck?.(item.id)}
+              hitSlop={4}
+            >
+              {({ pressed }) => (
+                <Box
+                  width={32}
+                  height={32}
+                  borderRadius="full"
+                  bg="successLight"
+                  alignItems="center"
+                  justifyContent="center"
+                  opacity={pressed ? 0.6 : 1}
+                >
+                  <CheckIcon color="#16AF7E" />
+                </Box>
+              )}
+            </Pressable>
+          )}
 
           <Pressable
             accessibilityRole="button"

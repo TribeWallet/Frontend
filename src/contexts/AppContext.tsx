@@ -6,12 +6,19 @@ import React, {
   useMemo,
   useState,
 } from 'react';
+import { AppState } from 'react-native';
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { SideMenu, SideMenuAction } from '../components/SideMenu/SideMenu';
 import { NotificationsModal } from '../features/notificacoes/components/NotificationsModal/NotificationsModal';
 import { useUserStore } from '../features/usuario/stores/userStore';
-import { buildNotifications } from '../features/notificacoes/services/notificationSync';
+import {
+  countNaoLidas,
+  excluirNotificacao,
+  listNotificacoes,
+  marcarLida,
+  marcarTodasLidas,
+} from '../features/notificacoes/services/notificacaoService';
 import { useAuthStore } from '../features/auth/stores/authStore';
 import {
   addIntegrantes,
@@ -74,7 +81,8 @@ interface NotificationsContextValue {
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   deleteNotification: (id: string) => void;
-  refreshDueNotifications: () => void;
+  /** Busca as notificações na API. É o que o sininho e a tela de notificações chamam. */
+  refreshNotifications: () => void;
   settings: NotificationSettings;
   updateSettings: (next: NotificationSettings) => void;
 }
@@ -157,7 +165,7 @@ export function useAppNotifications(): NotificationsContextValue {
     markAsRead: ctx.markAsRead,
     markAllAsRead: ctx.markAllAsRead,
     deleteNotification: ctx.deleteNotification,
-    refreshDueNotifications: ctx.refreshDueNotifications,
+    refreshNotifications: ctx.refreshNotifications,
     settings: ctx.settings,
     updateSettings: ctx.updateSettings,
   };
@@ -223,9 +231,8 @@ export function AppProvider({
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [settings, setSettings] = useState<NotificationSettings>(DEFAULT_SETTINGS);
-  // Ler e dispensar aviso é estado de tela: a API não guarda isso.
-  const [readIds, setReadIds] = useState<string[]>([]);
-  const [dismissedIds, setDismissedIds] = useState<string[]>([]);
+  // A lista só é buscada depois da primeira abertura do sininho; antes disso só a contagem.
+  const [notificationsRequested, setNotificationsRequested] = useState(false);
 
   const usuarioToken = useAuthStore((state) => state.user?.id);
   const queryClient = useQueryClient();
@@ -337,20 +344,49 @@ export function AppProvider({
 
   const profile = useUserStore((state) => state.profile);
 
+  // Sem FCM não há push: o app pergunta à API. A contagem alimenta o número do sininho
+  // (ao abrir o app e ao voltar do segundo plano) e a lista completa vem quando o sininho é aberto.
+  const notificationsKey = useMemo(() => ['notificacoes', usuarioToken] as const, [usuarioToken]);
+
+  const unreadCountQuery = useQuery({
+    queryKey: [...notificationsKey, 'contagem'],
+    queryFn: countNaoLidas,
+    enabled: Boolean(usuarioToken),
+  });
+
+  const notificationsQuery = useQuery({
+    queryKey: [...notificationsKey, 'lista'],
+    queryFn: listNotificacoes,
+    enabled: Boolean(usuarioToken) && notificationsRequested,
+  });
+
   const notifications = useMemo<NotificationItem[]>(
-    () =>
-      buildNotifications(commitments, payments)
-        .filter((item) => !dismissedIds.includes(item.id))
-        .map((item) =>
-          readIds.includes(item.id) ? { ...item, status: 'paid' as const } : item,
-        ),
-    [commitments, payments, dismissedIds, readIds],
+    () => notificationsQuery.data ?? [],
+    [notificationsQuery.data],
   );
 
   const unreadCount = useMemo(
-    () => notifications.filter((item) => item.status !== 'paid').length,
-    [notifications],
+    () =>
+      notificationsQuery.data
+        ? notificationsQuery.data.filter((item) => !item.read).length
+        : (unreadCountQuery.data ?? 0),
+    [notificationsQuery.data, unreadCountQuery.data],
   );
+
+  const refreshNotifications = useCallback(() => {
+    setNotificationsRequested(true);
+    queryClient.invalidateQueries({ queryKey: ['notificacoes'] });
+  }, [queryClient]);
+
+  // Voltar do segundo plano é o único "push" possível sem FCM.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        queryClient.invalidateQueries({ queryKey: ['notificacoes'] });
+      }
+    });
+    return () => subscription.remove();
+  }, [queryClient]);
 
   const invalidateGroups = useCallback(
     () => queryClient.invalidateQueries({ queryKey: ['grupos'] }),
@@ -371,17 +407,39 @@ export function AppProvider({
     invalidateCommitments();
   }, [invalidateCommitments]);
 
-  const markAsRead = useCallback((id: string) => {
-    setReadIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
-  }, []);
+  // Atualiza a lista na hora e confirma na API; se a chamada falhar, volta ao que o servidor tem.
+  const listKey = useMemo(() => [...notificationsKey, 'lista'], [notificationsKey]);
+  const patchList = useCallback(
+    (update: (items: NotificationItem[]) => NotificationItem[]) => {
+      queryClient.setQueryData<NotificationItem[]>(listKey, (items) => (items ? update(items) : items));
+    },
+    [queryClient, listKey],
+  );
+  const syncNotifications = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: ['notificacoes'] }),
+    [queryClient],
+  );
+
+  const markAsRead = useCallback(
+    (id: string) => {
+      patchList((items) => items.map((item) => (item.id === id ? { ...item, read: true } : item)));
+      marcarLida(id).finally(syncNotifications);
+    },
+    [patchList, syncNotifications],
+  );
 
   const markAllAsRead = useCallback(() => {
-    setReadIds(notifications.map((item) => item.id));
-  }, [notifications]);
+    patchList((items) => items.map((item) => ({ ...item, read: true })));
+    marcarTodasLidas().finally(syncNotifications);
+  }, [patchList, syncNotifications]);
 
-  const deleteNotification = useCallback((id: string) => {
-    setDismissedIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
-  }, []);
+  const deleteNotification = useCallback(
+    (id: string) => {
+      patchList((items) => items.filter((item) => item.id !== id));
+      excluirNotificacao(id).finally(syncNotifications);
+    },
+    [patchList, syncNotifications],
+  );
 
   const updateSettings = useCallback((next: NotificationSettings) => {
     setSettings(next);
@@ -526,10 +584,13 @@ export function AppProvider({
   const topBar = useMemo<TopBarActions>(
     () => ({
       openMenu: () => setMenuOpen(true),
-      openNotifications: () => setNotificationsOpen(true),
+      openNotifications: () => {
+        setNotificationsOpen(true);
+        refreshNotifications();
+      },
       openProfile: () => onOpenProfile(),
     }),
-    [onOpenProfile],
+    [onOpenProfile, refreshNotifications],
   );
 
   const handleCloseMenu = useCallback(() => setMenuOpen(false), []);
@@ -547,7 +608,7 @@ export function AppProvider({
       markAsRead,
       markAllAsRead,
       deleteNotification,
-      refreshDueNotifications: refetchCommitments,
+      refreshNotifications,
       settings,
       updateSettings,
       groups,
@@ -586,6 +647,7 @@ export function AppProvider({
       markAsRead,
       markAllAsRead,
       deleteNotification,
+      refreshNotifications,
       settings,
       updateSettings,
       groups,
