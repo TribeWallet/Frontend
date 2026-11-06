@@ -9,7 +9,7 @@ export class ApiError extends Error {
   }
 }
 
-type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
+type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 interface RequestOptions {
   body?: unknown;
@@ -195,6 +195,8 @@ export const apiClient = {
     request<T>('POST', path, { ...options, body }),
   put: <T>(path: string, body?: unknown, options?: RequestOptions) =>
     request<T>('PUT', path, { ...options, body }),
+  patch: <T = void>(path: string, body?: unknown, options?: RequestOptions) =>
+    request<T>('PATCH', path, { ...options, body }),
   delete: <T = void>(path: string, options?: RequestOptions) =>
     request<T>('DELETE', path, options),
   downloadPdf,

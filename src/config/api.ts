@@ -45,6 +45,13 @@ export const endpoints = {
     pdfByGrupo: (usuarioToken: string, grupoToken: string) =>
       `/api/relatorios/usuario/${encodeURIComponent(usuarioToken)}/grupo/${encodeURIComponent(grupoToken)}/pdf`,
   },
+  notificacoes: {
+    list: '/api/notificacoes',
+    unreadCount: '/api/notificacoes/nao-lidas/contagem',
+    markAllRead: '/api/notificacoes/lidas',
+    markRead: (token: string) => `/api/notificacoes/${token}/lida`,
+    byToken: (token: string) => `/api/notificacoes/${token}`,
+  },
   // O controller usa a rota padrão api/[controller], por isso o nome no singular e capitalizado.
   pagamentos: {
     create: '/api/Pagamento',

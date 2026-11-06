@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { ScrollView, Switch } from 'react-native';
+import { Switch } from 'react-native';
 import { Modal } from '../../../../components/Modal';
 import { Button } from '../../../../components/Button';
 import { Box, Text, PressableBox } from '../../../../theme';
@@ -55,10 +55,10 @@ export function NotificationsModal({
 
   const filtered = (() => {
     if (filter === 'unread') {
-      return notifications.filter((n) => n.status !== 'paid');
+      return notifications.filter((n) => !n.read);
     }
     if (filter === 'pending') {
-      return notifications.filter((n) => n.status === 'pending');
+      return notifications.filter((n) => n.type === 'pending_charge');
     }
     return notifications;
   })();
@@ -133,11 +133,8 @@ export function NotificationsModal({
         })}
       </Box>
 
-      <ScrollView
-        style={{ maxHeight: 320 }}
-        contentContainerStyle={{ paddingBottom: 12 }}
-        showsVerticalScrollIndicator={false}
-      >
+      {/* Sem ScrollView próprio: o Modal já rola o conteúdo, e rolagem aninhada trava no Android. */}
+      <Box pb="sm">
         {filtered.length === 0 ? (
           <Box py="lg" alignItems="center">
             <Text variant="body" color="textSecondary">Nenhuma notificação neste filtro.</Text>
@@ -152,7 +149,7 @@ export function NotificationsModal({
             />
           ))
         )}
-      </ScrollView>
+      </Box>
 
       <Box mt="md" pt="md" borderTopWidth={1} borderColor="border">
         <Text variant="bodyStrong" mb="sm">Configurações</Text>

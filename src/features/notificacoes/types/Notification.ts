@@ -1,19 +1,19 @@
-import type { TransactionStatus } from '../../../types/transactionStatus';
-
-export type NotificationStatus = TransactionStatus;
-
 export type NotificationType =
-  | 'overdue_commitment'
+  | 'group_invite'
+  | 'new_commitment'
   | 'registered_payment'
-  | 'pending_payment'
-  | 'new_commitment';
+  | 'pending_charge'
+  | 'settled_commitment'
+  | 'commitment_changed';
 
 export interface NotificationItem {
+  /** notificacaoToken devolvido pela API. */
   id: string;
   type: NotificationType;
   title: string;
   description: string;
-  group: string;
+  /** Quem gerou o aviso; nulo quando veio do sistema. */
+  origin: string | null;
   time: string;
-  status?: TransactionStatus;
+  read: boolean;
 }

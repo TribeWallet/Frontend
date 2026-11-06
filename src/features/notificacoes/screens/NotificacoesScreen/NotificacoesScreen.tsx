@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { ScrollView, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -27,7 +28,7 @@ export function NotificacoesScreen() {
     markAsRead,
     markAllAsRead,
     deleteNotification,
-    refreshDueNotifications,
+    refreshNotifications,
   } = useNotifications();
   const profile = useUserStore((state) => state.profile);
   const topBar = useTopBarActions();
@@ -35,12 +36,19 @@ export function NotificacoesScreen() {
 
   const isSmallPhone = width < 360;
 
+  // Sem push, a lista só é atualizada quando a pessoa abre a tela.
+  useFocusEffect(
+    useCallback(() => {
+      refreshNotifications();
+    }, [refreshNotifications]),
+  );
+
   const filtered = useMemo(() => {
     if (filter === 'unread') {
-      return notifications.filter((n) => n.status !== 'paid');
+      return notifications.filter((n) => !n.read);
     }
     if (filter === 'pending') {
-      return notifications.filter((n) => n.status === 'pending');
+      return notifications.filter((n) => n.type === 'pending_charge');
     }
     return notifications;
   }, [filter, notifications]);
@@ -125,7 +133,7 @@ export function NotificacoesScreen() {
                 title="Nenhuma notificação"
                 description="Você está em dia com tudo."
                 actionLabel="Atualizar"
-                onAction={refreshDueNotifications}
+                onAction={refreshNotifications}
               />
             ) : (
               filtered.map((item) => (
