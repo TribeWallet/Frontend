@@ -1,6 +1,7 @@
 import React from 'react';
-import { Box, Text } from '../../../../theme';
+import { Box, Text, useTheme } from '../../../../theme';
 import { CommitmentAvatar } from '../CommitmentAvatar/CommitmentAvatar';
+import { MoneyValue } from '../../../../components/MoneyValue';
 
 interface DashboardUpcoming {
   id: string;
@@ -8,7 +9,7 @@ interface DashboardUpcoming {
   initials: string;
   name: string;
   group: string;
-  value: string;
+  value: number;
   date: string;
   daysToDue: number;
 }
@@ -18,6 +19,7 @@ interface UpcomingItemProps {
 }
 
 export function UpcomingItem({ upcoming }: UpcomingItemProps) {
+  const theme = useTheme();
   const soon = upcoming.daysToDue < 7;
 
   return (
@@ -38,7 +40,7 @@ export function UpcomingItem({ upcoming }: UpcomingItemProps) {
       </Box>
 
       <Box alignItems="flex-end">
-        <Text variant="bodyStrong">{upcoming.value}</Text>
+        <MoneyValue amount={upcoming.value} />
         <Box
           mt="xxs"
           px="sm"
@@ -49,7 +51,7 @@ export function UpcomingItem({ upcoming }: UpcomingItemProps) {
           <Text
             variant="caption"
             style={{
-              color: soon ? '#E8A924' : '#0071DF',
+              color: soon ? theme.colors.warning : theme.colors.primary,
               fontWeight: '600',
             }}
           >

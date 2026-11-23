@@ -6,41 +6,33 @@ import { z } from 'zod';
 import * as ImagePicker from 'expo-image-picker';
 import { Modal } from '../../../../components/Modal';
 import { Input } from '../../../../components/Input';
+import { DatePicker } from '../../../../components/DatePicker/DatePicker';
 import { Button } from '../../../../components/Button';
 import { Select, SelectOption } from '../../../../components/Select';
 import { Box, Text, PressableBox } from '../../../../theme';
+import { useTranslation } from '../../../../hooks/useTranslation';
 import { useAppCommitments, useAppGroups } from '../../../../contexts/AppContext';
 import { getErrorMessage } from '../../../../services/api/apiClient';
 import { todayBR } from '../../../../utils/date';
-import { formatCurrency } from '../../../../utils/currency';
+import { MoneyValue } from '../../../../components/MoneyValue';
+import { useFormatMoney } from '../../../../hooks/useFormatMoney';
 import { maskDateBR, maskMoney, maskNumber, parseMoney } from '../../../../utils/masks';
 import type { AttachedFile } from '../../../../types/file';
 import type { Commitment, SplitMode } from '../../types/Commitment';
 import { commitmentCategories } from '../../services/categories';
 import { computeSplits } from '../../services/split';
 
-const schema = z.object({
-  name: z.string().min(2, 'Informe um nome'),
-  amount: z
-    .string()
-    .min(1, 'Informe um valor')
-    .regex(/^[0-9]{1,}(?:,[0-9]{1,2})?$/, 'Valor inválido'),
-  dueDate: z.string().regex(/^[0-3][0-9]\/[0-1][0-9]\/[0-9]{4}$/, 'Use o formato DD/MM/AAAA'),
-  groupId: z.string().min(1, 'Selecione um grupo'),
-  category: z.string().min(1, 'Selecione uma categoria'),
-  splitMode: z.enum(['equal', 'custom']),
-  parcelas: z
-    .string()
-    .min(1, 'Informe o número de parcelas')
-    .refine((value) => {
-      const parsed = Number(value);
-      return Number.isInteger(parsed) && parsed >= 1 && parsed <= 24;
-    }, 'Parcelas entre 1 e 24'),
-});
-
-type FormValues = z.infer<typeof schema>;
-
 const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg'];
+
+type FormValues = {
+  name: string;
+  amount: string;
+  dueDate: string;
+  groupId: string;
+  category: string;
+  splitMode: 'equal' | 'custom';
+  parcelas: string;
+};
 
 interface NewCommitmentModalProps {
   visible: boolean;
@@ -59,6 +51,27 @@ export function NewCommitmentModal({
 }: NewCommitmentModalProps) {
   const { groups } = useAppGroups();
   const { addCommitment, updateCommitment } = useAppCommitments();
+  const { t } = useTranslation();
+  const formatMoney = useFormatMoney();
+
+  const schema = z.object({
+    name: z.string().min(2, t('newCommitment.nameMinLength')),
+    amount: z
+      .string()
+      .min(1, t('payments.invalidValue'))
+      .regex(/^[0-9]{1,}(?:,[0-9]{1,2})?$/, t('payments.invalidValue')),
+    dueDate: z.string().regex(/^[0-3][0-9]\/[0-1][0-9]\/[0-9]{4}$/, t('newCommitment.dueDateInvalid')),
+    groupId: z.string().min(1, t('newCommitment.selectGroupRequired')),
+    category: z.string().min(1, t('newCommitment.selectCategoryRequired')),
+    splitMode: z.enum(['equal', 'custom']),
+    parcelas: z
+      .string()
+      .min(1, t('payments.installmentsRequired'))
+      .refine((value) => {
+        const parsed = Number(value);
+        return Number.isInteger(parsed) && parsed >= 1 && parsed <= 24;
+      }, t('newCommitment.parcelasRange')),
+  });
 
   const isEdit = Boolean(commitment);
   const [customSplits, setCustomSplits] = useState<
@@ -258,20 +271,20 @@ export function NewCommitmentModal({
     <Modal
       visible={visible}
       onClose={handleClose}
-      title={isEdit ? 'Editar compromisso' : 'Novo compromisso'}
+      title={isEdit ? t('commitments.editCommitment') : t('commitments.newCommitment')}
       subtitle={
-        isEdit ? 'Atualize os dados do compromisso' : 'Defina um compromisso para o grupo'
+        isEdit ? t('commitments.editSubtitle') : t('commitments.createSubtitle')
       }
       showCloseButton
       keyboardScrollEnabled={Platform.OS === 'android'}
       footer={
         <Box flexDirection="row" gap="sm">
           <Box flex={1}>
-            <Button title="Cancelar" onPress={handleClose} variant="outline" fullWidth />
+            <Button title={t('common.cancel')} onPress={handleClose} variant="outline" fullWidth />
           </Box>
           <Box flex={1}>
             <Button
-              title={isEdit ? 'Salvar' : 'Criar'}
+              title={isEdit ? t('common.save') : t('common.create')}
               onPress={onValidSubmit}
               loading={submitting}
               disabled={
@@ -291,11 +304,11 @@ export function NewCommitmentModal({
             name="name"
             render={({ field: { onChange, value, onBlur } }) => (
               <Input
-                label="Título"
+                label={t('newCommitment.title')}
                 value={value}
                 onChangeText={onChange}
                 onBlur={onBlur}
-                placeholder="Ex: Aluguel Março"
+                placeholder={t('newCommitment.titlePlaceholder')}
                 error={errors.name?.message}
               />
             )}
@@ -308,11 +321,12 @@ export function NewCommitmentModal({
                 name="amount"
                 render={({ field: { onChange, value, onBlur } }) => (
                   <Input
-                    label="Valor total"
+                    label={t('newCommitment.amount')}
+                    prefix="R$"
                     value={value}
                     onChangeText={(text) => onChange(maskMoney(text))}
                     onBlur={onBlur}
-                    placeholder="0,00"
+                    placeholder={t('newCommitment.amountPlaceholder')}
                     keyboardType="decimal-pad"
                     error={errors.amount?.message}
                   />
@@ -323,14 +337,12 @@ export function NewCommitmentModal({
               <Controller
                 control={control}
                 name="dueDate"
-                render={({ field: { onChange, value, onBlur } }) => (
-                  <Input
-                    label="Data"
+                render={({ field: { onChange, value } }) => (
+                  <DatePicker
+                    label={t('newCommitment.date')}
                     value={value}
-                    onChangeText={(text) => onChange(maskDateBR(text))}
-                    onBlur={onBlur}
-                    placeholder="DD/MM/AAAA"
-                    keyboardType="numeric"
+                    onChange={onChange}
+                    placeholder={t('datePicker.placeholderDate')}
                     error={errors.dueDate?.message}
                   />
                 )}
@@ -346,7 +358,7 @@ export function NewCommitmentModal({
                   name="parcelas"
                   render={({ field: { onChange, value, onBlur } }) => (
                     <Input
-                      label="Parcelas (mensais)"
+                      label={t('newCommitment.installments')}
                       value={value}
                       onChangeText={(text) => {
                         const masked = maskNumber(text, 2);
@@ -356,7 +368,7 @@ export function NewCommitmentModal({
                         }
                       }}
                       onBlur={onBlur}
-                      placeholder="1"
+                      placeholder={t('newCommitment.installmentsPlaceholder')}
                       keyboardType="numeric"
                       error={errors.parcelas?.message}
                     />
@@ -366,8 +378,7 @@ export function NewCommitmentModal({
               <Box flex={2} justifyContent="center">
                 {parcelas > 1 && totalAmount > 0 ? (
                   <Text variant="caption" color="textSecondary">
-                    Serão criados {parcelas} compromissos de {formatCurrency(perParcela)}, vencendo
-                    um por mês.
+                    {t('newCommitment.installmentsCreated', { parcelas, total: formatMoney(perParcela) })}
                   </Text>
                 ) : null}
               </Box>
@@ -375,8 +386,8 @@ export function NewCommitmentModal({
           ) : null}
 
           <Select
-            label="Grupo"
-            placeholder={lockedGroupId ? selectedGroup?.name ?? '' : 'Selecione um grupo'}
+            label={t('newCommitment.group')}
+            placeholder={lockedGroupId ? selectedGroup?.name ?? '' : t('newCommitment.selectGroup')}
             value={groupSelectValue}
             onChange={(value) => setValue('groupId', value, { shouldValidate: true })}
             options={groups.map<SelectOption>((group) => ({
@@ -384,14 +395,14 @@ export function NewCommitmentModal({
               label: group.name,
               description: `${group.members.length} integrante${group.members.length === 1 ? '' : 's'}`,
             }))}
-            emptyText="Crie um grupo antes de lançar compromissos"
+            emptyText={t('newCommitment.emptyGroup')}
             error={errors.groupId?.message}
             disabled={isEdit || Boolean(lockedGroupId)}
           />
 
           <Select
-            label="Categoria"
-            placeholder="Selecione uma categoria"
+            label={t('newCommitment.category')}
+            placeholder={t('newCommitment.selectCategory')}
             value={watched.category}
             onChange={(value) => setValue('category', value, { shouldValidate: true })}
             options={commitmentCategories.map<SelectOption>((category) => ({
@@ -402,10 +413,10 @@ export function NewCommitmentModal({
           />
 
           <Box>
-            <Text variant="label" marginBottom="xs">Imagem da nota (PNG, JPG ou JPEG)</Text>
+            <Text variant="label" marginBottom="xs">{t('newCommitment.receiptLabel')}</Text>
             <Box flexDirection="row" gap="xs" alignItems="center">
               <Button
-                title={imagem ? 'Trocar imagem' : 'Anexar imagem'}
+                title={imagem ? t('newCommitment.changeFile') : t('newCommitment.attachFile')}
                 variant="outline"
                 size="sm"
                 onPress={pickImagem}
@@ -416,7 +427,7 @@ export function NewCommitmentModal({
                     {imagem.name}
                   </Text>
                   <PressableBox onPress={() => setImagem(null)} hitSlop={8}>
-                    <Text variant="captionStrong" color="danger">Remover</Text>
+                    <Text variant="captionStrong" color="danger">{t('commitments.remove')}</Text>
                   </PressableBox>
                 </Box>
               ) : null}
@@ -425,7 +436,7 @@ export function NewCommitmentModal({
 
           {activeGroupId ? (
             <Box>
-              <Text variant="label" marginBottom="xs">Divisão de custos</Text>
+              <Text variant="label" marginBottom="xs">{t('newCommitment.splitCosts')}</Text>
               <Box flexDirection="row" gap="xs">
                 {(['equal', 'custom'] as SplitMode[]).map((mode) => {
                   const active = watched.splitMode === mode;
@@ -448,7 +459,7 @@ export function NewCommitmentModal({
                         opacity={blocked ? 0.5 : 1}
                       >
                         <Text variant="captionStrong" color={active ? 'white' : 'textSecondary'}>
-                          {mode === 'equal' ? 'Igual entre todos' : 'Valor exato'}
+                          {mode === 'equal' ? t('newCommitment.splitEqual') : t('newCommitment.splitExact')}
                         </Text>
                       </Box>
                     </PressableBox>
@@ -458,7 +469,7 @@ export function NewCommitmentModal({
 
               {members.length === 0 ? (
                 <Text variant="caption" color="danger" mt="sm">
-                  Este grupo não tem integrantes ativos.
+                  {t('newCommitment.noActiveMembers')}
                 </Text>
               ) : watched.splitMode === 'equal' ? (
                 <Box mt="sm">
@@ -480,7 +491,7 @@ export function NewCommitmentModal({
                         py="xs"
                       >
                         <Text variant="body">{member.name}</Text>
-                        <Text variant="bodyStrong">{formatCurrency(split?.amount ?? 0)}</Text>
+                        <MoneyValue amount={split?.amount ?? 0} />
                       </Box>
                     );
                   })}
@@ -498,6 +509,7 @@ export function NewCommitmentModal({
                           {member.name}
                         </Text>
                         <Input
+                          prefix="R$"
                           value={
                             customSplitInputs[member.integranteToken] ??
                             maskMoney((current * 100).toFixed(0))
@@ -517,15 +529,15 @@ export function NewCommitmentModal({
                               { integranteToken: member.integranteToken, amount: numeric },
                             ]);
                           }}
-                          placeholder="0,00"
+                          placeholder={t('newCommitment.amountPlaceholder')}
                           keyboardType="decimal-pad"
                         />
                       </Box>
                     );
                   })}
                   <Text variant="caption" color={totalMatches ? 'success' : 'danger'} mt="xs">
-                    Soma atual: {formatCurrency(splitResult.total)}{' '}
-                    {totalMatches ? '· bate com o valor total' : '· precisa igualar ao valor total'}
+                    {t('newCommitment.sumCurrent', { total: formatMoney(splitResult.total) })}{' '}
+                    {totalMatches ? t('newCommitment.sumMatches') : t('newCommitment.sumMismatch')}
                   </Text>
                 </Box>
               )}

@@ -1,16 +1,19 @@
-import React, { useCallback, useEffect } from 'react';
-import { StatusBar, StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo } from 'react';
+import { StatusBar, StyleSheet, View, useColorScheme, Appearance } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
 import { ThemeProvider } from '@shopify/restyle';
+
+import i18n from './src/i18n';
+import { getStoredLanguage } from './src/hooks/useTranslation';
 import {
   NavigationContainer,
   NavigationContainerRef,
   useNavigationContainerRef,
 } from '@react-navigation/native';
 
-import AppNavigator, { navTheme } from './src/navigation/AppNavigator';
+import AppNavigator, { navTheme, darkNavTheme } from './src/navigation/AppNavigator';
 import AuthNavigator from './src/navigation/AuthNavigator';
 import { AppProvider } from './src/contexts/AppContext';
 import { ConviteLinkHandler } from './src/features/grupos/components/ConviteLinkHandler/ConviteLinkHandler';
@@ -18,7 +21,7 @@ import { Loading } from './src/components/Loading';
 import { useUserStore } from './src/features/usuario/stores/userStore';
 import { useAuthStore } from './src/features/auth/stores/authStore';
 import { usePreferencesStore } from './src/features/configuracoes/stores/preferencesStore';
-import { lightTheme } from './src/theme';
+import { lightTheme, darkTheme } from './src/theme';
 import type { RootStackParamList } from './src/navigation/types';
 import type { SideMenuAction } from './src/components/SideMenu/SideMenu';
 
@@ -58,6 +61,7 @@ function RootNavigator() {
       useUserStore.persist.hasHydrated() &&
       usePreferencesStore.persist.hasHydrated(),
   );
+  const [languageReady, setLanguageReady] = React.useState(false);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const user = useAuthStore((state) => state.user);
   const setProfile = useUserStore((state) => state.setProfile);
@@ -84,6 +88,15 @@ function RootNavigator() {
   }, []);
 
   useEffect(() => {
+    const loadLanguage = async () => {
+      const saved = await getStoredLanguage();
+      await i18n.changeLanguage(saved);
+      setLanguageReady(true);
+    };
+    loadLanguage();
+  }, []);
+
+  useEffect(() => {
     if (isAuthenticated && user) {
       setProfile({
         id: user.id,
@@ -96,7 +109,7 @@ function RootNavigator() {
     }
   }, [isAuthenticated, user, setProfile]);
 
-  if (!storesHydrated) return <Loading fullScreen />;
+  if (!storesHydrated || !languageReady) return <Loading fullScreen />;
 
   return (
     <>
@@ -111,6 +124,26 @@ function App() {
   const navigationRef = useNavigationContainerRef<RootStackParamList>();
   const [activeTab, setActiveTab] = React.useState<string | undefined>(undefined);
   const navRef = React.useRef<NavigationContainerRef<RootStackParamList> | null>(null);
+  const systemColorScheme = useColorScheme();
+  const [systemScheme, setSystemScheme] = React.useState<'light' | 'dark' | null>(systemColorScheme);
+  const { appearance } = usePreferencesStore();
+
+  React.useEffect(() => {
+    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+      setSystemScheme(colorScheme);
+    });
+    return () => subscription.remove();
+  }, []);
+
+  const effectiveAppearance = useMemo(() => {
+    if (appearance === 'system') return systemScheme ?? 'light';
+    return appearance;
+  }, [appearance, systemScheme]);
+
+  const theme = useMemo(() => (effectiveAppearance === 'dark' ? darkTheme : lightTheme), [effectiveAppearance]);
+
+  const effectiveTheme = effectiveAppearance;
+
 
   React.useEffect(() => {
     navRef.current = navigationRef as unknown as NavigationContainerRef<RootStackParamList> | null;
@@ -181,23 +214,23 @@ function App() {
   return (
     <GestureHandlerRootView style={styles.root}>
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider theme={lightTheme}>
-          <SafeAreaProvider>
-            <StatusBar barStyle="dark-content" />
-            <View style={styles.container}>
+        <SafeAreaProvider>
+          <StatusBar barStyle={effectiveTheme === 'dark' ? 'light-content' : 'dark-content'} />
+          <ThemeProvider theme={theme}>
+            <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
               <AppProvider
                 onOpenProfile={openProfile}
                 onNavigate={handleNavigate}
                 onLogout={handleLogout}
                 activeTab={activeTab}
               >
-                <NavigationContainer ref={navigationRef} theme={navTheme}>
+                <NavigationContainer ref={navigationRef} theme={effectiveTheme === 'dark' ? darkNavTheme : navTheme}>
                   <RootNavigator />
                 </NavigationContainer>
               </AppProvider>
             </View>
-          </SafeAreaProvider>
-        </ThemeProvider>
+          </ThemeProvider>
+        </SafeAreaProvider>
       </QueryClientProvider>
     </GestureHandlerRootView>
   );
@@ -207,7 +240,6 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFB',
   },
 });
 

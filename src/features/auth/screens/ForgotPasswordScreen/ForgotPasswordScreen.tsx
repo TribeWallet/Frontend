@@ -13,6 +13,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useKeyboardScroll } from '../../../../hooks/useKeyboardScroll';
+import { useTranslation } from '../../../../hooks/useTranslation';
+
 // 1. IMPORTAÇÃO DOS ESTILOS SEPARADOS
 import { styles } from './ForgotPasswordScreen.styles';
 
@@ -27,9 +30,13 @@ export function ForgotPasswordScreen({
   onBackToLogin,
 }: ForgotPasswordScreenProps) {
   const { width, height } = useWindowDimensions();
+  const { t } = useTranslation();
 
   const [email, setEmail] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
+
+  const { scrollRef, handleFocusCapture, handleContentSizeChange } =
+    useKeyboardScroll();
 
   /*
    * ==========================================================
@@ -116,6 +123,7 @@ export function ForgotPasswordScreen({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
+          ref={scrollRef}
           style={styles.scroll}
           contentContainerStyle={[
             styles.scrollContent,
@@ -126,6 +134,7 @@ export function ForgotPasswordScreen({
             },
           ]}
           keyboardShouldPersistTaps="handled"
+          onContentSizeChange={handleContentSizeChange}
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           showsVerticalScrollIndicator={false}
           bounces={false}
@@ -141,11 +150,11 @@ export function ForgotPasswordScreen({
             <View style={styles.card}>
               
               {/* TÍTULO */}
-              <Text style={styles.title}>Esqueceu a senha?</Text>
+              <Text style={styles.title}>{t('auth.forgotPassword')}</Text>
 
               {/* SUBTÍTULO */}
               <Text style={styles.subtitle}>
-                Digite seu e-mail para receber as instruções para redefinir sua senha
+                {t('auth.recoverSubtitle')}
               </Text>
 
               {/* FORM */}
@@ -153,12 +162,13 @@ export function ForgotPasswordScreen({
                 
                 {/* E-MAIL */}
                 <View style={styles.field}>
-                  <Text style={styles.label}>E-mail</Text>
+                  <Text style={styles.label}>{t('auth.email')}</Text>
                   <TextInput
                     value={email}
                     onChangeText={(text: string) => setEmail(text)}
+                    onFocusCapture={handleFocusCapture}
                     style={styles.input}
-                    placeholder="seu@email.com"
+                    placeholder={t('auth.emailPlaceholder')}
                     placeholderTextColor="#9AA0A6"
                     keyboardType="email-address"
                     autoCapitalize="none"
@@ -182,10 +192,10 @@ export function ForgotPasswordScreen({
                     loading && styles.submitButtonDisabled,
                   ]}
                   accessibilityRole="button"
-                  accessibilityLabel="Enviar instruções"
+                  accessibilityLabel={t('auth.sendInstructions')}
                 >
                   <Text style={styles.submitButtonText}>
-                    {loading ? 'Enviando...' : 'Enviar instruções'}
+                    {loading ? t('auth.sending') : t('auth.sendInstructionsAlt')}
                   </Text>
                 </Pressable>
               </View>
@@ -196,9 +206,9 @@ export function ForgotPasswordScreen({
                 hitSlop={8}
                 style={styles.backButton}
                 accessibilityRole="button"
-                accessibilityLabel="Voltar para o login"
+                accessibilityLabel={t('auth.backToLogin')}
               >
-                <Text style={styles.backText}>← Voltar para o login</Text>
+                <Text style={styles.backText}>{t('auth.backToLoginAlt')}</Text>
               </Pressable>
 
             </View>

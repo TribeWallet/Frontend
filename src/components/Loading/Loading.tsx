@@ -7,7 +7,7 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
-import { Box, Text } from '../../theme';
+import { Box, Text, useTheme } from '../../theme';
 
 export interface LoadingProps {
   label?: string;
@@ -16,6 +16,7 @@ export interface LoadingProps {
 }
 
 export function Loading({ label, size = 'md', fullScreen = false }: LoadingProps) {
+  const theme = useTheme();
   const rotation = useSharedValue(0);
 
   useEffect(() => {
@@ -33,10 +34,10 @@ export function Loading({ label, size = 'md', fullScreen = false }: LoadingProps
   const content = (
     <Box flexDirection="row" alignItems="center" gap="sm">
       {size === 'sm' ? (
-        <ActivityIndicator size="small" color="#0071DF" />
+        <ActivityIndicator size="small" color={theme.colors.primary} />
       ) : (
         <Animated.View style={animatedStyle}>
-          <ActivityIndicator size={size === 'lg' ? 'large' : 'small'} color="#0071DF" />
+          <ActivityIndicator size={size === 'lg' ? 'large' : 'small'} color={theme.colors.primary} />
         </Animated.View>
       )}
       {label && (

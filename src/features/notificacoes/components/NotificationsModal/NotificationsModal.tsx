@@ -2,7 +2,8 @@ import React, { useCallback, useState } from 'react';
 import { Switch } from 'react-native';
 import { Modal } from '../../../../components/Modal';
 import { Button } from '../../../../components/Button';
-import { Box, Text, PressableBox } from '../../../../theme';
+import { Box, Text, PressableBox, useTheme } from '../../../../theme';
+import { useTranslation } from '../../../../hooks/useTranslation';
 import { NotificationItemView } from '../NotificationItem/NotificationItem';
 import type { NotificationItem } from '../../types/Notification';
 
@@ -27,19 +28,6 @@ export interface NotificationSettings {
 
 type FilterKey = 'all' | 'unread' | 'pending';
 
-const FILTER_LABELS: Record<FilterKey, string> = {
-  all: 'Todas',
-  unread: 'Não lidas',
-  pending: 'Pendentes',
-};
-
-const SETTINGS_LABELS: Record<keyof NotificationSettings, string> = {
-  pushEnabled: 'Notificações push',
-  emailEnabled: 'Notificações por e-mail',
-  overdueAlerts: 'Alertas de vencimento',
-  weeklyDigest: 'Resumo semanal',
-};
-
 export function NotificationsModal({
   visible,
   onClose,
@@ -51,6 +39,22 @@ export function NotificationsModal({
   settings,
   onConfigureChange,
 }: NotificationsModalProps) {
+  const theme = useTheme();
+  const { t } = useTranslation();
+
+  const FILTER_LABELS: Record<FilterKey, string> = {
+    all: t('notifications.all'),
+    unread: t('notifications.unread'),
+    pending: t('notifications.pending'),
+  };
+
+  const SETTINGS_LABELS: Record<keyof NotificationSettings, string> = {
+    pushEnabled: t('settings.pushNotifications'),
+    emailEnabled: t('settings.emailNotifications'),
+    overdueAlerts: t('settings.overdueAlerts'),
+    weeklyDigest: t('settings.weeklyDigest'),
+  };
+
   const [filter, setFilter] = useState<FilterKey>('all');
 
   const filtered = (() => {
@@ -74,18 +78,18 @@ export function NotificationsModal({
     <Modal
       visible={visible}
       onClose={onClose}
-      title="Notificações"
-      subtitle={`${unreadCount} não lidas`}
+      title={t('notificationsModal.title')}
+      subtitle={unreadCount > 0 ? t('notificationsModal.subtitleUnread', { count: unreadCount }) : t('notificationsModal.subtitleAllRead')}
       showCloseButton
       variant="bottom"
       footer={
-        <Button title="Fechar" onPress={onClose} variant="outline" fullWidth />
+        <Button title={t('notificationsModal.close')} onPress={onClose} variant="outline" fullWidth />
       }
     >
       <Box flexDirection="row" justifyContent="space-between" alignItems="center" mb="sm">
         <PressableBox onPress={onMarkAllRead} accessibilityRole="button">
           <Text variant="bodySmallStrong" color="primary">
-            Marcar todas como lidas
+            {t('notifications.markAllRead')}
           </Text>
         </PressableBox>
         <Box flexDirection="row" alignItems="center" gap="xs">
@@ -102,7 +106,9 @@ export function NotificationsModal({
               {unreadCount}
             </Text>
           </Box>
-          <Text variant="caption" color="textSecondary">não lidas</Text>
+          <Text variant="caption" color="textSecondary">
+            {t('notifications.unreadLabel')}
+          </Text>
         </Box>
       </Box>
 
@@ -137,7 +143,9 @@ export function NotificationsModal({
       <Box pb="sm">
         {filtered.length === 0 ? (
           <Box py="lg" alignItems="center">
-            <Text variant="body" color="textSecondary">Nenhuma notificação neste filtro.</Text>
+            <Text variant="body" color="textSecondary">
+              {t('notifications.noNotificationsFilter')}
+            </Text>
           </Box>
         ) : (
           filtered.map((item) => (
@@ -152,7 +160,7 @@ export function NotificationsModal({
       </Box>
 
       <Box mt="md" pt="md" borderTopWidth={1} borderColor="border">
-        <Text variant="bodyStrong" mb="sm">Configurações</Text>
+        <Text variant="bodyStrong" mb="sm">{t('settings.title')}</Text>
         {(Object.keys(SETTINGS_LABELS) as (keyof NotificationSettings)[]).map((key) => (
           <Box
             key={key}
@@ -165,8 +173,8 @@ export function NotificationsModal({
             <Switch
               value={settings[key]}
               onValueChange={() => handleToggle(key)}
-              trackColor={{ false: '#DFE4E7', true: '#0071DF' }}
-              thumbColor="#FFFFFF"
+              trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+              thumbColor={theme.colors.white}
             />
           </Box>
         ))}

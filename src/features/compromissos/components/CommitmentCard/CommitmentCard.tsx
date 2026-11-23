@@ -1,11 +1,15 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, Pressable, View } from 'react-native';
 import { Pill } from '../../../../components/Pill';
-import { Box, Text } from '../../../../theme';
+import { Box, Text, useTheme } from '../../../../theme';
+import { useTranslation } from '../../../../hooks/useTranslation';
 import type { Commitment, CommitmentSummary } from '../../types/Commitment';
 import { summarizeCommitment } from '../../services/split';
-import { formatCurrency } from '../../../../utils/currency';
-import { diffDays } from '../../../../utils/date';
+import { MoneyValue } from '../../../../components/MoneyValue';
+import { useFormatMoney } from '../../../../hooks/useFormatMoney';
+import { isCommitmentOverdue } from '../../../../utils/date';
+import { translateCategory } from '../../../../utils/categoryTranslations';
+import { initialsFromName } from '../../../../utils/formatters';
 import { environment } from '../../../../config/environment';
 
 interface CommitmentCardProps {
@@ -13,33 +17,40 @@ interface CommitmentCardProps {
   onPress?: (id: string) => void;
 }
 
-const statusPalette = {
-  paid: { background: '#E7F8F2', color: '#16AF7E', border: '#B6E7D6' },
-  partial: { background: '#FFF6E2', color: '#E8A924', border: '#F2DAA6' },
-  pending: { background: '#EDF5FF', color: '#3089EF', border: '#BDD7FB' },
-  overdue: { background: '#FDE8EB', color: '#EF5067', border: '#F5C1CB' },
-};
+function statusPaletteFor(theme: any) {
+  return {
+    paid: { background: theme.colors.successLight, color: theme.colors.success, border: theme.colors.success },
+    partial: { background: theme.colors.warningLight, color: theme.colors.warning, border: theme.colors.warning },
+    pending: { background: theme.colors.primaryLight, color: theme.colors.primary, border: theme.colors.primary },
+    overdue: { background: theme.colors.dangerLight, color: theme.colors.danger, border: theme.colors.danger },
+  };
+}
 
-const statusLabel = {
-  paid: 'Pago',
-  partial: 'Parcial',
-  pending: 'Pendente',
-  overdue: 'Vencido',
-};
-
-const avatarColors = {
-  blue: '#0071DF',
-  teal: '#16AF7E',
-  indigo: '#6E5BEF',
-};
+function avatarColorsFor(theme: any) {
+  return {
+    blue: theme.colors.primary,
+    teal: theme.colors.success,
+    indigo: '#6E5BEF',
+  };
+}
 
 export function CommitmentCard({ commitment, onPress }: CommitmentCardProps) {
-  const daysToDue = diffDays(commitment.dueDate);
-  const isOverdue =
-    commitment.status !== 'paid' &&
-    ('overdue' in commitment ? commitment.overdue : daysToDue !== null && daysToDue < 0);
+  const theme = useTheme();
+  const { t, language } = useTranslation();
+  const formatMoney = useFormatMoney();
+
+  const [imageFailed, setImageFailed] = useState(false);
+
+  const statusLabel = {
+    paid: t('common.paid'),
+    partial: t('common.partial'),
+    pending: t('common.pending'),
+    overdue: t('common.overdue'),
+  };
+
+  const isOverdue = isCommitmentOverdue(commitment);
   const effectiveStatus = isOverdue ? 'overdue' : commitment.status;
-  const palette = statusPalette[effectiveStatus];
+  const palette = statusPaletteFor(theme)[effectiveStatus];
   const summary =
     'splits' in commitment
       ? summarizeCommitment(commitment)
@@ -49,6 +60,7 @@ export function CommitmentCard({ commitment, onPress }: CommitmentCardProps) {
       ? commitment.imagem
       : `${environment.mediaUrl}/${commitment.imagem}`
     : null;
+  const avatarColors = avatarColorsFor(theme);
 
   return (
     <Pressable
@@ -75,15 +87,16 @@ export function CommitmentCard({ commitment, onPress }: CommitmentCardProps) {
               justifyContent: 'center',
             }}
           >
-            {imageUri ? (
+            {imageUri && !imageFailed ? (
               <Image
                 source={{ uri: imageUri }}
+                onError={() => setImageFailed(true)}
                 style={{ width: 44, height: 44, borderRadius: 9999 }}
               />
             ) : (
               <Text variant="bodyStrong" color="white" style={{ fontSize: 16 }}>
-              {commitment.initials}
-            </Text>
+                {initialsFromName(commitment.name)}
+              </Text>
             )}
           </View>
 
@@ -122,17 +135,17 @@ export function CommitmentCard({ commitment, onPress }: CommitmentCardProps) {
         </Box>
 
         <Box flexDirection="row" flexWrap="wrap" gap="xs">
-          <Pill label={commitment.category} tone="neutral" size="sm" />
+          <Pill label={translateCategory(commitment.category, language)} tone="neutral" size="sm" />
           {isOverdue ? (
-            <Pill label={`Vencido em ${commitment.dueDate}`} tone="danger" size="sm" />
+            <Pill label={t('commitments.overdueOn', { date: commitment.dueDate })} tone="danger" size="sm" />
           ) : (
-            <Pill label={`Vence ${commitment.dueDate}`} tone="primary" size="sm" />
+            <Pill label={t('commitments.dueOn', { date: commitment.dueDate })} tone="primary" size="sm" />
           )}
           <Pill
             label={
               commitment.splitMode === 'equal'
-                ? 'Divisão igual'
-                : 'Personalizada'
+                ? t('commitments.equalSplit')
+                : t('commitments.customSplit')
             }
             tone="warning"
             size="sm"
@@ -141,7 +154,7 @@ export function CommitmentCard({ commitment, onPress }: CommitmentCardProps) {
 
         <Box mt="sm">
           <Box flexDirection="row" justifyContent="space-between" mb="xxs">
-            <Text variant="caption" color="textSecondary">Progresso</Text>
+            <Text variant="caption" color="textSecondary">{t('commitmentCard.progress')}</Text>
             <Text variant="captionStrong">{summary.progress}%</Text>
           </Box>
           <Box height={6} bg="border" borderRadius="full" overflow="hidden">
@@ -162,13 +175,13 @@ export function CommitmentCard({ commitment, onPress }: CommitmentCardProps) {
           mt="sm"
         >
           <Box>
-            <Text variant="bodyStrong">{formatCurrency(commitment.amount)}</Text>
+            <MoneyValue amount={commitment.amount} />
             <Text variant="caption" color="textMuted">
-              Restante {formatCurrency(summary.remaining)}
+              Restante {formatMoney(summary.remaining)}
             </Text>
           </Box>
           <Box alignItems="flex-end">
-            <Text variant="captionStrong" color="primary">Toque para ver</Text>
+            <Text variant="captionStrong" color="primary">{t('commitmentCard.tapToView')}</Text>
           </Box>
         </Box>
       </Box>

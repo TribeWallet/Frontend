@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, View } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
-import { Box, Text } from '../../../../theme';
+import { Box, Text, useTheme } from '../../../../theme';
 
 interface StatCardProps {
   stat: {
@@ -16,11 +16,13 @@ interface StatCardProps {
   onPress?: () => void;
 }
 
-const toneColors = {
-  blue: { bg: '#E8F1FF' as const, icon: '#0071DF' as const, trend: '#0071DF' as const },
-  yellow: { bg: '#FFF4E0' as const, icon: '#E8A924' as const, trend: '#E8A924' as const },
-  green: { bg: '#E0F7EF' as const, icon: '#16AF7E' as const, trend: '#16AF7E' as const },
-};
+function toneColorsFor(theme: any) {
+  return {
+    blue: { bg: theme.colors.primaryLight, icon: theme.colors.primary, trend: theme.colors.primary },
+    yellow: { bg: theme.colors.warningLight, icon: theme.colors.warning, trend: theme.colors.warning },
+    green: { bg: theme.colors.successLight, icon: theme.colors.success, trend: theme.colors.success },
+  };
+}
 
 function renderIcon(icon: 'groups' | 'clock' | 'card' | 'trend', color: string): React.ReactNode {
   switch (icon) {
@@ -94,7 +96,8 @@ function renderIcon(icon: 'groups' | 'clock' | 'card' | 'trend', color: string):
 }
 
 export function StatCard({ stat, onPress }: StatCardProps) {
-  const palette = toneColors[stat.tone];
+  const theme = useTheme();
+  const palette = toneColorsFor(theme)[stat.tone];
 
   return (
     <Pressable onPress={onPress}>

@@ -1,7 +1,9 @@
 import React from 'react';
 import Svg, { Circle, Path } from 'react-native-svg';
-import { Box, Text } from '../../../../theme';
+import { Box, Text, useTheme } from '../../../../theme';
 import { CommitmentAvatar } from '../CommitmentAvatar/CommitmentAvatar';
+import { MoneyValue } from '../../../../components/MoneyValue';
+import { useTranslation } from '../../../../hooks/useTranslation';
 
 type TransactionStatus = 'paid' | 'partial' | 'pending';
 
@@ -11,7 +13,7 @@ interface DashboardTransaction {
   initials: string;
   name: string;
   group: string;
-  value: string;
+  value: number;
   status: TransactionStatus;
 }
 
@@ -57,15 +59,21 @@ function renderStatusIcon(status: TransactionStatus, color: string) {
   }
 }
 
+function statusColorsFor(theme: any) {
+  return {
+    paid: { color: theme.colors.success, label: 'common.paid' },
+    partial: { color: theme.colors.warning, label: 'common.partial' },
+    pending: { color: theme.colors.danger, label: 'common.pending' },
+  };
+}
+
 export function TransactionItem({
   transaction,
   showDivider = false,
 }: TransactionItemProps) {
-  const status = {
-    paid: { color: '#16AF7E', label: 'Pago' },
-    partial: { color: '#E8A924', label: 'Pago parcial' },
-    pending: { color: '#EF586D', label: 'Pendente' },
-  }[transaction.status];
+  const theme = useTheme();
+  const { t } = useTranslation();
+  const status = statusColorsFor(theme)[transaction.status];
 
   return (
     <Box>
@@ -86,7 +94,7 @@ export function TransactionItem({
         </Box>
 
         <Box alignItems="flex-end">
-          <Text variant="bodyStrong">{transaction.value}</Text>
+          <MoneyValue amount={transaction.value} />
           <Box
             flexDirection="row"
             alignItems="center"
@@ -95,11 +103,17 @@ export function TransactionItem({
             paddingVertical="xxs"
             paddingHorizontal="xs"
             borderRadius="full"
-            style={{ backgroundColor: status.color + '35' }}
+            bg={
+              transaction.status === 'paid'
+                ? 'successLight'
+                : transaction.status === 'partial'
+                  ? 'warningLight'
+                  : 'dangerLight'
+            }
           >
             {renderStatusIcon(transaction.status, status.color)}
             <Text variant="caption" style={{ color: status.color, fontWeight: '600' }}>
-              {status.label}
+              {t(status.label)}
             </Text>
           </Box>
         </Box>

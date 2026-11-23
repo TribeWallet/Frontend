@@ -6,7 +6,8 @@ import { z } from 'zod';
 import { Modal } from '../../../../components/Modal';
 import { Input } from '../../../../components/Input';
 import { Button } from '../../../../components/Button';
-import { Box, Text, PressableBox } from '../../../../theme';
+import { Box, Text, PressableBox, useTheme } from '../../../../theme';
+import { useTranslation } from '../../../../hooks/useTranslation';
 import { useAppGroups } from '../../../../contexts/AppContext';
 import { getErrorMessage } from '../../../../services/api/apiClient';
 import { fullName, isValidEmail } from '../../../../utils/formatters';
@@ -17,19 +18,19 @@ import {
 } from '../../../usuario/services/usuarioService';
 import type { Group, GroupMember } from '../../types/Group';
 
-const schema = z.object({
-  name: z.string().min(2, 'Informe um nome com pelo menos 2 caracteres'),
-  description: z.string().min(3, 'Descreva brevemente o grupo'),
-  tone: z.enum(['blue', 'green', 'family']),
-});
+type FormValues = {
+  name: string;
+  description: string;
+  tone: 'blue' | 'green' | 'family';
+};
 
-type FormValues = z.infer<typeof schema>;
-
-const tones: { id: Group['tone']; label: string; color: string }[] = [
-  { id: 'blue', label: 'Casa', color: '#E8F1FF' },
-  { id: 'green', label: 'Viagem', color: '#E0F7EF' },
-  { id: 'family', label: 'Família', color: '#FDE8EB' },
-];
+function tonesFor(theme: any, t: any) {
+  return [
+    { id: 'blue', label: t('grupos.toneCasa'), color: theme.colors.primaryLight },
+    { id: 'green', label: t('grupos.toneViagem'), color: theme.colors.successLight },
+    { id: 'family', label: t('grupos.toneFamilia'), color: theme.colors.dangerLight },
+  ];
+}
 
 interface NewGroupModalProps {
   visible: boolean;
@@ -50,6 +51,15 @@ export function NewGroupModal({
   onCreated,
   group,
 }: NewGroupModalProps) {
+  const theme = useTheme();
+  const { t } = useTranslation();
+
+  const schema = z.object({
+    name: z.string().min(2, t('newGroup.nameMinLength')),
+    description: z.string().min(3, t('newGroup.descriptionMinLength')),
+    tone: z.enum(['blue', 'green', 'family']),
+  });
+
   const { addGroup, updateGroup, addGroupMembers, removeGroupMember } =
     useAppGroups();
   const currentUser = useAuthStore((state) => state.user);
@@ -102,7 +112,7 @@ export function NewGroupModal({
     if (isValidEmail(term)) {
       const usuario = await findUsuarioByEmail(term);
       if (!usuario) {
-        setMemberError('Nenhum usuário cadastrado com esse e-mail.');
+        setMemberError(t('grupos.memberNotFoundEmail'));
         return null;
       }
       return {
@@ -113,13 +123,11 @@ export function NewGroupModal({
     }
     const encontrados = await searchUsuariosByNome(term);
     if (encontrados.length === 0) {
-      setMemberError('Nenhum usuário encontrado com esse nome.');
+      setMemberError(t('grupos.memberNotFoundName'));
       return null;
     }
     if (encontrados.length > 1) {
-      setMemberError(
-        `${encontrados.length} usuários com esse nome. Informe o e-mail para escolher.`,
-      );
+      setMemberError(t('grupos.membersFound', { count: encontrados.length }));
       return null;
     }
     const [usuario] = encontrados;
@@ -133,11 +141,11 @@ export function NewGroupModal({
   const handleAddMember = async () => {
     const term = search.trim();
     if (term.length < 2) {
-      setMemberError('Informe o nome ou o e-mail do integrante.');
+      setMemberError(t('grupos.memberSearchRequired'));
       return;
     }
     if (term.toLowerCase() === currentUser?.email.toLowerCase()) {
-      setMemberError('Você já faz parte do grupo.');
+      setMemberError(t('grupos.alreadyMember'));
       return;
     }
 
@@ -153,11 +161,11 @@ export function NewGroupModal({
           member.email?.trim().toLowerCase() === found.email.trim().toLowerCase(),
       );
       if (alreadyInGroup) {
-        setMemberError('Esse integrante já está no grupo.');
+        setMemberError(t('grupos.memberAlreadyInGroup'));
         return;
       }
       if (members.some((member) => member.usuarioToken === found.usuarioToken)) {
-        setMemberError('Esse integrante já foi adicionado.');
+        setMemberError(t('grupos.memberAlreadyAdded'));
         return;
       }
 
@@ -181,10 +189,10 @@ export function NewGroupModal({
 
   const handleRemoveMember = (integranteToken: string, name: string) => {
     if (!group) return;
-    Alert.alert('Remover integrante', `Remover ${name} do grupo?`, [
-      { text: 'Cancelar', style: 'cancel' },
+    Alert.alert(t('grupos.removeMemberTitle'), t('grupos.removeMemberConfirm', { name }), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Remover',
+        text: t('grupos.remove'),
         style: 'destructive',
         onPress: async () => {
           setSubmitting(true);
@@ -242,20 +250,20 @@ export function NewGroupModal({
     <Modal
       visible={visible}
       onClose={handleClose}
-      title={isEdit ? 'Editar grupo' : 'Novo grupo'}
+      title={isEdit ? t('newGroup.editTitle') : t('newGroup.title')}
       subtitle={
-        isEdit ? 'Atualize as informações do grupo' : 'Crie um grupo e adicione integrantes'
+        isEdit ? t('newGroup.editSubtitle') : t('newGroup.subtitle')
       }
       showCloseButton
       keyboardScrollEnabled={Platform.OS === 'android'}
       footer={
         <Box flexDirection="row" gap="sm">
           <Box flex={1}>
-            <Button title="Cancelar" onPress={handleClose} variant="outline" fullWidth />
+            <Button title={t('common.cancel')} onPress={handleClose} variant="outline" fullWidth />
           </Box>
           <Box flex={1}>
             <Button
-              title={isEdit ? 'Salvar' : 'Criar grupo'}
+              title={isEdit ? t('common.save') : t('newGroup.createGroup')}
               onPress={onValidSubmit}
               disabled={!isValid}
               loading={submitting}
@@ -271,11 +279,11 @@ export function NewGroupModal({
             name="name"
             render={({ field: { onChange, value, onBlur } }) => (
               <Input
-                label="Nome do grupo"
+                label={t('newGroup.groupName')}
                 value={value}
                 onChangeText={onChange}
                 onBlur={onBlur}
-                placeholder="Ex: Apartamento 302"
+                placeholder={t('newGroup.groupNamePlaceholder')}
                 error={errors.name?.message}
               />
             )}
@@ -286,20 +294,20 @@ export function NewGroupModal({
             name="description"
             render={({ field: { onChange, value, onBlur } }) => (
               <Input
-                label="Descrição"
+                label={t('newGroup.description')}
                 value={value}
                 onChangeText={onChange}
                 onBlur={onBlur}
-                placeholder="Para que serve este grupo?"
+                placeholder={t('newGroup.descriptionPlaceholder')}
                 error={errors.description?.message}
               />
             )}
           />
 
           <Box>
-            <Text variant="label" marginBottom="xs">Categoria</Text>
+            <Text variant="label" marginBottom="xs">{t('grupos.category')}</Text>
             <Box flexDirection="row" gap="xs" flexWrap="wrap">
-              {tones.map((tone) => {
+              {tonesFor(theme, t).map((tone) => {
                 const active = watched.tone === tone.id;
                 return (
                   <PressableBox
@@ -343,7 +351,7 @@ export function NewGroupModal({
           </Box>
 
           <Box>
-            <Text variant="label" marginBottom="xs">Integrantes</Text>
+            <Text variant="label" marginBottom="xs">{t('common.members')}</Text>
 
             {group ? (
               group.members.map((member, index) => (
@@ -359,7 +367,7 @@ export function NewGroupModal({
                   <Box flex={1}>
                     <Text variant="bodyStrong">
                       {member.name}
-                      {isCurrentUserMember(member) ? ' (você)' : ''}
+                      {isCurrentUserMember(member) ? t('grupos.you') : ''}
                     </Text>
                     {member.email ? (
                       <Text variant="caption" color="textSecondary">
@@ -368,13 +376,12 @@ export function NewGroupModal({
                     ) : null}
                   </Box>
                   {isCurrentUserMember(member) ? null : (
-                    <PressableBox
+                    <Button
+                      title={t('commitments.remove')}
+                      variant="outline"
+                      size="sm"
                       onPress={() => handleRemoveMember(member.integranteToken, member.name)}
-                      accessibilityRole="button"
-                      hitSlop={6}
-                    >
-                      <Text variant="captionStrong" color="danger">Remover</Text>
-                    </PressableBox>
+                    />
                   )}
                 </Box>
               ))
@@ -382,7 +389,7 @@ export function NewGroupModal({
               <>
                 {currentUser ? (
                   <Box py="xs">
-                    <Text variant="bodyStrong">{currentUser.name} (você)</Text>
+                    <Text variant="bodyStrong">{currentUser.name}{t('grupos.you')}</Text>
                     <Text variant="caption" color="textSecondary">
                       {currentUser.email}
                     </Text>
@@ -404,13 +411,12 @@ export function NewGroupModal({
                         {member.email}
                       </Text>
                     </Box>
-                    <PressableBox
+                    <Button
+                      title={t('commitments.remove')}
+                      variant="outline"
+                      size="sm"
                       onPress={() => handleRemovePending(member.usuarioToken)}
-                      accessibilityRole="button"
-                      hitSlop={6}
-                    >
-                      <Text variant="captionStrong" color="danger">Remover</Text>
-                    </PressableBox>
+                    />
                   </Box>
                 ))}
               </>
@@ -418,13 +424,13 @@ export function NewGroupModal({
 
             <Box mt="sm">
               <Input
-                label="Nome ou e-mail do integrante"
+                label={t('grupos.memberSearchLabel')}
                 value={search}
                 onChangeText={(text) => {
                   setSearch(text);
                   if (memberError) setMemberError(null);
                 }}
-                placeholder="Ana ou ana@exemplo.com"
+                placeholder={t('grupos.memberSearchPlaceholder')}
                 autoCapitalize="none"
                 autoCorrect={false}
                 error={memberError ?? undefined}
@@ -432,7 +438,7 @@ export function NewGroupModal({
               />
             </Box>
             <Button
-              title="Adicionar integrante"
+              title={t('grupos.addMember')}
               onPress={handleAddMember}
               variant="outline"
               size="sm"

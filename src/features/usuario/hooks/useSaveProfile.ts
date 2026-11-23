@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../../auth/stores/authStore';
 import { toAuthUser } from '../../auth/services/authService';
 import { updateUsuario } from '../services/usuarioService';
-import { splitFullName } from '../../../utils/formatters';
+import { splitFullName, initialsFromName } from '../../../utils/formatters';
 import type { ProfileSaveData } from '../components/ProfileModal/ProfileModal';
 
 export function useSaveProfile() {
@@ -17,7 +17,7 @@ export function useSaveProfile() {
       if (!user) return;
       const nameChanged = data.name.trim() !== user.name;
       if (!nameChanged && !data.imagem) {
-        updateUser({ initials: data.initials });
+        updateUser({ initials: initialsFromName(data.name) });
         return;
       }
       const { nome, sobrenome } = nameChanged
@@ -30,7 +30,7 @@ export function useSaveProfile() {
       });
       updateUser({
         ...toAuthUser(updated),
-        initials: data.initials,
+        initials: initialsFromName(data.name),
         notificationCount: user.notificationCount,
       });
       await queryClient.invalidateQueries({ queryKey: ['grupos'] });

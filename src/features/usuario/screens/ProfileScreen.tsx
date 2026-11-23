@@ -8,7 +8,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { TopBar } from '../../../components/TopBar';
 import { Button } from '../../../components/Button';
 import { Pill } from '../../../components/Pill';
-import { Box, Text } from '../../../theme';
+import { Box, Text, useTheme } from '../../../theme';
 import { ProfileModal } from '../components/ProfileModal/ProfileModal';
 import { useUserStore } from '../stores/userStore';
 import { useSaveProfile } from '../hooks/useSaveProfile';
@@ -19,9 +19,11 @@ import {
   useAppPayments,
 } from '../../../contexts/AppContext';
 import { useTopBarActions } from '../../../hooks/useTopBarActions';
+import { useTranslation } from '../../../hooks/useTranslation';
 import type { RootStackParamList } from '../../../navigation/types';
-import { formatCurrency } from '../../../utils/currency';
+import { MoneyValue } from '../../../components/MoneyValue';
 import { environment } from '../../../config/environment';
+import { useFormatMoney } from '../../../hooks/useFormatMoney';
 import { useAppDashboard } from '../../dashboard/hooks/useDashboard';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Profile'>;
@@ -38,6 +40,9 @@ export function ProfileScreen() {
   const { payments } = useAppPayments();
   const topBar = useTopBarActions();
   const [editing, setEditing] = useState(false);
+  const theme = useTheme();
+  const { t } = useTranslation();
+  const formatMoney = useFormatMoney();
   const { data, isLoading, isError: dashboardError, refetch } = useAppDashboard();
 
   const totalPaid = data?.valorTotalPago ?? payments.reduce((sum, p) => sum + p.amount, 0);
@@ -45,9 +50,9 @@ export function ProfileScreen() {
   const totalGroups = data?.gruposAtivosCount ?? groups.length;
   const dynamicStats = useMemo(
     () => [
-      { value: String(data?.gruposAtivosCount ?? 0), label: 'Grupos' },
-      { value: String(data?.compromissosCountTotal ?? 0), label: 'Compromissos' },
-      { value: String(data?.pagamentosCountTotal ?? 0), label: 'Pagamentos' },
+      { value: String(data?.gruposAtivosCount ?? 0), label: t('common.groups') },
+      { value: String(data?.compromissosCountTotal ?? 0), label: t('commitments.title') },
+      { value: String(data?.pagamentosCountTotal ?? 0), label: t('payments.title') },
     ],
     [groups.length, payments.length, punctuality],
   );
@@ -63,7 +68,7 @@ export function ProfileScreen() {
   }, [clearProfile, authLogout, navigation]);
 
   const handleSave = useCallback(
-    async (data: { initials: string; name: string; email: string }) => {
+    async (data: { name: string; email: string }) => {
       await saveProfile(data);
       setEditing(false);
     },
@@ -75,7 +80,7 @@ export function ProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFB' }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
       <Box flex={1} width="100%" maxWidth={430} alignSelf="center" bg="background">
         <TopBar
           initials={user?.initials ?? ''}
@@ -148,44 +153,43 @@ export function ProfileScreen() {
               gap="md"
             >
               <Box flexDirection="row" alignItems="center" justifyContent="space-between">
-                <Text variant="bodyStrong">Total pago</Text>
-                <Pill label={formatCurrency(totalPaid)} tone="success" />
+                <Text variant="bodyStrong">{t('profile.totalPaid')}</Text>
+                <Pill label={formatMoney(totalPaid)} tone="success" />
               </Box>
               <Box flexDirection="row" alignItems="center" justifyContent="space-between">
-                <Text variant="bodyStrong">Pontualidade</Text>
+                <Text variant="bodyStrong">{t('profile.punctuality')}</Text>
                 <Pill
                   label={`${punctuality}%`}
                   tone={punctuality >= 80 ? 'success' : punctuality >= 60 ? 'warning' : 'danger'}
                 />
               </Box>
               <Box flexDirection="row" alignItems="center" justifyContent="space-between">
-                <Text variant="bodyStrong">Grupos</Text>
+                <Text variant="bodyStrong">{t('common.groups')}</Text>
                 <Pill label={String(totalGroups)} tone="primary" />
               </Box>
             </Box>
 
             <Box width="100%" gap="sm">
-              <Button title="Editar perfil" onPress={handleEdit} variant="outline" fullWidth />
+              <Button title={t('profile.editProfile')} onPress={handleEdit} variant="outline" fullWidth />
               <Button
-                title="Histórico de alterações"
+                title={t('profile.history')}
                 onPress={() => navigation.navigate('History')}
                 variant="outline"
                 fullWidth
               />
               <Button
-                title="Suporte"
+                title={t('profile.support')}
                 onPress={() => navigation.navigate('Support')}
                 variant="outline"
                 fullWidth
               />
-              <Button title="Sair" onPress={handleLogout} variant="danger" fullWidth />
+              <Button title={t('profile.logout')} onPress={handleLogout} variant="danger" fullWidth />
             </Box>
           </Box>
         </ScrollView>
       </Box>
       <ProfileModal
         visible={editing}
-        initials={user?.initials ?? ''}
         name={user?.name ?? ''}
         email={user?.email ?? ''}
         stats={dynamicStats}

@@ -445,6 +445,11 @@ export function AppProvider({
     setSettings(next);
   }, []);
 
+  const invalidateReports = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: ['relatorio'] }),
+    [queryClient],
+  );
+
   const addGroup = useCallback(
     async (input: NewGroupInput) => {
       if (!usuarioToken) {
@@ -459,9 +464,10 @@ export function AppProvider({
       });
       await saveGroupTone(created.grupoToken, input.tone);
       await invalidateGroups();
+      await invalidateReports();
       return toGroup(created);
     },
-    [usuarioToken, invalidateGroups],
+    [usuarioToken, invalidateGroups, invalidateReports],
   );
 
   const updateGroup = useCallback(
@@ -561,24 +567,27 @@ export function AppProvider({
     async (draft: PaymentDraft) => {
       await createPagamento(draft);
       await invalidateCommitments();
+      await invalidateReports();
     },
-    [invalidateCommitments],
+    [invalidateCommitments, invalidateReports],
   );
 
   const updatePayment = useCallback(
     async (id: string, patch: PaymentPatch) => {
       await updatePagamento(id, patch);
       await invalidateCommitments();
+      await invalidateReports();
     },
-    [invalidateCommitments],
+    [invalidateCommitments, invalidateReports],
   );
 
   const deletePayment = useCallback(
     async (id: string) => {
       await deletePagamento(id);
       await invalidateCommitments();
+      await invalidateReports();
     },
-    [invalidateCommitments],
+    [invalidateCommitments, invalidateReports],
   );
 
   const topBar = useMemo<TopBarActions>(
@@ -690,6 +699,10 @@ export function AppProvider({
         onSelect={(action) => {
           if (action === 'logout') {
             onLogout?.();
+            return;
+          }
+          if (action === 'alerts') {
+            setNotificationsOpen(true);
             return;
           }
           onNavigate(action);

@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Image, Pressable } from 'react-native';
-import { Box, Text } from '../../theme';
+import { Box, Text, useTheme } from '../../theme';
 import { environment } from '../../config/environment';
 import { useAuthStore } from '../../features/auth/stores/authStore';
+import { useTranslation } from '../../hooks/useTranslation';
 import { BellIcon, MenuIcon } from './icons';
 
 export type TopBarSize = 'standard' | 'compact';
@@ -27,6 +28,8 @@ export function TopBar({
   onOpenProfile,
 }: TopBarProps) {
   const compact = size === 'compact';
+  const theme = useTheme();
+  const { t } = useTranslation();
   const authImageUrl = useAuthStore((state) => state.user?.imageUrl);
   const resolvedImageUrl = imageUrl ?? (authImageUrl
     ?`${environment.mediaUrl}/${authImageUrl}`
@@ -48,7 +51,7 @@ export function TopBar({
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Abrir menu"
+        accessibilityLabel={t('common.openMenu')}
         onPress={onOpenMenu}
         hitSlop={12}
         style={({ pressed }) => ({
@@ -56,13 +59,13 @@ export function TopBar({
           opacity: pressed ? 0.6 : 1,
         })}
       >
-        <MenuIcon color="#1F2A33" />
+        <MenuIcon color={theme.colors.text} />
       </Pressable>
 
       <Box flexDirection="row" alignItems="center" gap="sm">
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Notificações"
+          accessibilityLabel={t('common.notifications')}
           onPress={onOpenNotifications}
           hitSlop={12}
           style={({ pressed }) => ({
@@ -71,7 +74,7 @@ export function TopBar({
           })}
         >
           <Box position="relative">
-            <BellIcon color="#1F2A33" />
+            <BellIcon color={theme.colors.text} />
             {notificationCount > 0 && (
               <Box
                 position="absolute"
@@ -95,7 +98,7 @@ export function TopBar({
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Abrir perfil"
+          accessibilityLabel={t('common.openProfile')}
           onPress={onOpenProfile}
           hitSlop={10}
           style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}

@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Alert, ScrollView, Switch, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -8,7 +8,8 @@ import Svg, { Path } from 'react-native-svg';
 import { TopBar } from '../../../components/TopBar';
 import { Button } from '../../../components/Button';
 import { Select, SelectOption } from '../../../components/Select';
-import { Box, Text, PressableBox } from '../../../theme';
+import { Box, Text, PressableBox, useTheme } from '../../../theme';
+import { LegalModal } from '../../../components/LegalModal/LegalModal';
 import { useUserStore } from '../../usuario/stores/userStore';
 import { useAppGroups } from '../../../contexts/AppContext';
 import { useAppNotifications } from '../../../hooks/useNotifications';
@@ -23,6 +24,8 @@ import { deleteUsuario } from '../../usuario/services/usuarioService';
 import { getErrorMessage } from '../../../services/api/apiClient';
 import { formatCurrency } from '../../../utils/currency';
 import { useTopBarActions } from '../../../hooks/useTopBarActions';
+import { useTranslation } from '../../../hooks/useTranslation';
+import { useFormatMoney } from '../../../hooks/useFormatMoney';
 import type { RootStackParamList } from '../../../navigation/types';
 import { version as appVersion } from '../../../../package.json';
 
@@ -79,7 +82,7 @@ function SettingRow({ label, description, trailing, onPress }: SettingRowProps) 
           </Text>
         ) : null}
       </Box>
-      {trailing ?? (onPress ? <ChevronRight color="#69757C" /> : null)}
+      {trailing ?? (onPress ? <ChevronRight color="textMuted" /> : null)}
     </Box>
   );
 
@@ -99,24 +102,33 @@ function SettingRow({ label, description, trailing, onPress }: SettingRowProps) 
 }
 
 // Só as opções que o app realmente aplica hoje.
-const APPEARANCE_OPTIONS: SelectOption[] = [
-  { id: 'light', label: 'Claro', description: 'Tema padrão' },
-  { id: 'system', label: 'Sistema', description: 'Segue o aparelho' },
-];
-
-const CURRENCY_OPTIONS: SelectOption[] = [
-  { id: 'BRL', label: 'Real (R$)', description: 'Moeda brasileira' },
-];
-
-const LANGUAGE_OPTIONS: SelectOption[] = [
-  { id: 'pt-BR', label: 'Português (Brasil)' },
-];
 
 export function SettingsScreen() {
   const navigation = useNavigation<NavigationProp>();
   const topBar = useTopBarActions();
   const { width } = useWindowDimensions();
   const isSmallPhone = width < 360;
+  const theme = useTheme();
+  const { t, changeLanguage, language: i18nLanguage } = useTranslation();
+  const [termsModalVisible, setTermsModalVisible] = useState(false);
+  const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
+  const formatMoney = useFormatMoney();
+
+  const APPEARANCE_OPTIONS: SelectOption[] = [
+    { id: 'light', label: t('settings.appearanceLight'), description: t('settings.appearanceLightDesc') },
+    { id: 'dark', label: t('settings.appearanceDark'), description: t('settings.appearanceDarkDesc') },
+    { id: 'system', label: t('settings.appearanceSystem'), description: t('settings.appearanceSystemDesc') },
+  ];
+
+  const CURRENCY_OPTIONS: SelectOption[] = [
+    { id: 'BRL', label: t('settings.currencyBRL'), description: t('settings.currencyBRLDesc') },
+  ];
+
+  const LANGUAGE_OPTIONS: SelectOption[] = [
+    { id: 'pt-BR', label: t('common.languagePortuguese') },
+    { id: 'en-US', label: t('common.languageEnglish') },
+    { id: 'es-ES', label: t('common.languageSpanish') },
+  ];
 
   const profile = useUserStore((state) => state.profile);
   const authUser = useAuthStore((state) => state.user);
@@ -146,15 +158,15 @@ export function SettingsScreen() {
   } = useAppNotifications();
 
   const groupOptions: SelectOption[] = [
-    { id: '', label: 'Nenhum (sempre perguntar)' },
+    { id: '', label: t('settings.groupNone') },
     ...groups.map((group) => ({ id: group.id, label: group.name })),
   ];
 
   const handleLogout = useCallback(() => {
-    Alert.alert('Sair da conta', 'Tem certeza que deseja sair?', [
-      { text: 'Cancelar', style: 'cancel' },
+    Alert.alert(t('settings.logoutConfirmTitle'), t('settings.logoutConfirmMsg'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Sair',
+        text: t('settings.logout'),
         style: 'destructive',
         onPress: () => {
           authLogout();
@@ -167,12 +179,12 @@ export function SettingsScreen() {
   const handleDeleteAccount = useCallback(() => {
     if (!authUser) return;
     Alert.alert(
-      'Excluir conta',
-      'Sua conta será excluída e você sairá do app. Deseja continuar?',
+      t('settings.deleteAccountTitle'),
+      t('settings.deleteAccountConfirmMsg'),
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Excluir',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -180,7 +192,7 @@ export function SettingsScreen() {
               clearProfile();
               authLogout();
             } catch (error) {
-              Alert.alert('Erro', getErrorMessage(error));
+              Alert.alert(t('common.errorTitle'), getErrorMessage(error));
             }
           },
         },
@@ -190,17 +202,17 @@ export function SettingsScreen() {
 
   const handleReset = useCallback(() => {
     Alert.alert(
-      'Restaurar preferências',
-      'Todas as configurações voltam ao padrão.',
+      t('settings.resetPreferencesTitle'),
+      t('settings.resetPreferencesDesc'),
       [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Restaurar', style: 'destructive', onPress: () => reset() },
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('settings.resetPreferencesConfirm'), style: 'destructive', onPress: () => reset() },
       ],
     );
   }, [reset]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFB' }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
       <Box flex={1} width="100%" maxWidth={430} alignSelf="center" bg="background">
         <TopBar
           initials={profile?.initials ?? ''}
@@ -209,14 +221,14 @@ export function SettingsScreen() {
           onOpenProfile={topBar.openProfile}
         />
         <ScrollView
-          style={{ flex: 1 }}
+          style={{ flex: 1, backgroundColor: theme.colors.background }}
           contentContainerStyle={{ paddingBottom: 110 }}
           showsVerticalScrollIndicator={false}
         >
           <Box width="100%" px={isSmallPhone ? 'sm' : 'md'} pt="md" gap="xs">
-            <Text variant="h1">Configurações</Text>
+            <Text variant="h1">{t('settings.title')}</Text>
             <Text variant="bodySmall" color="textSecondary">
-              Personalize sua experiência no TribeWallet.
+              {t('settings.subtitle')}
             </Text>
 
             <Box
@@ -230,7 +242,7 @@ export function SettingsScreen() {
             >
               <Box>
                 <Text variant="captionStrong" color="primary">
-                  CONTA ATIVA
+                  {t('settings.contaAtiva')}
                 </Text>
                 <Text variant="bodyStrong" color="primary">
                   {profile?.name ?? ''}
@@ -241,171 +253,172 @@ export function SettingsScreen() {
               </Box>
             </Box>
 
-            <SectionTitle>Conta</SectionTitle>
+            <SectionTitle>{t('settings.account')}</SectionTitle>
             <SettingRow
-              label="Editar perfil"
-              description="Nome, iniciais e e-mail"
+              label={t('settings.editProfile')}
+              description={t('settings.editProfileDesc')}
               onPress={() => navigation.navigate('EditProfile')}
             />
             <SettingRow
-              label="Histórico de alterações"
-              description="Veja suas últimas ações"
+              label={t('settings.history')}
+              description={t('settings.historyDesc')}
               onPress={() => navigation.navigate('History')}
             />
             <SettingRow
-              label="Suporte"
-              description="Fale com a nossa equipe"
+              label={t('settings.support')}
+              description={t('settings.supportDesc')}
               onPress={() => navigation.navigate('Support')}
             />
 
-            <SectionTitle>Preferências</SectionTitle>
+            <SectionTitle>{t('settings.preferences')}</SectionTitle>
             <Box mb="md" gap="md">
               <Select
-                label="Aparência"
-                placeholder="Selecione"
+                label={t('settings.appearance')}
+                placeholder={t('settings.appearanceSelect')}
                 value={appearance}
                 onChange={(value) => setAppearance(value as AppearanceMode)}
                 options={APPEARANCE_OPTIONS}
               />
               <Select
-                label="Moeda"
-                placeholder="Selecione"
+                label={t('settings.currency')}
+                placeholder={t('settings.appearanceSelect')}
                 value={currency}
                 onChange={(value) => setCurrency(value as Currency)}
                 options={CURRENCY_OPTIONS}
-                helperText={`Exemplo: ${formatCurrency(1234.56)}`}
+                helperText={`${t('settings.currencyExample')}: ${formatMoney(1234.56)}`}
               />
               <Select
-                label="Idioma"
-                placeholder="Selecione"
+                label={t('settings.language')}
+                placeholder={t('settings.appearanceSelect')}
                 value={language}
-                onChange={(value) =>
-                  setLanguage(value as 'pt-BR' | 'en-US')
-                }
+                onChange={(value) => {
+                  setLanguage(value as 'pt-BR' | 'en-US' | 'es-ES');
+                  changeLanguage(value as 'pt-BR' | 'en-US' | 'es-ES');
+                }}
                 options={LANGUAGE_OPTIONS}
               />
               <Select
-                label="Grupo padrão"
-                placeholder="Selecione"
+                label={t('settings.defaultGroup')}
+                placeholder={t('settings.appearanceSelect')}
                 value={defaultGroupId ?? ''}
                 onChange={(value) =>
                   setDefaultGroupId(value ? value : undefined)
                 }
                 options={groupOptions}
-                helperText="Pré-selecionado ao criar pagamentos"
+                helperText={t('settings.defaultGroupDesc')}
               />
             </Box>
 
-            <SectionTitle>Privacidade e segurança</SectionTitle>
+            <SectionTitle>{t('settings.privacySecurity')}</SectionTitle>
             <SettingRow
-              label="Bloqueio por biometria"
-              description="Exige autenticação ao abrir o app"
+              label={t('settings.biometricLock')}
+              description={t('settings.biometricLockDesc')}
               trailing={
                 <Switch
                   value={biometricLock}
                   onValueChange={setBiometricLock}
-                  trackColor={{ false: '#DFE4E7', true: '#0071DF' }}
-                  thumbColor="#FFFFFF"
+                  trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                  thumbColor={theme.colors.white}
                 />
               }
             />
             <SettingRow
-              label="Ocultar valores"
-              description="Esconde valores monetários nas listas"
+              label={t('settings.hideValues')}
+              description={t('settings.hideValuesDesc')}
               trailing={
                 <Switch
                   value={hideValues}
                   onValueChange={setHideValues}
-                  trackColor={{ false: '#DFE4E7', true: '#0071DF' }}
-                  thumbColor="#FFFFFF"
+                  trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                  thumbColor={theme.colors.white}
                 />
               }
             />
 
-            <SectionTitle>Notificações</SectionTitle>
+            <SectionTitle>{t('settings.notifications')}</SectionTitle>
             <SettingRow
-              label="Notificações push"
+              label={t('settings.pushNotifications')}
               trailing={
                 <Switch
                   value={notifSettings.pushEnabled}
                   onValueChange={(value) =>
                     updateSettings({ ...notifSettings, pushEnabled: value })
                   }
-                  trackColor={{ false: '#DFE4E7', true: '#0071DF' }}
-                  thumbColor="#FFFFFF"
+                  trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                  thumbColor={theme.colors.white}
                 />
               }
             />
             <SettingRow
-              label="Notificações por e-mail"
+              label={t('settings.emailNotifications')}
               trailing={
                 <Switch
                   value={notifSettings.emailEnabled}
                   onValueChange={(value) =>
                     updateSettings({ ...notifSettings, emailEnabled: value })
                   }
-                  trackColor={{ false: '#DFE4E7', true: '#0071DF' }}
-                  thumbColor="#FFFFFF"
+                  trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                  thumbColor={theme.colors.white}
                 />
               }
             />
             <SettingRow
-              label="Alertas de vencimento"
-              description="Avisa quando um compromisso está perto do vencimento"
+              label={t('settings.overdueAlerts')}
+              description={t('settings.overdueAlertsDesc')}
               trailing={
                 <Switch
                   value={notifSettings.overdueAlerts}
                   onValueChange={(value) =>
                     updateSettings({ ...notifSettings, overdueAlerts: value })
                   }
-                  trackColor={{ false: '#DFE4E7', true: '#0071DF' }}
-                  thumbColor="#FFFFFF"
+                  trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                  thumbColor={theme.colors.white}
                 />
               }
             />
             <SettingRow
-              label="Resumo semanal"
-              description="Receba um resumo toda segunda-feira"
+              label={t('settings.weeklyDigest')}
+              description={t('settings.weeklyDigestDesc')}
               trailing={
                 <Switch
                   value={notifSettings.weeklyDigest}
                   onValueChange={(value) =>
                     updateSettings({ ...notifSettings, weeklyDigest: value })
                   }
-                  trackColor={{ false: '#DFE4E7', true: '#0071DF' }}
-                  thumbColor="#FFFFFF"
+                  trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                  thumbColor={theme.colors.white}
                 />
               }
             />
 
-            <SectionTitle>Sobre</SectionTitle>
-            <SettingRow label="TribeWallet" description={`Versão ${appVersion}`} />
+            <SectionTitle>{t('settings.about')}</SectionTitle>
+            <SettingRow label={t('settings.appName')} description={`${t('settings.version')} ${appVersion}`} />
             <SettingRow
-              label="Termos de uso"
-              description="Condições do serviço"
-              onPress={() => Alert.alert('Termos de uso', 'Conteúdo em breve.')}
+              label={t('auth.termsOfUse')}
+              description={t('settings.termsDesc')}
+              onPress={() => setTermsModalVisible(true)}
             />
             <SettingRow
-              label="Política de privacidade"
-              description="Como cuidamos dos seus dados"
-              onPress={() => Alert.alert('Privacidade', 'Conteúdo em breve.')}
+              label={t('auth.privacyPolicy')}
+              description={t('settings.privacyDesc')}
+              onPress={() => setPrivacyModalVisible(true)}
             />
 
             <Box mt="lg" gap="sm">
               <Button
-                title="Restaurar preferências"
+                title={t('settings.resetPreferences')}
                 onPress={handleReset}
                 variant="outline"
                 fullWidth
               />
               <Button
-                title="Sair da conta"
+                title={t('settings.logout')}
                 onPress={handleLogout}
                 variant="danger"
                 fullWidth
               />
               <Button
-                title="Excluir conta"
+                title={t('settings.deleteAccount')}
                 onPress={handleDeleteAccount}
                 variant="outline"
                 fullWidth
@@ -414,6 +427,20 @@ export function SettingsScreen() {
           </Box>
         </ScrollView>
       </Box>
+
+      <LegalModal
+        visible={termsModalVisible}
+        onClose={() => setTermsModalVisible(false)}
+        title={t('auth.termsOfUse')}
+        content={t('auth.termsContent')}
+      />
+
+      <LegalModal
+        visible={privacyModalVisible}
+        onClose={() => setPrivacyModalVisible(false)}
+        title={t('auth.privacyPolicy')}
+        content={t('auth.privacyContent')}
+      />
     </SafeAreaView>
   );
 }

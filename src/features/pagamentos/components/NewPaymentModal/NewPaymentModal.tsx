@@ -1,21 +1,26 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert } from 'react-native';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as DocumentPicker from 'expo-document-picker';
+import * as Sharing from 'expo-sharing';
 import { File as ExpoFile, Paths } from 'expo-file-system';
 import { Modal } from '../../../../components/Modal';
 import { Input } from '../../../../components/Input';
+import { DatePicker } from '../../../../components/DatePicker/DatePicker';
 import { Button } from '../../../../components/Button';
 import { Select, SelectOption } from '../../../../components/Select';
 import { Box, Text, PressableBox } from '../../../../theme';
+import { useTranslation } from '../../../../hooks/useTranslation';
 import {
   useAppCommitments,
   useAppGroups,
   useAppPayments,
 } from '../../../../contexts/AppContext';
 import { getErrorMessage } from '../../../../services/api/apiClient';
-import { formatCurrency } from '../../../../utils/currency';
 import { todayBR } from '../../../../utils/date';
+import { MoneyValue } from '../../../../components/MoneyValue';
+import { useFormatMoney } from '../../../../hooks/useFormatMoney';
 import { maskDateBR, maskMoney, parseMoney } from '../../../../utils/masks';
 import { useAuthStore } from '../../../auth/stores/authStore';
 import type { AttachedFile } from '../../../../types/file';
@@ -46,6 +51,8 @@ export function NewPaymentModal({
   const { commitments } = useAppCommitments();
   const { addPayment } = useAppPayments();
   const user = useAuthStore((state) => state.user);
+  const { t } = useTranslation();
+  const formatMoney = useFormatMoney();
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -133,7 +140,7 @@ export function NewPaymentModal({
       availableCommitments.map((commitment) => ({
         id: commitment.id,
         label: commitment.name,
-        description: `Vence ${commitment.dueDate} • ${formatCurrency(commitment.amount)}`,
+        description: `Vence ${commitment.dueDate} • ${formatMoney(commitment.amount)}`,
       })),
     [availableCommitments],
   );
@@ -154,9 +161,22 @@ export function NewPaymentModal({
     });
   }, []);
 
+  // Visualização de comprovante anexado localmente (arquivo no dispositivo).
+  // Não depende do backend: usa expo-sharing.shareAsync diretamente no URI local.
+  const viewReceipt = useCallback(
+    async (uri: string) => {
+      try {
+        await Sharing.shareAsync(uri, { mimeType: 'application/pdf' });
+      } catch {
+        Alert.alert(t('common.errorTitle'), t('payments.receiptOpenError'));
+      }
+    },
+    [t],
+  );
+
   const onValidSubmit = handleSubmit(async (values) => {
     if (!activeShare) {
-      setSubmitError('Você não participa deste compromisso.');
+      setSubmitError(t('payments.notParticipating'));
       return;
     }
     setSubmitting(true);
@@ -185,17 +205,17 @@ export function NewPaymentModal({
     <Modal
       visible={visible}
       onClose={handleClose}
-      title="Registrar pagamento"
-      subtitle="Todo pagamento quita a fatia de um integrante"
+      title={t('newPayment.modalTitle')}
+      subtitle={t('newPayment.modalSubtitle')}
       showCloseButton
       footer={
         <Box flexDirection="row" gap="sm">
           <Box flex={1}>
-            <Button title="Cancelar" onPress={handleClose} variant="outline" fullWidth />
+            <Button title={t('newPayment.cancel')} onPress={handleClose} variant="outline" fullWidth />
           </Box>
           <Box flex={1}>
             <Button
-              title="Registrar"
+              title={t('newPayment.register')}
               onPress={onValidSubmit}
               loading={submitting}
               disabled={!canSubmit}
@@ -211,16 +231,17 @@ export function NewPaymentModal({
           name="groupId"
           render={({ field: { onChange, value } }) => (
             <Select
-              label="Grupo"
-              placeholder="Selecione um grupo"
+              label={t('newPayment.group')}
+              placeholder={t('payments.selectGroup')}
               value={value}
               onChange={(next) => {
                 onChange(next);
                 setValue('commitmentId', '', { shouldValidate: true });
               }}
               options={groupOptions}
-              emptyText="Nenhum grupo disponível"
+              emptyText={t('payments.noGroupsAvailable')}
               error={errors.groupId?.message}
+              disabled={Boolean(commitmentId)}
             />
           )}
         />
@@ -230,15 +251,17 @@ export function NewPaymentModal({
           name="commitmentId"
           render={({ field: { onChange, value } }) => (
             <Select
-              label="Compromisso"
+              label={t('payments.commitment')}
               placeholder={
-                watched.groupId ? 'Selecione o compromisso' : 'Selecione um grupo primeiro'
+                watched.groupId
+                  ? t('payments.selectCommitment')
+                  : t('payments.selectGroupFirst')
               }
               value={value}
               onChange={onChange}
               options={commitmentOptions}
-              disabled={!watched.groupId}
-              emptyText="Nenhum compromisso neste grupo"
+              disabled={Boolean(commitmentId) || !watched.groupId}
+              emptyText={t('payments.noCommitmentInGroup')}
               error={errors.commitmentId?.message}
             />
           )}
@@ -251,14 +274,14 @@ export function NewPaymentModal({
               name="amount"
               render={({ field: { onChange, value, onBlur } }) => (
                 <Input
-                  label="Valor"
+                  label={t('newPayment.value')}
                   value={value}
                   onChangeText={(text) => onChange(maskMoney(text))}
                   onBlur={onBlur}
                   placeholder={
                     activeShare && remainingAmount > 0
-                      ? formatCurrency(remainingAmount)
-                      : '0,00'
+                      ? formatMoney(remainingAmount)
+                      : t('payments.amountPlaceholder')
                   }
                   keyboardType="decimal-pad"
                   error={errors.amount?.message}
@@ -270,14 +293,12 @@ export function NewPaymentModal({
             <Controller
               control={control}
               name="date"
-              render={({ field: { onChange, value, onBlur } }) => (
-                <Input
-                  label="Data"
+              render={({ field: { onChange, value } }) => (
+                <DatePicker
+                  label={t('newPayment.date')}
                   value={value}
-                  onChangeText={(text) => onChange(maskDateBR(text))}
-                  onBlur={onBlur}
-                  placeholder="DD/MM/AAAA"
-                  keyboardType="numeric"
+                  onChange={onChange}
+                  placeholder={t('datePicker.placeholderDate')}
                   error={errors.date?.message}
                 />
               )}
@@ -290,7 +311,7 @@ export function NewPaymentModal({
           name="method"
           render={({ field: { onChange, value } }) => (
             <Box>
-              <Text variant="label" marginBottom="xs">Forma de pagamento</Text>
+              <Text variant="label" marginBottom="xs">{t('payments.paymentMethod')}</Text>
               <Box flexDirection="row" gap="xs" flexWrap="wrap">
                 {paymentMethodOptions.map((option) => {
                   const active = value === option.id;
@@ -310,7 +331,7 @@ export function NewPaymentModal({
                         borderColor={active ? 'primary' : 'border'}
                       >
                         <Text variant="captionStrong" color={active ? 'white' : 'text'}>
-                          {option.label}
+                          {t(option.label as any)}
                         </Text>
                       </Box>
                     </PressableBox>
@@ -322,21 +343,29 @@ export function NewPaymentModal({
         />
 
         <Box>
-          <Text variant="label" marginBottom="xs">Comprovante (PDF, opcional)</Text>
-          <Box flexDirection="row" gap="xs" alignItems="center">
+          <Text variant="label" marginBottom="xs">{t('payments.receipt')}</Text>
+          <Box flexDirection="column" gap="xs">
             <Button
-              title={comprovante ? 'Trocar arquivo' : 'Anexar PDF'}
+              title={comprovante ? t('payments.changeFile') : t('payments.attachFile')}
               variant="outline"
               size="sm"
+              fullWidth
               onPress={pickComprovante}
             />
             {comprovante ? (
-              <Box flex={1} flexDirection="row" alignItems="center" gap="xs">
-                <Text variant="caption" numberOfLines={1} flex={1} color="primary">
+              <Box gap="xs">
+                <Text variant="caption" numberOfLines={1} color="primary">
                   {comprovante.name}
                 </Text>
+                {/* <Button
+                  title={t('payments.viewReceipt')}
+                  variant="outline"
+                  size="sm"
+                  fullWidth
+                  onPress={() => viewReceipt(comprovante.uri)}
+                /> */}
                 <PressableBox onPress={() => setComprovante(null)} hitSlop={8}>
-                  <Text variant="captionStrong" color="danger">Remover</Text>
+                  <Text variant="captionStrong" color="danger">{t('commitments.remove')}</Text>
                 </PressableBox>
               </Box>
             ) : null}
@@ -345,16 +374,16 @@ export function NewPaymentModal({
 
         {selectedCommitment && !fixedShare && !activeShare ? (
           <Text variant="caption" color="danger">
-            Você não tem fatia neste compromisso.
+            {t('payments.noShare')}
           </Text>
         ) : null}
 
         {activeShare ? (
           <Box bg="background" borderRadius="md" borderWidth={1} borderColor="border" p="md">
-            <Text variant="captionStrong" color="textSecondary">FATIA SELECIONADA</Text>
+            <Text variant="captionStrong" color="textSecondary">{t('payments.selectedShare')}</Text>
             <Text variant="bodyStrong" mt="xxs">{activeShare.name}</Text>
             <Text variant="caption" color="textSecondary">
-              Em aberto: {formatCurrency(remainingAmount)}
+              {t('payments.openAmount')} {formatMoney(remainingAmount)}
             </Text>
           </Box>
         ) : null}

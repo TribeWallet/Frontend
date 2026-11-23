@@ -7,20 +7,23 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { TopBar } from '../../../../components/TopBar';
 import { Button } from '../../../../components/Button';
 import { Loading } from '../../../../components/Loading';
-import { Box, Text } from '../../../../theme';
+import { Box, Text, useTheme } from '../../../../theme';
 import { useAppDashboard } from '../../hooks/useDashboard';
 import { StatCard } from '../../components/StatCard/StatCard';
+import { useCommitmentSummaries } from '../../../compromissos/hooks/useCommitmentSummaries';
 import { SectionCard } from '../../components/SectionCard/SectionCard';
 import { TransactionItem } from '../../components/TransactionItem/TransactionItem';
 import { UpcomingItem } from '../../components/UpcomingItem/UpcomingItem';
 import { AlertBanner } from '../../components/AlertBanner/AlertBanner';
 import { useTopBarActions } from '../../../../hooks/useTopBarActions';
 import { useAppNotifications } from '../../../../hooks/useNotifications';
-import { formatCurrency } from '../../../../utils/currency';
-import { isoToBR } from '../../../../utils/date';
+import { MoneyValue } from '../../../../components/MoneyValue';
+import { MaskedText } from '../../../../components/MaskedText';
+import { isoToBR, isCommitmentOverdue } from '../../../../utils/date';
 import { initialsFromName } from '../../../../utils/formatters';
 import { environment } from '../../../../config/environment';
 import { useAuthStore } from '../../../auth/stores/authStore';
+import { useTranslation } from '../../../../hooks/useTranslation';
 import { SituacaoPagamento } from '../../Types/Dashboard';
 import type { RootStackParamList } from '../../../../navigation/types';
 
@@ -43,11 +46,19 @@ export function DashboardScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { width } = useWindowDimensions();
   const { data, isLoading, isError: dashboardError, refetch } = useAppDashboard();
+  const { commitments, commitmentsLoading } = useCommitmentSummaries();
   const topBar = useTopBarActions();
   const { unreadCount } = useAppNotifications();
   const user = useAuthStore((state) => state.user);
   const isSmallPhone = width < 360;
+  const theme = useTheme();
+  const { t } = useTranslation();
 
+  const isVencido = useCallback(
+    (commitment: { status: string; dueDate?: string | null; overdue?: boolean }) =>
+      isCommitmentOverdue(commitment),
+    [],
+  );
 
   const statCards = useMemo(
     () =>
@@ -57,28 +68,28 @@ export function DashboardScreen() {
               id: 'stat-groups',
               tone: 'blue' as const,
               icon: 'groups' as const,
-              label: 'Grupos Ativos',
+              label: t('dashboard.statGroups'),
               value: String(data.gruposAtivosCount),
             },
             {
               id: 'stat-due-soon',
               tone: 'yellow' as const,
               icon: 'clock' as const,
-              label: 'Vencendo em Breve',
+              label: t('dashboard.statDueSoon'),
               value: String(data.compromissosAVencerCount),
             },
             {
               id: 'stat-pending-payments',
               tone: 'blue' as const,
               icon: 'card' as const,
-              label: 'Pagamentos Pendentes',
+              label: t('dashboard.statPendingPayments'),
               value: String(data.pagamentosPendentesCount),
             },
             {
               id: 'stat-punctuality',
               tone: 'green' as const,
               icon: 'trend' as const,
-              label: 'Taxa de Pontualidade',
+              label: t('dashboard.statPunctuality'),
               value: `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(
                 data.taxaDePontualidade * 100,
               )}%`,
@@ -99,17 +110,29 @@ export function DashboardScreen() {
             initials: initialsFromName(item.nomeCompromisso),
             name: item.nomeCompromisso,
             group: item.nomeGrupo,
-            value: formatCurrency(item.valorDevedor),
+            value: item.valorDevedor,
             status: transactionStatusByPaymentSituation[item.situacaoPagamento],
           };
         }),
     [data],
   );
 
+  const vencidosCount = useMemo(
+    () => commitments.filter((c: any) => isVencido(c)).length,
+    [commitments, isVencido],
+  );
+
   const upcomingCommitments = useMemo(
     () =>
       (data?.transacoesEVencimentos ?? [])
-        .filter((item) => !item.vencido && item.diasParaVencimento >= 0)
+        .filter((item) => {
+          const overdue = isCommitmentOverdue({
+            status: transactionStatusByPaymentSituation[item.situacaoPagamento],
+            dueDate: item.dataVencimento ? isoToBR(item.dataVencimento) : null,
+            overdue: item.vencido,
+          });
+          return !overdue;
+        })
         .map((item) => ({
           source: item,
           remaining: Math.max(0, item.valorDevedor - item.valorPago),
@@ -123,7 +146,7 @@ export function DashboardScreen() {
           initials: initialsFromName(source.nomeCompromisso),
           name: source.nomeCompromisso,
           group: source.nomeGrupo,
-          value: formatCurrency(source.valorDevedor),
+          value: source.valorDevedor,
           date: isoToBR(source.dataVencimento) || source.dataVencimento,
           daysToDue: source.diasParaVencimento,
         })),
@@ -140,13 +163,13 @@ export function DashboardScreen() {
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Bom dia';
-    if (hour < 18) return 'Boa tarde';
-    return 'Boa noite';
-  }, []);
+    if (hour < 12) return t('dashboard.greetingMorning');
+    if (hour < 18) return t('dashboard.greetingAfternoon');
+    return t('dashboard.greetingEvening');
+  }, [t]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFB' }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
       <Box flex={1} width="100%" maxWidth={430} alignSelf="center" bg="background">
         <TopBar
           initials={user?.initials ?? ''}
@@ -168,27 +191,27 @@ export function DashboardScreen() {
               <Text variant="captionStrong" color="primary">
                 {greeting.toUpperCase()}
               </Text>
-              <Text variant="h1">{user?.name?.split(' ')[0] || 'Olá'}</Text>
+              <Text variant="h1">{user?.name?.split(' ')[0] || t('dashboard.hello')}</Text>
               <Text variant="bodySmall" color="textSecondary">
-                Sua visão geral financeira em um só lugar.
+                {t('dashboard.subtitle')}
               </Text>
             </Box>
 
             {dashboardError ? (
               <Box bg="dangerLight" borderRadius="md" p="md" mb="md">
                 <Text variant="bodyStrong" color="danger">
-                  Não foi possível carregar seus dados
+                  {t('dashboard.errorTitle')}
                 </Text>
                 <Text variant="caption" color="textSecondary" mb="sm">
-                  {dashboardError ?? 'Verifique se a API está rodando.'}
+                  {t('dashboard.errorMessage')}
                 </Text>
-                <Button title="Tentar novamente" onPress={refetch} size="sm" />
+                <Button title={t('common.tryAgain')} onPress={refetch} size="sm" />
               </Box>
             ) : null}
 
             {isLoading ? (
               <Box mb="md">
-                <Loading label="Carregando seus dados..." />
+                <Loading label={t('common.loading')} />
               </Box>
             ) : null}
 
@@ -200,11 +223,15 @@ export function DashboardScreen() {
               ))}
             </Box>
 
-            {data && data.compromissosVencidosCount > 0 ? (
+            {data && vencidosCount > 0 ? (
               <Box mb="md">
                 <AlertBanner
-                  title={`${data.compromissosVencidosCount} compromisso${data.compromissosVencidosCount === 1 ? '' : 's'} vencido${data.compromissosVencidosCount === 1 ? '' : 's'}`}
-                  description="Regularize os valores em aberto para evitar pendências no grupo."
+                  title={
+                    vencidosCount === 1
+                      ? t('dashboard.overdueAlertOne', { count: vencidosCount })
+                      : t('dashboard.overdueAlertOther', { count: vencidosCount })
+                  }
+                  description={t('dashboard.overdueDescription')}
                   onPressView={handleViewOverdue}
                 />
               </Box>
@@ -230,27 +257,29 @@ export function DashboardScreen() {
                 </Box>
                 <Box flex={1}>
                   <Text variant="bodyStrong" color="success">
-                    Tudo em dia
+                    {t('dashboard.noOverdue')}
                   </Text>
                   <Text variant="caption" color="textSecondary">
-                    Sem compromissos vencidos neste momento.
+                    {t('dashboard.noOverdueDescription')}
                   </Text>
                 </Box>
               </Box>
             ) : null}
 
-            <Button
-              title="Novo pagamento"
-              onPress={handleNewPayment}
-              fullWidth
-              size="md"
-            />
+            <Box mb="md">
+              <Button
+                title={t('dashboard.newPayment')}
+                onPress={handleNewPayment}
+                fullWidth
+                size="md"
+              />
+            </Box>
 
-            <SectionCard title="Últimas transações">
+            <SectionCard title={t('dashboard.latestTransactions')}>
               {transactions.length === 0 ? (
                 <Text variant="caption" color="textSecondary">
-                  Nenhuma transação para exibir.
-                </Text>
+                    {t('dashboard.noTransactions')}
+                  </Text>
               ) : (
                 transactions.map((transaction, index) => (
                   <TransactionItem
@@ -263,10 +292,10 @@ export function DashboardScreen() {
             </SectionCard>
 
             <Box mt="md">
-              <SectionCard title="Próximos vencimentos">
+              <SectionCard title={t('dashboard.upcoming')}>
                 {upcomingCommitments.length === 0 ? (
                   <Text variant="caption" color="textSecondary">
-                    Nenhum vencimento próximo.
+                    {t('dashboard.noUpcoming')}
                   </Text>
                 ) : (
                   upcomingCommitments.map((item, index) => (

@@ -3,7 +3,8 @@ import { Alert, Share, View } from 'react-native';
 import { Modal } from '../../../../components/Modal';
 import { Pill } from '../../../../components/Pill';
 import { Button } from '../../../../components/Button';
-import { Box, Text } from '../../../../theme';
+import { Box, Text, useTheme } from '../../../../theme';
+import { useTranslation } from '../../../../hooks/useTranslation';
 import { CommitmentCard } from '../../../../features/compromissos/components/CommitmentCard/CommitmentCard';
 import { CommitmentDetailModal } from '../../../../features/compromissos/components/CommitmentDetailModal/CommitmentDetailModal';
 import { NewGroupModal } from '../NewGroupModal/NewGroupModal';
@@ -13,7 +14,7 @@ import { getErrorMessage } from '../../../../services/api/apiClient';
 import { createConvite } from '../../services/conviteService';
 import type { Group } from '../../types/Group';
 import type { Commitment } from '../../../../features/compromissos/types/Commitment';
-import { formatCurrency } from '../../../../utils/currency';
+import { MoneyValue } from '../../../../components/MoneyValue';
 
 interface GroupDetailModalProps {
   visible: boolean;
@@ -22,6 +23,8 @@ interface GroupDetailModalProps {
 }
 
 export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalProps) {
+  const theme = useTheme();
+  const { t } = useTranslation();
   const { commitments } = useAppCommitments();
   const { deleteGroup } = useAppGroups();
 
@@ -34,10 +37,10 @@ export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalPr
 
   const handleDelete = () => {
     if (!group) return;
-    Alert.alert('Excluir grupo', `Tem certeza que deseja excluir "${group.name}"?`, [
-      { text: 'Cancelar', style: 'cancel' },
+    Alert.alert(t('grupos.deleteGroupTitle'), t('grupos.deleteGroupConfirm', { name: group.name }), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Excluir',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           setDeleting(true);
@@ -45,7 +48,7 @@ export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalPr
             await deleteGroup(group.id);
             onClose();
           } catch (error) {
-            Alert.alert('Não foi possível excluir o grupo', getErrorMessage(error));
+            Alert.alert(t('grupos.groupDeleteErrorTitle'), getErrorMessage(error));
           } finally {
             setDeleting(false);
           }
@@ -60,10 +63,10 @@ export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalPr
     try {
       const convite = await createConvite(group.id);
       await Share.share({
-        message: `Entre no grupo "${group.name}" no Tribe Wallet: ${convite.link}`,
+        message: t('grupos.inviteShareMessage', { groupName: group.name, link: convite.link }),
       });
     } catch (error) {
-      Alert.alert('Não foi possível gerar o link', getErrorMessage(error));
+      Alert.alert(t('grupos.groupLinkErrorTitle'), getErrorMessage(error));
     } finally {
       setInviting(false);
     }
@@ -100,7 +103,7 @@ export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalPr
         <Box flexDirection="row" gap="sm">
           <Box flex={1}>
             <Button
-              title="Editar"
+              title={t('groupDetail.edit')}
               onPress={() => setEditing(true)}
               variant="outline"
               disabled={deleting}
@@ -109,7 +112,7 @@ export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalPr
           </Box>
           <Box flex={1}>
             <Button
-              title="Excluir"
+              title={t('groupDetail.delete')}
               onPress={handleDelete}
               variant="danger"
               loading={deleting}
@@ -130,15 +133,20 @@ export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalPr
             justifyContent="space-between"
           >
             <Box flex={1}>
-              <Text variant="captionStrong" color="primary">RESUMO</Text>
-              <Text variant="display" color="primary">
-                {formatCurrency(totalPaid)}
+              <Text variant="captionStrong" color="primary">
+                {t('groupDetail.summary')}
               </Text>
-              <Text variant="caption" color="textSecondary">
-                Pago • Em aberto {formatCurrency(totalOpen)}
+              <Text variant="display" color="primary" numberOfLines={1} ellipsizeMode="tail">
+                <MoneyValue amount={totalPaid} variant="display" />
+              </Text>
+              <Text variant="caption" color="textSecondary" mt="xs">
+                {t('groupDetail.paid')}: <MoneyValue amount={totalPaid} />
+              </Text>
+              <Text variant="caption" color="textSecondary" mt="xs">
+                {t('groupDetail.open')}: <MoneyValue amount={totalOpen} />
               </Text>
             </Box>
-            <Pill label={`${group.summary.members} membros`} tone="primary" />
+            <Pill label={t('groupDetail.membersCount', { count: group.summary.members })} tone="primary" />
           </Box>
 
           <Text variant="bodySmall" color="textSecondary">
@@ -153,15 +161,17 @@ export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalPr
             p="md"
           >
             <Box flexDirection="row" alignItems="center" justifyContent="space-between">
-              <Text variant="bodyStrong">Integrantes</Text>
-              <Button
-                title="Convidar por link"
-                variant="outline"
-                size="sm"
-                onPress={handleInvite}
-                loading={inviting}
-                disabled={inviting}
-              />
+              <Text variant="bodyStrong">{t('common.members')}</Text>
+              <Box mb="sm">
+                <Button
+                  title={t('groupDetail.inviteLink')}
+                  variant="outline"
+                  size="sm"
+                  onPress={handleInvite}
+                  loading={inviting}
+                  disabled={inviting}
+                />
+              </Box>
             </Box>
             {group.members.map((member) => (
               <Box
@@ -179,7 +189,7 @@ export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalPr
                       width: 32,
                       height: 32,
                       borderRadius: 9999,
-                      backgroundColor: '#0071DF',
+                      backgroundColor: theme.colors.primary,
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
@@ -203,9 +213,9 @@ export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalPr
           </Box>
 
           <Box flexDirection="row" alignItems="center" justifyContent="space-between">
-            <Text variant="bodyStrong">Compromissos ({groupCommitments.length})</Text>
+            <Text variant="bodyStrong">{t('groupDetail.commitments', { count: groupCommitments.length })}</Text>
             <Button
-              title="Novo compromisso"
+              title={t('groupDetail.newCommitment')}
               variant="outline"
               size="sm"
               onPress={() => setNewCommitment(true)}
@@ -213,7 +223,7 @@ export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalPr
           </Box>
           {groupCommitments.length === 0 ? (
             <Text variant="caption" color="textSecondary">
-              Nenhum compromisso cadastrado neste grupo ainda.
+              {t('groupDetail.noCommitments')}
             </Text>
           ) : (
             groupCommitments.map((commitment) => (

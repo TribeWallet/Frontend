@@ -7,11 +7,12 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { TopBar } from '../../../components/TopBar';
 import { Button } from '../../../components/Button';
 import { Input } from '../../../components/Input';
-import { Box, Text } from '../../../theme';
+import { Box, Text, useTheme } from '../../../theme';
 import { ProfileModal } from '../components/ProfileModal/ProfileModal';
 import { useUserStore } from '../stores/userStore';
 import { useSaveProfile } from '../hooks/useSaveProfile';
 import { useTopBarActions } from '../../../hooks/useTopBarActions';
+import { useTranslation } from '../../../hooks/useTranslation';
 import type { RootStackParamList } from '../../../navigation/types';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'EditProfile'>;
@@ -21,9 +22,11 @@ export function EditProfileScreen() {
   const profile = useUserStore((state) => state.profile);
   const saveProfile = useSaveProfile();
   const topBar = useTopBarActions();
+  const theme = useTheme();
+  const { t } = useTranslation();
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFB' }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
       <Box flex={1} width="100%" maxWidth={430} alignSelf="center" bg="background">
         <TopBar
           initials={profile?.initials ?? ''}
@@ -32,13 +35,12 @@ export function EditProfileScreen() {
           onOpenProfile={topBar.openProfile}
         />
         <ScrollView contentContainerStyle={{ padding: 16 }}>
-          <Text variant="h2" mb="sm">Editar perfil</Text>
+          <Text variant="h2" mb="sm">{t('settings.editProfile')}</Text>
           <Text variant="bodySmall" color="textSecondary" mb="md">
-            Atualize seus dados pessoais. Eles aparecem no menu lateral e nos relatórios.
+            {t('editProfile.subtitle')}
           </Text>
           <ProfileModal
             visible
-            initials={profile?.initials ?? ''}
             name={profile?.name ?? ''}
             email={profile?.email ?? ''}
             stats={[]}

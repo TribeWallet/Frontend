@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import {
   useAppCommitments,
@@ -287,7 +287,8 @@ export function buildDashboardData(
 
 export function useDashboardOverview() {
   const { groups, groupsLoading, groupsError, refetchGroups } = useAppGroups();
-  const { commitments, commitmentsLoading, commitmentsError } = useAppCommitments();
+  const { commitments, commitmentsLoading, commitmentsError, refetchCommitments } =
+    useAppCommitments();
   const { payments } = useAppPayments();
   const user = useAuthStore((state) => state.user);
 
@@ -303,11 +304,16 @@ export function useDashboardOverview() {
     };
   }, [groups, commitments, payments, user]);
 
+  const refetch = useCallback(() => {
+    refetchGroups();
+    refetchCommitments();
+  }, [refetchGroups, refetchCommitments]);
+
   return {
     data,
     isLoading: groupsLoading || commitmentsLoading,
     isError: Boolean(groupsError || commitmentsError),
     error: groupsError ?? commitmentsError,
-    refetch: refetchGroups,
+    refetch,
   };
 }

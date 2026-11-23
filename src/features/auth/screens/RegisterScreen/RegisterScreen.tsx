@@ -10,6 +10,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { useKeyboardScroll } from '../../../../hooks/useKeyboardScroll';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 
@@ -21,7 +22,9 @@ import { TribeWalletLogo } from '../../components/TribeWalletLogo';
 import { useAuthStore } from '../../stores/authStore';
 import * as authService from '../../services/authService';
 import { getErrorMessage } from '../../../../services/api/apiClient';
+import { useTheme } from '../../../../theme';
 import { isValidEmail } from '../../../../utils/formatters';
+import { useTranslation } from '../../../../hooks/useTranslation';
 
 export interface RegisterScreenProps {
   onLogin?: () => void;
@@ -29,6 +32,8 @@ export interface RegisterScreenProps {
 
 export function RegisterScreen({ onLogin }: RegisterScreenProps) {
   const { width, height } = useWindowDimensions();
+  const theme = useTheme();
+  const { t } = useTranslation();
 
   /*
    * ==========================================================
@@ -47,6 +52,9 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
   const [submitting, setSubmitting] = useState<boolean>(false);
 
   const setSession = useAuthStore((state) => state.login);
+
+  const { scrollRef, handleFocusCapture, handleContentSizeChange } =
+    useKeyboardScroll();
 
   /*
    * ==========================================================
@@ -108,27 +116,27 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
     const normalizedEmail = email.trim().toLowerCase();
 
     if (!nome.trim()) {
-      setError('Informe o nome.');
+      setError(t('auth.fillName'));
       return;
     }
     if (!sobrenome.trim()) {
-      setError('Informe o sobrenome.');
+      setError(t('auth.fillSurname'));
       return;
     }
     if (!usuario.trim()) {
-      setError('Informe o nome de usuário.');
+      setError(t('auth.fillUsername'));
       return;
     }
     if (!isValidEmail(normalizedEmail)) {
-      setError('Informe um e-mail válido.');
+      setError(t('auth.fillValidEmail'));
       return;
     }
     if (senha.length < 6) {
-      setError('A senha precisa ter pelo menos 6 caracteres.');
+      setError(t('auth.passwordMinLength'));
       return;
     }
     if (senha !== confirmarSenha) {
-      setError('As senhas não coincidem.');
+      setError(t('auth.passwordsDontMatch'));
       return;
     }
 
@@ -173,6 +181,7 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
+          ref={scrollRef}
           style={styles.scroll}
           contentContainerStyle={[
             styles.scrollContent,
@@ -183,6 +192,7 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
             },
           ]}
           keyboardShouldPersistTaps="handled"
+          onContentSizeChange={handleContentSizeChange}
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           showsVerticalScrollIndicator={false}
           bounces={false}
@@ -196,9 +206,9 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
 
             {/* CARD */}
             <View style={styles.card}>
-              <Text style={styles.title}>Criar conta</Text>
+              <Text style={styles.title}>{t('auth.createAccountTitle')}</Text>
               <Text style={styles.subtitle}>
-                Preencha os dados abaixo para criar sua conta
+                {t('auth.createAccountSubtitle')}
               </Text>
 
               {/* FORMULÁRIO */}
@@ -206,12 +216,14 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
                 
                 {/* NOME */}
                 <View style={styles.field}>
-                  <Text style={styles.label}>Nome</Text>
+                  <Text style={styles.label}>{t('auth.name')}</Text>
                   <TextInput
                     value={nome}
-                    onChangeText={handleNomeChange} // Aplica filtro em tempo real
+                    onChangeText={handleNomeChange}
+                    onFocusCapture={handleFocusCapture}
+                    // Aplica filtro em tempo real
                     style={styles.input}
-                    placeholder="Seu nome"
+                    placeholder={t('auth.yourName')}
                     placeholderTextColor="#9AA0A6"
                     autoCapitalize="words"
                     autoCorrect={false}
@@ -224,12 +236,14 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
 
                 {/* SOBRENOME */}
                 <View style={styles.field}>
-                  <Text style={styles.label}>Sobrenome</Text>
+                  <Text style={styles.label}>{t('auth.surname')}</Text>
                   <TextInput
                     value={sobrenome}
-                    onChangeText={handleSobrenomeChange} // Aplica filtro em tempo real
+                    onChangeText={handleSobrenomeChange}
+                    onFocusCapture={handleFocusCapture}
+                    // Aplica filtro em tempo real
                     style={styles.input}
-                    placeholder="Seu sobrenome"
+                    placeholder={t('auth.yourSurname')}
                     placeholderTextColor="#9AA0A6"
                     autoCapitalize="words"
                     autoCorrect={false}
@@ -242,12 +256,14 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
 
                 {/* USUÁRIO */}
                 <View style={styles.field}>
-                  <Text style={styles.label}>Nome de usuário</Text>
+                  <Text style={styles.label}>{t('auth.username')}</Text>
                   <TextInput
                     value={usuario}
-                    onChangeText={handleUsuarioChange} // Remove espaços
+                    onChangeText={handleUsuarioChange}
+                    onFocusCapture={handleFocusCapture}
+                    // Remove espaços
                     style={styles.input}
-                    placeholder="Seu nome de usuário"
+                    placeholder={t('auth.yourUsername')}
                     placeholderTextColor="#9AA0A6"
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -260,12 +276,14 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
 
                 {/* EMAIL */}
                 <View style={styles.field}>
-                  <Text style={styles.label}>E-mail</Text>
+                  <Text style={styles.label}>{t('auth.email')}</Text>
                   <TextInput
                     value={email}
-                    onChangeText={handleEmailChange} // Remove espaços
+                    onChangeText={handleEmailChange}
+                    onFocusCapture={handleFocusCapture}
+                    // Remove espaços
                     style={styles.input}
-                    placeholder="seu@email.com"
+                    placeholder={t('auth.emailPlaceholder')}
                     placeholderTextColor="#9AA0A6"
                     keyboardType="email-address"
                     autoCapitalize="none"
@@ -279,13 +297,15 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
 
                 {/* SENHA */}
                 <View style={styles.field}>
-                  <Text style={styles.label}>Senha</Text>
+                  <Text style={styles.label}>{t('auth.password')}</Text>
                   <View style={styles.passwordWrapper}>
                     <TextInput
                       value={senha}
-                      onChangeText={setSenha} // Aceita tudo (alfanumérico e especiais)
+                      onChangeText={setSenha}
+                      onFocusCapture={handleFocusCapture}
+                      // Aceita tudo (alfanumérico e especiais)
                       style={[styles.input, styles.passwordInput]}
-                      placeholder="Mínimo 6 caracteres"
+                      placeholder={t('auth.passwordMin6')}
                       placeholderTextColor="#9AA0A6"
                       secureTextEntry={!senhaVisible}
                       autoCapitalize="none"
@@ -303,7 +323,9 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
                       ]}
                       hitSlop={8}
                       accessibilityRole="button"
-                      accessibilityLabel={senhaVisible ? 'Ocultar senha' : 'Mostrar senha'}
+                      accessibilityLabel={
+                        senhaVisible ? t('auth.hidePassword') : t('auth.showPassword')
+                      }
                     >
                       <PasswordEye visible={senhaVisible} />
                     </Pressable>
@@ -312,13 +334,15 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
 
                 {/* CONFIRMAR SENHA */}
                 <View style={styles.field}>
-                  <Text style={styles.label}>Confirmar senha</Text>
+                  <Text style={styles.label}>{t('auth.confirmPassword')}</Text>
                   <View style={styles.passwordWrapper}>
                     <TextInput
                       value={confirmarSenha}
-                      onChangeText={setConfirmarSenha} // Aceita tudo
+                      onChangeText={setConfirmarSenha}
+                      onFocusCapture={handleFocusCapture}
+                      // Aceita tudo
                       style={[styles.input, styles.passwordInput]}
-                      placeholder="Repita sua senha"
+                      placeholder={t('auth.repeatPassword')}
                       placeholderTextColor="#9AA0A6"
                       secureTextEntry={!confirmarSenhaVisible}
                       autoCapitalize="none"
@@ -337,7 +361,11 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
                       ]}
                       hitSlop={8}
                       accessibilityRole="button"
-                      accessibilityLabel={confirmarSenhaVisible ? 'Ocultar senha' : 'Mostrar senha'}
+                      accessibilityLabel={
+                        confirmarSenhaVisible
+                          ? t('auth.hidePassword')
+                          : t('auth.showPassword')
+                      }
                     >
                       <PasswordEye visible={confirmarSenhaVisible} />
                     </Pressable>
@@ -347,7 +375,7 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
                 {error ? (
                   <View
                     style={{
-                      backgroundColor: '#FDE8EB',
+                      backgroundColor: theme.colors.dangerLight,
                       borderRadius: 8,
                       padding: 10,
                       marginBottom: 12,
@@ -355,7 +383,7 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
                   >
                     <Text
                       style={{
-                        color: '#B91C2C',
+                        color: theme.colors.danger,
                         fontSize: 13,
                         fontWeight: '500',
                       }}
@@ -375,19 +403,21 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
                     submitting && { opacity: 0.7 },
                   ]}
                   accessibilityRole="button"
-                  accessibilityLabel="Criar conta"
+                  accessibilityLabel={t('auth.createAccount')}
                 >
                   <Text style={styles.registerButtonText}>
-                    {submitting ? 'Criando conta...' : 'Criar conta'}
+                    {submitting
+                      ? t('auth.creatingAccount')
+                      : t('auth.createAccount')}
                   </Text>
                 </Pressable>
               </View>
 
               {/* LOGIN FOOTER */}
               <View style={styles.loginFooter}>
-                <Text style={styles.loginText}>Já tem uma conta?</Text>
+                <Text style={styles.loginText}>{t('auth.haveAccount')}</Text>
                 <Pressable onPress={handleLogin} hitSlop={8}>
-                  <Text style={styles.loginLink}>Fazer login</Text>
+                  <Text style={styles.loginLink}>{t('auth.backToLogin')}</Text>
                 </Pressable>
               </View>
 
@@ -408,25 +438,26 @@ interface PasswordEyeProps {
 }
 
 function PasswordEye({ visible }: PasswordEyeProps) {
+  const theme = useTheme();
   return (
     <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
       {visible ? (
         <>
           <Path
             d="M3 3L21 21"
-            stroke="#6D7379"
+            stroke={theme.colors.textSecondary}
             strokeWidth={1.7}
             strokeLinecap="round"
           />
           <Path
             d="M10.6 6.9C11.05 6.84 11.5 6.8 12 6.8C18.2 6.8 21.5 12 21.5 12C20.85 13 20.05 13.9 19.1 14.65"
-            stroke="#6D7379"
+            stroke={theme.colors.textSecondary}
             strokeWidth={1.5}
             strokeLinecap="round"
           />
           <Path
             d="M6.2 9.15C4.05 10.4 2.5 12 2.5 12C2.5 12 5.8 17.2 12 17.2C13.15 17.2 14.2 17 15.15 16.7"
-            stroke="#6D7379"
+            stroke={theme.colors.textSecondary}
             strokeWidth={1.5}
             strokeLinecap="round"
           />
@@ -435,10 +466,10 @@ function PasswordEye({ visible }: PasswordEyeProps) {
         <>
           <Path
             d="M2.5 12C2.5 12 5.8 7 12 7C18.2 7 21.5 12 21.5 12C21.5 12 18.2 17 12 17C5.8 17 2.5 12 2.5 12Z"
-            stroke="#6D7379"
+            stroke={theme.colors.textSecondary}
             strokeWidth={1.5}
           />
-          <Circle cx="12" cy="12" r="2.5" stroke="#6D7379" strokeWidth={1.5} />
+          <Circle cx="12" cy="12" r="2.5" stroke={theme.colors.textSecondary} strokeWidth={1.5} />
         </>
       )}
     </Svg>

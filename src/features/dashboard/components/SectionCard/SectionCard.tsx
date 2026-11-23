@@ -68,7 +68,7 @@ export function SectionCard({
                 <Text variant="bodySmallStrong" color="text">
                   Ver todas
                 </Text>
-                <ChevronRight color="#22282C" />
+                <ChevronRight color="text" />
               </Box>
             )}
           </Pressable>

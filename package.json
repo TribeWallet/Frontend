@@ -13,6 +13,7 @@
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/datetimepicker": "^9.3.0",
     "@react-navigation/bottom-tabs": "^7.18.18",
     "@react-navigation/native": "^7.3.18",
     "@react-navigation/native-stack": "^7.18.10",
@@ -25,8 +26,10 @@
     "expo-file-system": "~58.0.13",
     "expo-image-picker": "~58.0.10",
     "expo-sharing": "~58.0.21",
+    "i18next": "^27.2.4",
     "react": "19.3.0",
     "react-hook-form": "^7.87.0",
+    "react-i18next": "^18.0.3",
     "react-native": "0.88.1",
     "react-native-gesture-handler": "~3.3.0",
     "react-native-reanimated": "4.7.1",
@@ -38,7 +41,16 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@testing-library/jest-native": "^5.4.3",
+    "@testing-library/react-native": "^14.1.0",
+    "@types/jest": "^30.0.0",
     "@types/react": "~19.3.0",
+    "@types/react-native": "^0.72.8",
+    "jest": "^30.5.2",
+    "jest-environment-node": "^30.5.2",
+    "react-test-renderer": "^19.3.1",
+    "ts-jest": "^29.4.15",
+    "ts-node": "^10.9.2",
     "typescript": "~6.0.3"
   },
   "engines": {

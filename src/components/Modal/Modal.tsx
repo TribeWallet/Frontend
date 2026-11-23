@@ -22,7 +22,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
-import { Box, Text } from '../../theme';
+import { Box, Text, useTheme } from '../../theme';
+import { useTranslation } from '../../hooks/useTranslation';
 
 export interface ModalProps {
   visible: boolean;
@@ -50,6 +51,7 @@ function CloseIcon({ color }: { color: string }) {
 }
 
 function HeaderGrabber() {
+  const theme = useTheme();
   return (
     <Box alignItems="center" pt="xs" pb="xs">
       <View
@@ -57,7 +59,7 @@ function HeaderGrabber() {
           width: 40,
           height: 4,
           borderRadius: 2,
-          backgroundColor: '#DFE4E7',
+          backgroundColor: theme.colors.border,
         }}
       />
     </Box>
@@ -79,6 +81,8 @@ export function Modal({
   dismissOnBackdrop = true,
 }: ModalProps) {
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
+  const { t } = useTranslation();
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const scrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
   const focusedInput = useRef<number | HostInstance | null>(null);
@@ -172,7 +176,7 @@ export function Modal({
             <Pressable
               style={styles.touchableArea}
               onPress={dismissOnBackdrop ? onClose : undefined}
-              accessibilityLabel="Fechar"
+              accessibilityLabel={t('common.close')}
             />
           ) : null}
 
@@ -181,7 +185,7 @@ export function Modal({
             <Pressable
               style={StyleSheet.absoluteFill}
               onPress={dismissOnBackdrop ? onClose : undefined}
-              accessibilityLabel="Fechar"
+              accessibilityLabel={t('common.close')}
             />
           ) : null}
 
@@ -197,7 +201,7 @@ export function Modal({
                 : FadeOut.duration(150)
             }
             style={[
-              styles.content,
+              { backgroundColor: theme.colors.surface },
               variant === 'bottom' && {
                 borderTopLeftRadius: 24,
                 borderTopRightRadius: 24,
@@ -226,7 +230,7 @@ export function Modal({
                 style={
                   variant === 'bottom'
                     ? { borderBottomWidth: 0 }
-                    : { borderBottomWidth: 1, borderColor: '#F0F3F4' }
+                    : { borderBottomWidth: 1, borderColor: theme.colors.border }
                 }
               >
                 <Box flex={1} pr="sm">
@@ -251,7 +255,7 @@ export function Modal({
                     onPress={onClose}
                     hitSlop={10}
                     accessibilityRole="button"
-                    accessibilityLabel="Fechar"
+                    accessibilityLabel={t('common.close')}
                   >
                     {({ pressed }) => (
                       <Box
@@ -263,7 +267,7 @@ export function Modal({
                         justifyContent="center"
                         opacity={pressed ? 0.7 : 1}
                       >
-                        <CloseIcon color="#171717" />
+                        <CloseIcon color={theme.colors.text} />
                       </Box>
                     )}
                   </Pressable>
@@ -281,6 +285,7 @@ export function Modal({
                   style={scrollStyle.scroll}
                   contentContainerStyle={[
                     scrollStyle.content,
+                    { backgroundColor: theme.colors.surface },
                     {
                       paddingBottom:
                         scrollStyle.content.paddingBottom +
@@ -323,8 +328,8 @@ export function Modal({
                   paddingTop: 16,
                   paddingBottom: insets.bottom > 0 ? insets.bottom + 8 : 16,
                   borderTopWidth: 1,
-                  borderColor: '#DFE4E7',
-                  backgroundColor: '#FFFFFF',
+                  borderColor: theme.colors.border,
+                  backgroundColor: theme.colors.surface,
                 }}
               >
                 {footer}

@@ -11,25 +11,20 @@ import { Button } from '../../../components/Button';
 import { PaymentCard } from '../components/PaymentCard/PaymentCard';
 import { NewPaymentModal } from '../components/NewPaymentModal/NewPaymentModal';
 import { EditPaymentModal } from '../components/EditPaymentModal/EditPaymentModal';
-import { Box, Text, PressableBox } from '../../../theme';
+import { Box, Text, PressableBox, useTheme } from '../../../theme';
 import {
   useAppCommitments,
   useAppGroups,
   useAppPayments,
 } from '../../../contexts/AppContext';
 import { useTopBarActions } from '../../../hooks/useTopBarActions';
+import { useTranslation } from '../../../hooks/useTranslation';
 import { useUserStore } from '../../usuario/stores/userStore';
-import { formatCurrency } from '../../../utils/currency';
+import { MoneyValue } from '../../../components/MoneyValue';
 import { paymentMethodLabels } from '../types/Payment';
 import type { Payment, PaymentMethod } from '../types/Payment';
 
 type Filter = 'all' | 'paid' | 'partial';
-
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: 'all', label: 'Todos' },
-  { key: 'paid', label: 'Fatias quitadas' },
-  { key: 'partial', label: 'Fatias parciais' },
-];
 
 export function PaymentsScreen() {
   const topBar = useTopBarActions();
@@ -38,6 +33,13 @@ export function PaymentsScreen() {
   const { payments } = useAppPayments();
   const { groups } = useAppGroups();
   const { commitmentsLoading, commitmentsError, refetchCommitments } = useAppCommitments();
+  const { t } = useTranslation();
+
+  const FILTERS: { key: Filter; label: string }[] = [
+    { key: 'all', label: t('common.all') },
+    { key: 'paid', label: t('common.paid') },
+    { key: 'partial', label: t('common.partial') },
+  ];
 
   const [filter, setFilter] = useState<Filter>('all');
   const [groupFilter, setGroupFilter] = useState<string>('all');
@@ -46,6 +48,7 @@ export function PaymentsScreen() {
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
 
   const isSmallPhone = width < 360;
+  const theme = useTheme();
 
   const filtered = useMemo(
     () =>
@@ -60,7 +63,7 @@ export function PaymentsScreen() {
 
   const groupOptions = useMemo<SelectOption[]>(
     () => [
-      { id: 'all', label: 'Todos os grupos' },
+      { id: 'all', label: t('common.allGroups') },
       ...groups.map((group) => ({ id: group.id, label: group.name })),
     ],
     [groups],
@@ -69,10 +72,10 @@ export function PaymentsScreen() {
   const methodOptions = useMemo<SelectOption[]>(() => {
     const used = Array.from(new Set(payments.map((payment) => payment.method)));
     return [
-      { id: 'all', label: 'Todas as formas' },
+      { id: 'all', label: t('payments.filterAll') },
       ...used.map((method) => ({
         id: method,
-        label: paymentMethodLabels[method as PaymentMethod],
+        label: t(paymentMethodLabels[method as PaymentMethod]),
       })),
     ];
   }, [payments]);
@@ -83,7 +86,7 @@ export function PaymentsScreen() {
   );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFB' }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
       <Box flex={1} width="100%" maxWidth={430} alignSelf="center" bg="background">
         <TopBar
           initials={profile?.initials ?? ''}
@@ -98,11 +101,11 @@ export function PaymentsScreen() {
         >
           <Box width="100%" px={isSmallPhone ? 'sm' : 'md'} pt="md">
             <ScreenHeader
-              title="Pagamentos"
-              subtitle="Registre, edite e exclua pagamentos"
+              title={t('payments.title')}
+              subtitle={t('payments.subtitle')}
             >
               <Button
-                title="Novo pagamento"
+                title={t('payments.newPayment')}
                 onPress={() => setCreating(true)}
                 fullWidth
               />
@@ -118,8 +121,8 @@ export function PaymentsScreen() {
               justifyContent="space-between"
             >
               <Box>
-                <Text variant="captionStrong" color="primary">FILTRADO</Text>
-                <Text variant="h2" color="primary">{formatCurrency(total)}</Text>
+                <Text variant="captionStrong" color="primary">{t('payments.filtered')}</Text>
+                <MoneyValue amount={total} variant="h2" />
                 <Text variant="caption" color="textSecondary">
                   {filtered.length} pagamento{filtered.length === 1 ? '' : 's'}
                 </Text>
@@ -154,35 +157,35 @@ export function PaymentsScreen() {
             </Box>
 
             <Select
-              label="Filtrar por grupo"
-              placeholder="Todos os grupos"
+              label={t('reports.filterGroup')}
+              placeholder={t('common.allGroups')}
               value={groupFilter}
               onChange={setGroupFilter}
               options={groupOptions}
             />
 
             <Select
-              label="Forma de pagamento"
-              placeholder="Todas as formas"
+              label={t('payments.paymentMethod')}
+              placeholder={t('payments.allMethods')}
               value={methodFilter}
               onChange={setMethodFilter}
               options={methodOptions}
             />
 
             {commitmentsLoading ? (
-              <Loading label="Carregando pagamentos..." />
+              <Loading label={t('payments.loading')} />
             ) : commitmentsError ? (
               <EmptyState
-                title="Não foi possível carregar os pagamentos"
+                title={t('payments.errorTitle')}
                 description={commitmentsError}
-                actionLabel="Tentar novamente"
+                actionLabel={t('payments.tryAgain')}
                 onAction={refetchCommitments}
               />
             ) : filtered.length === 0 ? (
               <EmptyState
-                title="Sem pagamentos"
-                description="Use o botão acima para registrar o primeiro pagamento."
-                actionLabel="Novo pagamento"
+                title={t('payments.noPayments')}
+                description={t('payments.noPaymentsDesc')}
+                actionLabel={t('payments.newPayment')}
                 onAction={() => setCreating(true)}
               />
             ) : (
@@ -199,11 +202,19 @@ export function PaymentsScreen() {
           </Box>
         </ScrollView>
       </Box>
-      <NewPaymentModal visible={creating} onClose={() => setCreating(false)} />
+      <NewPaymentModal
+        visible={creating}
+        onClose={() => setCreating(false)}
+        onCreated={() => {
+          refetchCommitments();
+          setCreating(false);
+        }}
+      />
       <EditPaymentModal
         visible={editingPayment !== null}
         payment={editingPayment}
         onClose={() => setEditingPayment(null)}
+        onSaved={() => refetchCommitments()}
       />
     </SafeAreaView>
   );
