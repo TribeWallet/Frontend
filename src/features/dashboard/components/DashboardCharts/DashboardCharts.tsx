@@ -252,8 +252,9 @@ export function LineChart({ data, height = 160, formatter }: LineChartProps) {
       </Box>
     );
   }
-  const max = Math.max(...data.map((d) => d.value), 1);
-  const min = Math.min(...data.map((d) => d.value), 0);
+  const safeValues = data.map((d) => (Number.isFinite(d.value) ? d.value : 0));
+  const max = Math.max(...safeValues, 1);
+  const min = Math.min(...safeValues, 0);
   const padding = { left: 36, right: 12, top: 12, bottom: 28 };
   const width = 320;
   const innerW = width - padding.left - padding.right;
@@ -262,8 +263,9 @@ export function LineChart({ data, height = 160, formatter }: LineChartProps) {
   const step = innerW / Math.max(1, data.length - 1);
 
   const points = data.map((item, index) => {
+    const safeValue = Number.isFinite(item.value) ? item.value : 0;
     const x = padding.left + step * index;
-    const y = padding.top + innerH - ((item.value - min) / range) * innerH;
+    const y = padding.top + innerH - ((safeValue - min) / range) * innerH;
     return { x, y, item };
   });
 

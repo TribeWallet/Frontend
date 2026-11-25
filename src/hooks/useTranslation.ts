@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation as useRNTranslation, Trans as RNTrans } from 'react-i18next';
-import i18n, { setStoredLanguage, getStoredLanguage, Language, LANGUAGES } from '../i18n';
+import i18n, {
+  setStoredLanguage,
+  getStoredLanguage,
+  getStoredLanguageRaw,
+  getDetectedLanguage,
+  Language,
+  LANGUAGES,
+} from '../i18n';
 
 export function useTranslation() {
   const { t, i18n: i18nInstance, ready } = useRNTranslation();
@@ -38,5 +45,5 @@ export function useTranslation() {
 
 export { RNTrans as Trans };
 
-export { getStoredLanguage };
+export { getStoredLanguage, getStoredLanguageRaw, getDetectedLanguage };
 export type { Language };

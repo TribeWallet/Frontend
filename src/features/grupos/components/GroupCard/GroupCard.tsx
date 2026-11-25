@@ -113,11 +113,11 @@ export function GroupCard({ group, onPress }: GroupCardProps) {
             <Text variant="caption" color="textSecondary">{t('common.members')}</Text>
           </Box>
           <Box alignItems="center" flex={1}>
-            <MaskedText text={group.summary.openValue} />
+            <MaskedText text={group.summary.openValue} variant="caption" numberOfLines={1} ellipsizeMode="tail" />
             <Text variant="caption" color="textSecondary">{t('groupCard.open')}</Text>
           </Box>
           <Box alignItems="center" flex={1}>
-            <MaskedText text={group.summary.paidValue} />
+            <MaskedText text={group.summary.paidValue} variant="caption" numberOfLines={1} ellipsizeMode="tail" />
             <Text variant="caption" color="textSecondary">{t('groupCard.paid')}</Text>
           </Box>
         </Box>

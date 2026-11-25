@@ -81,7 +81,9 @@
     "latestTransactions": "Últimas transações",
     "noTransactions": "Nenhuma transação para exibir.",
     "noUpcoming": "Nenhum vencimento próximo.",
-    "upcoming": "Próximos vencimentos"
+    "upcoming": "Próximos vencimentos",
+    "viewDetails": "Ver detalhes",
+    "a11yViewDetails": "Ver detalhes do alerta"
   },
   "commitments": {
     "title": "Compromissos",
@@ -573,6 +575,16 @@
     "maxDateError": "Data máxima não permitida",
     "confirm": "Confirmar",
     "month": "Mês",
-    "year": "Ano"
+    "year": "Ano",
+    "biometric": {
+      "title": "Autenticação biométrica",
+      "subtitle": "Use {{type}} para desbloquear o app",
+      "authenticate": "Autenticar",
+      "authenticating": "Autenticando...",
+      "notSupported": "Biometria não disponível neste dispositivo",
+      "facial": "reconhecimento facial",
+      "fingerprint": "impressão digital",
+      "generic": "biometria"
+    }
   }
 }

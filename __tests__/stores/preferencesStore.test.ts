@@ -11,7 +11,7 @@ import { usePreferencesStore } from '../../src/features/configuracoes/stores/pre
 
 describe('preferencesStore', () => {
   const DEFAULT_STATE = {
-    appearance: 'light' as const,
+    appearance: 'system' as const,
     currency: 'BRL' as const,
     biometricLock: false,
     hideValues: false,
@@ -25,7 +25,7 @@ describe('preferencesStore', () => {
 
   it('deve ter estado inicial padrão', () => {
     const state = usePreferencesStore.getState();
-    expect(state.appearance).toBe('light');
+    expect(state.appearance).toBe('system');
     expect(state.currency).toBe('BRL');
     expect(state.biometricLock).toBe(false);
     expect(state.hideValues).toBe(false);
@@ -91,7 +91,7 @@ describe('preferencesStore', () => {
     usePreferencesStore.getState().reset();
 
     const state = usePreferencesStore.getState();
-    expect(state.appearance).toBe('light');
+    expect(state.appearance).toBe('system');
     expect(state.currency).toBe('BRL');
     expect(state.biometricLock).toBe(false);
     expect(state.hideValues).toBe(false);

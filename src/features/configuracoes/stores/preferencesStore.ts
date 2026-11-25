@@ -26,7 +26,7 @@ const DEFAULT_STATE: Pick<
   PreferencesState,
   'appearance' | 'currency' | 'biometricLock' | 'hideValues' | 'defaultGroupId' | 'language'
 > = {
-  appearance: 'light',
+  appearance: 'system',
   currency: 'BRL',
   biometricLock: false,
   hideValues: false,

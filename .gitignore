@@ -3,10 +3,12 @@ node_modules/
 .expo/
 dist/
 web-build/
+node_modules/
 npm-debug.log
 coverage/
 android/
 ios/
 .md
+__tests__/
 src/config/environment.ts
 .idea/

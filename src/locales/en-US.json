@@ -81,7 +81,9 @@
     "latestTransactions": "Latest transactions",
     "noTransactions": "No transactions to display.",
     "noUpcoming": "No upcoming due dates.",
-    "upcoming": "Upcoming"
+    "upcoming": "Upcoming",
+    "viewDetails": "View details",
+    "a11yViewDetails": "View alert details"
   },
   "commitments": {
     "title": "Commitments",
@@ -574,6 +576,16 @@
     "maxDateError": "Maximum date not allowed",
     "confirm": "Confirm",
     "month": "Month",
-    "year": "Year"
+    "year": "Year",
+    "biometric": {
+      "title": "Biometric authentication",
+      "subtitle": "Use {{type}} to unlock the app",
+      "authenticate": "Authenticate",
+      "authenticating": "Authenticating...",
+      "notSupported": "Biometrics not available on this device",
+      "facial": "face recognition",
+      "fingerprint": "fingerprint",
+      "generic": "biometrics"
+    }
   }
 }

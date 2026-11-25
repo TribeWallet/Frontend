@@ -187,13 +187,12 @@ export function NewCommitmentModal({
 
   const handleSplitModeChange = useCallback(
     (mode: SplitMode) => {
-      if (mode === 'custom' && parcelas > 1) return;
       if (mode === 'custom' && customSplits.every((split) => split.amount === 0)) {
         applyEqualDefaultsToCustom();
       }
       setValue('splitMode', mode, { shouldValidate: true });
     },
-    [parcelas, customSplits, applyEqualDefaultsToCustom, setValue],
+    [customSplits, applyEqualDefaultsToCustom, setValue],
   );
 
   const handleClose = useCallback(() => {
@@ -363,9 +362,6 @@ export function NewCommitmentModal({
                       onChangeText={(text) => {
                         const masked = maskNumber(text, 2);
                         onChange(masked);
-                        if ((Number(masked) || 1) > 1 && watched.splitMode === 'custom') {
-                          setValue('splitMode', 'equal', { shouldValidate: true });
-                        }
                       }}
                       onBlur={onBlur}
                       placeholder={t('newCommitment.installmentsPlaceholder')}
@@ -440,13 +436,12 @@ export function NewCommitmentModal({
               <Box flexDirection="row" gap="xs">
                 {(['equal', 'custom'] as SplitMode[]).map((mode) => {
                   const active = watched.splitMode === mode;
-                  const blocked = mode === 'custom' && parcelas > 1 && !isEdit;
                   return (
                     <PressableBox
                       key={mode}
-                      onPress={() => !blocked && handleSplitModeChange(mode)}
+                      onPress={() => handleSplitModeChange(mode)}
                       accessibilityRole="button"
-                      accessibilityState={{ selected: active, disabled: blocked }}
+                      accessibilityState={{ selected: active }}
                       style={{ flex: 1 }}
                     >
                       <Box
@@ -456,7 +451,6 @@ export function NewCommitmentModal({
                         borderWidth={1}
                         borderColor={active ? 'primary' : 'border'}
                         alignItems="center"
-                        opacity={blocked ? 0.5 : 1}
                       >
                         <Text variant="captionStrong" color={active ? 'white' : 'textSecondary'}>
                           {mode === 'equal' ? t('newCommitment.splitEqual') : t('newCommitment.splitExact')}
@@ -503,6 +497,8 @@ export function NewCommitmentModal({
                       customSplits.find(
                         (entry) => entry.integranteToken === member.integranteToken,
                       )?.amount ?? 0;
+                    const porParcela =
+                      parcelas > 1 ? current / parcelas : current;
                     return (
                       <Box key={member.integranteToken} gap="xxs">
                         <Text variant="bodySmall" color="textSecondary">
@@ -532,6 +528,14 @@ export function NewCommitmentModal({
                           placeholder={t('newCommitment.amountPlaceholder')}
                           keyboardType="decimal-pad"
                         />
+                        {parcelas > 1 && (
+                          <Text variant="caption" color="textSecondary">
+                            {t('newCommitment.installmentsCreated', {
+                              parcelas,
+                              total: formatMoney(porParcela),
+                            })}
+                          </Text>
+                        )}
                       </Box>
                     );
                   })}
