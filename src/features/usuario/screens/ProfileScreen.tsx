@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Image, ScrollView, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { TopBar } from '../../../components/TopBar';
@@ -44,6 +44,12 @@ export function ProfileScreen() {
   const { t } = useTranslation();
   const formatMoney = useFormatMoney();
   const { data, isLoading, isError: dashboardError, refetch } = useAppDashboard();
+
+  useFocusEffect(
+    useCallback(() => {
+      void refetch();
+    }, [refetch]),
+  );
 
   const totalPaid = data?.valorTotalPago ?? payments.reduce((sum, p) => sum + p.amount, 0);
   const punctuality = data?.taxaDePontualidade? (data.taxaDePontualidade)*100 : 0;
