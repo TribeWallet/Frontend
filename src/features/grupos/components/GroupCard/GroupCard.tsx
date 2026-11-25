@@ -2,25 +2,35 @@ import React from 'react';
 import { Pressable, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { Pill } from '../../../../components/Pill';
-import { Box, Text } from '../../../../theme';
+import { Box, Text, useTheme } from '../../../../theme';
+import { useTranslation } from '../../../../hooks/useTranslation';
 import type { Group, GroupTone } from '../../types/Group';
-import { formatCurrency } from '../../../../utils/currency';
+import { MaskedText } from '../../../../components/MaskedText';
 
 interface GroupCardProps {
   group: Group;
   onPress?: (id: string) => void;
 }
 
-const toneColors: Record<GroupTone, { bg: string; icon: string }> = {
-  blue: { bg: '#E8F1FF', icon: '#0071DF' },
-  green: { bg: '#E0F7EF', icon: '#16AF7E' },
-  family: { bg: '#FDE8EB', icon: '#EF5067' },
-};
+const memberBg: ('primary' | 'success' | 'warning' | 'danger')[] = [
+  'primary',
+  'success',
+  'warning',
+  'danger',
+];
 
-const memberBg = ['#0071DF', '#16AF7E', '#6E5BEF', '#E8A924'];
+function toneColorsFor(theme: any, tone: GroupTone) {
+  switch (tone) {
+    case 'blue':
+      return { bg: theme.colors.primaryLight, icon: theme.colors.primary };
+    case 'green':
+      return { bg: theme.colors.successLight, icon: theme.colors.success };
+    case 'family':
+      return { bg: theme.colors.dangerLight, icon: theme.colors.danger };
+  }
+}
 
-function GroupIcon({ tone }: { tone: GroupTone }) {
-  const color = toneColors[tone].icon;
+function GroupIcon({ tone, color }: { tone: GroupTone; color: string }) {
   if (tone === 'green') {
     return (
       <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
@@ -44,7 +54,9 @@ function GroupIcon({ tone }: { tone: GroupTone }) {
 }
 
 export function GroupCard({ group, onPress }: GroupCardProps) {
-  const palette = toneColors[group.tone];
+  const theme = useTheme();
+  const { t } = useTranslation();
+  const palette = toneColorsFor(theme, group.tone);
 
   return (
     <Pressable
@@ -72,7 +84,7 @@ export function GroupCard({ group, onPress }: GroupCardProps) {
               marginRight: 12,
             }}
           >
-            <GroupIcon tone={group.tone} />
+            <GroupIcon tone={group.tone} color={palette.icon} />
           </View>
 
           <Box flex={1}>
@@ -98,15 +110,15 @@ export function GroupCard({ group, onPress }: GroupCardProps) {
         >
           <Box alignItems="center" flex={1}>
             <Text variant="bodyStrong">{group.summary.members}</Text>
-            <Text variant="caption" color="textSecondary">Integrantes</Text>
+            <Text variant="caption" color="textSecondary">{t('common.members')}</Text>
           </Box>
           <Box alignItems="center" flex={1}>
-            <Text variant="bodyStrong" color="danger">{group.summary.openValue}</Text>
-            <Text variant="caption" color="textSecondary">Em aberto</Text>
+            <MaskedText text={group.summary.openValue} variant="caption" numberOfLines={1} ellipsizeMode="tail" />
+            <Text variant="caption" color="textSecondary">{t('groupCard.open')}</Text>
           </Box>
           <Box alignItems="center" flex={1}>
-            <Text variant="bodyStrong" color="success">{group.summary.paidValue}</Text>
-            <Text variant="caption" color="textSecondary">Pago</Text>
+            <MaskedText text={group.summary.paidValue} variant="caption" numberOfLines={1} ellipsizeMode="tail" />
+            <Text variant="caption" color="textSecondary">{t('groupCard.paid')}</Text>
           </Box>
         </Box>
 
@@ -119,9 +131,9 @@ export function GroupCard({ group, onPress }: GroupCardProps) {
                   width: 28,
                   height: 28,
                   borderRadius: 9999,
-                  backgroundColor: memberBg[index] || '#0071DF',
+                  backgroundColor: theme.colors[memberBg[index]],
                   borderWidth: 2,
-                  borderColor: '#FFFFFF',
+                  borderColor: theme.colors.white,
                   alignItems: 'center',
                   justifyContent: 'center',
                   marginLeft: index > 0 ? -8 : 0,
@@ -129,7 +141,7 @@ export function GroupCard({ group, onPress }: GroupCardProps) {
               >
                 <Text
                   variant="captionStrong"
-                  style={{ color: '#FFFFFF', fontSize: 11 }}
+                  style={{ color: theme.colors.white, fontSize: 11 }}
                 >
                   {member.initials}
                 </Text>
@@ -141,9 +153,9 @@ export function GroupCard({ group, onPress }: GroupCardProps) {
                   width: 28,
                   height: 28,
                   borderRadius: 9999,
-                  backgroundColor: '#DFE4E7',
+                  backgroundColor: theme.colors.border,
                   borderWidth: 2,
-                  borderColor: '#FFFFFF',
+                  borderColor: theme.colors.white,
                   alignItems: 'center',
                   justifyContent: 'center',
                   marginLeft: -8,
@@ -158,13 +170,13 @@ export function GroupCard({ group, onPress }: GroupCardProps) {
 
           <View
             style={{
-              backgroundColor: '#0071DF',
+              backgroundColor: theme.colors.primary,
               paddingHorizontal: 12,
               paddingVertical: 6,
               borderRadius: 9999,
             }}
           >
-            <Text variant="captionStrong" color="white">Abrir</Text>
+            <Text variant="captionStrong" color="white">{t('groupCard.openGroup')}</Text>
           </View>
         </Box>
       </Box>

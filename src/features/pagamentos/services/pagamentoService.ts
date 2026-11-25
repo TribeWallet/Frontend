@@ -6,7 +6,7 @@ import type { TransactionStatus } from '../../../types/transactionStatus';
 import { brToISO, isoToBR } from '../../../utils/date';
 import type { Payment, PaymentDraft, PaymentMethod, PaymentPatch } from '../types/Payment';
 
-const METHOD_TO_API: Record<PaymentMethod, number> = {
+export const METHOD_TO_API: Record<PaymentMethod, number> = {
   pix: MetodoPagamento.pix,
   dinheiro: MetodoPagamento.dinheiro,
   credito: MetodoPagamento.cartaoCredito,

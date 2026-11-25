@@ -8,17 +8,12 @@ import { ScreenHeader } from '../../../../components/ScreenHeader';
 import { TopBar } from '../../../../components/TopBar';
 import { NotificationItemView } from '../../components/NotificationItem/NotificationItem';
 import { useNotifications } from '../../../../hooks/useNotifications';
-import { Box, Text, PressableBox } from '../../../../theme';
+import { Box, Text, PressableBox, useTheme } from '../../../../theme';
 import { useTopBarActions } from '../../../../hooks/useTopBarActions';
+import { useTranslation } from '../../../../hooks/useTranslation';
 import { useUserStore } from '../../../usuario/stores/userStore';
 
 type FilterKey = 'all' | 'unread' | 'pending';
-
-const FILTER_LABELS: Record<FilterKey, string> = {
-  all: 'Todas',
-  unread: 'Não lidas',
-  pending: 'Pendentes',
-};
 
 export function NotificacoesScreen() {
   const { width } = useWindowDimensions();
@@ -35,6 +30,14 @@ export function NotificacoesScreen() {
   const [filter, setFilter] = useState<FilterKey>('all');
 
   const isSmallPhone = width < 360;
+  const theme = useTheme();
+  const { t } = useTranslation();
+
+  const FILTER_LABELS: Record<FilterKey, string> = {
+    all: t('notifications.filterAll'),
+    unread: t('notifications.unread'),
+    pending: t('notifications.pending'),
+  };
 
   // Sem push, a lista só é atualizada quando a pessoa abre a tela.
   useFocusEffect(
@@ -54,7 +57,7 @@ export function NotificacoesScreen() {
   }, [filter, notifications]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFB' }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
       <Box flex={1} width="100%" maxWidth={430} alignSelf="center" bg="background">
         <TopBar
           initials={profile?.initials ?? ''}
@@ -71,11 +74,11 @@ export function NotificacoesScreen() {
         >
           <Box width="100%" px={isSmallPhone ? 'sm' : 'md'} pt="md">
             <ScreenHeader
-              title="Notificações"
+              title={t('notifications.title')}
               subtitle={
                 unreadCount > 0
-                  ? `Você tem ${unreadCount} notificações não lidas`
-                  : 'Você está em dia com tudo'
+                  ? t('notifications.unread', { count: unreadCount })
+                  : t('notifications.allRead')
               }
             >
               <Box flexDirection="row" justifyContent="space-between" mb="sm">
@@ -85,7 +88,7 @@ export function NotificacoesScreen() {
                   hitSlop={4}
                 >
                   <Text variant="bodySmallStrong" color="primary">
-                    Marcar todas como lidas
+                    {t('notifications.markAllRead')}
                   </Text>
                 </PressableBox>
 
@@ -95,7 +98,7 @@ export function NotificacoesScreen() {
                   hitSlop={4}
                 >
                   <Text variant="bodySmallStrong" color="primary">
-                    Configurar
+                    {t('notifications.configure')}
                   </Text>
                 </PressableBox>
               </Box>
@@ -130,9 +133,9 @@ export function NotificacoesScreen() {
 
             {filtered.length === 0 ? (
               <EmptyState
-                title="Nenhuma notificação"
-                description="Você está em dia com tudo."
-                actionLabel="Atualizar"
+                title={t('notifications.noNotifications')}
+                description={t('notifications.noNotificationsDesc')}
+                actionLabel={t('notifications.refresh')}
                 onAction={refreshNotifications}
               />
             ) : (

@@ -12,7 +12,7 @@ export interface PreferencesState {
   biometricLock: boolean;
   hideValues: boolean;
   defaultGroupId?: string;
-  language: 'pt-BR' | 'en-US';
+  language: 'pt-BR' | 'en-US' | 'es-ES';
   setAppearance: (mode: AppearanceMode) => void;
   setCurrency: (currency: Currency) => void;
   setBiometricLock: (enabled: boolean) => void;
@@ -24,12 +24,13 @@ export interface PreferencesState {
 
 const DEFAULT_STATE: Pick<
   PreferencesState,
-  'appearance' | 'currency' | 'biometricLock' | 'hideValues' | 'language'
+  'appearance' | 'currency' | 'biometricLock' | 'hideValues' | 'defaultGroupId' | 'language'
 > = {
-  appearance: 'light',
+  appearance: 'system',
   currency: 'BRL',
   biometricLock: false,
   hideValues: false,
+  defaultGroupId: undefined,
   language: 'pt-BR',
 };
 

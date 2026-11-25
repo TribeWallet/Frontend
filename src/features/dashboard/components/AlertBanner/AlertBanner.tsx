@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { Box, Text } from '../../../../theme';
+import { useTranslation } from '../../../../hooks/useTranslation';
 
 interface AlertBannerProps {
   title: string;
@@ -14,6 +15,7 @@ export function AlertBanner({
   description,
   onPressView,
 }: AlertBannerProps) {
+  const { t } = useTranslation();
   return (
     <Box
       flexDirection="row"
@@ -55,7 +57,7 @@ export function AlertBanner({
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Ver detalhes do alerta"
+        accessibilityLabel={t('dashboard.a11yViewDetails')}
         onPress={onPressView}
         hitSlop={8}
       >
@@ -68,7 +70,7 @@ export function AlertBanner({
             opacity={pressed ? 0.85 : 1}
           >
             <Text variant="captionStrong" color="white">
-              Ver
+              {t('dashboard.viewDetails')}
             </Text>
           </Box>
         )}

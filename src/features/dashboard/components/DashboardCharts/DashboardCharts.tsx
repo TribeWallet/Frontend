@@ -9,9 +9,7 @@ import Svg, {
   Rect,
   Text as SvgText,
 } from 'react-native-svg';
-import { Box, Text } from '../../../../theme';
-
-const COLORS = ['#0071DF', '#16AF7E', '#E8A924', '#6E5BEF', '#EF5067'];
+import { Box, Text, useTheme } from '../../../../theme';
 
 export interface ChartDatum {
   label: string;
@@ -25,6 +23,7 @@ interface BarChartProps {
 }
 
 export function BarChart({ data, height = 160, formatter }: BarChartProps) {
+  const theme = useTheme();
   if (!data.length) {
     return (
       <Box alignItems="center" py="md">
@@ -45,6 +44,14 @@ export function BarChart({ data, height = 160, formatter }: BarChartProps) {
   const ticks = 4;
   const tickValues = Array.from({ length: ticks + 1 }, (_, i) => (max / ticks) * i);
 
+  const chartColors = [
+    theme.colors.primary,
+    theme.colors.success,
+    theme.colors.warning,
+    theme.colors.primary,
+    theme.colors.danger,
+  ];
+
   return (
     <View>
       <Svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`}>
@@ -57,7 +64,7 @@ export function BarChart({ data, height = 160, formatter }: BarChartProps) {
                 y1={y}
                 x2={width - padding.right}
                 y2={y}
-                stroke="#DFE4E7"
+                stroke={theme.colors.border}
                 strokeDasharray="3,4"
                 strokeWidth={0.7}
               />
@@ -66,7 +73,7 @@ export function BarChart({ data, height = 160, formatter }: BarChartProps) {
                 y={y + 4}
                 textAnchor="end"
                 fontSize={9}
-                fill="#8C949B"
+                fill={theme.colors.textMuted}
               >
                 {formatter ? formatter(tick) : Math.round(tick).toString()}
               </SvgText>
@@ -85,14 +92,14 @@ export function BarChart({ data, height = 160, formatter }: BarChartProps) {
                 width={barWidth}
                 height={h}
                 rx={6}
-                fill={COLORS[index % COLORS.length]}
+                fill={chartColors[index % chartColors.length]}
               />
               <SvgText
                 x={x + barWidth / 2}
                 y={height - 10}
                 textAnchor="middle"
                 fontSize={10}
-                fill="#6D7379"
+                fill={theme.colors.textSecondary}
               >
                 {truncate(item.label, 12)}
               </SvgText>
@@ -117,6 +124,7 @@ export function DonutChart({
   centerLabel,
   centerValue,
 }: DonutChartProps) {
+  const theme = useTheme();
   const total = data.reduce((sum, item) => sum + item.value, 0);
   if (total <= 0 || !data.length) {
     return (
@@ -134,6 +142,14 @@ export function DonutChart({
   const cy = radius;
   const circumference = 2 * Math.PI * inner;
 
+  const chartColors = [
+    theme.colors.primary,
+    theme.colors.success,
+    theme.colors.warning,
+    theme.colors.primary,
+    theme.colors.danger,
+  ];
+
   let offset = 0;
   return (
     <View style={{ alignItems: 'center' }}>
@@ -143,7 +159,7 @@ export function DonutChart({
             cx={cx}
             cy={cy}
             r={inner}
-            stroke="#DFE4E7"
+            stroke={theme.colors.border}
             strokeWidth={stroke}
             fill="none"
           />
@@ -157,7 +173,7 @@ export function DonutChart({
                 cx={cx}
                 cy={cy}
                 r={inner}
-                stroke={COLORS[index % COLORS.length]}
+                stroke={chartColors[index % chartColors.length]}
                 strokeWidth={stroke}
                 strokeDasharray={dashArray}
                 strokeDashoffset={-offset}
@@ -176,7 +192,7 @@ export function DonutChart({
             textAnchor="middle"
             fontSize={18}
             fontWeight="700"
-            fill="#171717"
+            fill={theme.colors.text}
           >
             {centerValue}
           </SvgText>
@@ -187,7 +203,7 @@ export function DonutChart({
             y={cy + 16}
             textAnchor="middle"
             fontSize={10}
-            fill="#6D7379"
+            fill={theme.colors.textSecondary}
           >
             {centerLabel}
           </SvgText>
@@ -201,7 +217,7 @@ export function DonutChart({
                 width: 10,
                 height: 10,
                 borderRadius: 2,
-                backgroundColor: COLORS[index % COLORS.length],
+                backgroundColor: chartColors[index % chartColors.length],
               }}
             />
             <Box flex={1}>
@@ -226,6 +242,7 @@ interface LineChartProps {
 }
 
 export function LineChart({ data, height = 160, formatter }: LineChartProps) {
+  const theme = useTheme();
   if (!data.length) {
     return (
       <Box alignItems="center" py="md">
@@ -235,8 +252,9 @@ export function LineChart({ data, height = 160, formatter }: LineChartProps) {
       </Box>
     );
   }
-  const max = Math.max(...data.map((d) => d.value), 1);
-  const min = Math.min(...data.map((d) => d.value), 0);
+  const safeValues = data.map((d) => (Number.isFinite(d.value) ? d.value : 0));
+  const max = Math.max(...safeValues, 1);
+  const min = Math.min(...safeValues, 0);
   const padding = { left: 36, right: 12, top: 12, bottom: 28 };
   const width = 320;
   const innerW = width - padding.left - padding.right;
@@ -245,8 +263,9 @@ export function LineChart({ data, height = 160, formatter }: LineChartProps) {
   const step = innerW / Math.max(1, data.length - 1);
 
   const points = data.map((item, index) => {
+    const safeValue = Number.isFinite(item.value) ? item.value : 0;
     const x = padding.left + step * index;
-    const y = padding.top + innerH - ((item.value - min) / range) * innerH;
+    const y = padding.top + innerH - ((safeValue - min) / range) * innerH;
     return { x, y, item };
   });
 
@@ -271,7 +290,7 @@ export function LineChart({ data, height = 160, formatter }: LineChartProps) {
                 y1={y}
                 x2={width - padding.right}
                 y2={y}
-                stroke="#DFE4E7"
+                stroke={theme.colors.border}
                 strokeDasharray="3,4"
                 strokeWidth={0.7}
               />
@@ -280,24 +299,31 @@ export function LineChart({ data, height = 160, formatter }: LineChartProps) {
                 y={y + 4}
                 textAnchor="end"
                 fontSize={9}
-                fill="#8C949B"
+                fill={theme.colors.textMuted}
               >
                 {formatter ? formatter(tick) : Math.round(tick).toString()}
               </SvgText>
             </G>
           );
         })}
-        <Path d={areaPath} fill="#E8F1FF" opacity={0.6} />
-        <Path d={linePath} stroke="#0071DF" strokeWidth={2.4} fill="none" />
+        <Path d={areaPath} fill={theme.colors.primaryLight} opacity={0.6} />
+        <Path d={linePath} stroke={theme.colors.primary} strokeWidth={2.4} fill="none" />
         {points.map((p, i) => (
           <G key={i}>
-            <Circle cx={p.x} cy={p.y} r={3.5} fill="#FFFFFF" stroke="#0071DF" strokeWidth={2} />
+            <Circle
+              cx={p.x}
+              cy={p.y}
+              r={3.5}
+              fill={theme.colors.white}
+              stroke={theme.colors.primary}
+              strokeWidth={2}
+            />
             <SvgText
               x={p.x}
               y={height - 10}
               textAnchor="middle"
               fontSize={10}
-              fill="#6D7379"
+              fill={theme.colors.textSecondary}
             >
               {truncate(p.item.label, 12)}
             </SvgText>
@@ -314,6 +340,7 @@ interface HorizontalBarListProps {
 }
 
 export function HorizontalBarList({ data, formatter }: HorizontalBarListProps) {
+  const theme = useTheme();
   if (!data.length) {
     return (
       <Box alignItems="center" py="md">
@@ -324,6 +351,13 @@ export function HorizontalBarList({ data, formatter }: HorizontalBarListProps) {
     );
   }
   const max = Math.max(...data.map((d) => d.value), 1);
+  const chartColors = [
+    theme.colors.primary,
+    theme.colors.success,
+    theme.colors.warning,
+    theme.colors.primary,
+    theme.colors.danger,
+  ];
   return (
     <Box gap="sm">
       {data.map((item, index) => {
@@ -341,7 +375,7 @@ export function HorizontalBarList({ data, formatter }: HorizontalBarListProps) {
             <View
               style={{
                 height: 8,
-                backgroundColor: '#F0F3F4',
+                backgroundColor: theme.colors.border,
                 borderRadius: 9999,
                 overflow: 'hidden',
               }}
@@ -350,7 +384,7 @@ export function HorizontalBarList({ data, formatter }: HorizontalBarListProps) {
                 style={{
                   width: `${Math.max(2, percent)}%`,
                   height: '100%',
-                  backgroundColor: COLORS[index % COLORS.length],
+                  backgroundColor: chartColors[index % chartColors.length],
                   borderRadius: 9999,
                 }}
               />
@@ -367,6 +401,7 @@ interface TrendSparkProps {
 }
 
 export function TrendSpark({ data }: TrendSparkProps) {
+  const theme = useTheme();
   if (data.length < 2) return null;
   const max = Math.max(...data.map((d) => d.value), 1);
   const min = Math.min(...data.map((d) => d.value), 0);
@@ -384,7 +419,7 @@ export function TrendSpark({ data }: TrendSparkProps) {
       <Polyline
         points={points.join(' ')}
         fill="none"
-        stroke="#0071DF"
+        stroke={theme.colors.primary}
         strokeWidth={1.6}
       />
     </Svg>

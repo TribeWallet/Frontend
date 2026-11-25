@@ -5,6 +5,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { NewGroupModal } from '../components/NewGroupModal/NewGroupModal';
 import { useAppGroups } from '../../../contexts/AppContext';
+import { useTranslation } from '../../../hooks/useTranslation';
 import type { RootStackParamList } from '../../../navigation/types';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'NewGroup'>;
@@ -13,12 +14,14 @@ type GroupRoute = RouteProp<RootStackParamList, 'NewGroup'>;
 export function NewGroupScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<GroupRoute>();
-  const { getGroup } = useAppGroups();
+  const { getGroup, refetchGroups } = useAppGroups();
+  const { t } = useTranslation();
   const group = route.params?.id ? getGroup(route.params.id) : undefined;
 
   const handleCreated = useCallback(() => {
-    Alert.alert('Grupo salvo', 'As alterações foram aplicadas.');
-  }, []);
+    Alert.alert(t('newGroup.groupSavedTitle'), t('newGroup.savedMsg'));
+    refetchGroups();
+  }, [refetchGroups]);
 
   return (
     <NewGroupModal

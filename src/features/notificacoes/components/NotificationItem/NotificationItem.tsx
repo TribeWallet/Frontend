@@ -1,7 +1,8 @@
 import React from 'react';
 import { Pressable } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { Box, Text } from '../../../../theme';
+import { Box, Text, useTheme } from '../../../../theme';
+import { useTranslation } from '../../../../hooks/useTranslation';
 import type { NotificationItem } from '../../types/Notification';
 
 interface NotificationItemProps {
@@ -63,6 +64,8 @@ export function NotificationItemView({
   onCheck,
   onDelete,
 }: NotificationItemProps) {
+  const theme = useTheme();
+  const { t } = useTranslation();
   const isOverdue = item.type === 'pending_charge';
 
   return (
@@ -84,7 +87,7 @@ export function NotificationItemView({
         justifyContent="center"
         mr="sm"
       >
-        <BellIcon color={isOverdue ? '#EF5067' : '#0071DF'} />
+        <BellIcon color={isOverdue ? theme.colors.danger : theme.colors.primary} />
       </Box>
 
       <Box flex={1}>
@@ -123,7 +126,7 @@ export function NotificationItemView({
                   justifyContent="center"
                   opacity={pressed ? 0.6 : 1}
                 >
-                  <CheckIcon color="#16AF7E" />
+                  <CheckIcon color="success" />
                 </Box>
               )}
             </Pressable>
@@ -131,7 +134,7 @@ export function NotificationItemView({
 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Excluir notificação"
+            accessibilityLabel={t('notifications.deleteNotification')}
             onPress={() => onDelete?.(item.id)}
             hitSlop={4}
           >
@@ -145,7 +148,7 @@ export function NotificationItemView({
                 justifyContent="center"
                 opacity={pressed ? 0.6 : 1}
               >
-                <TrashIcon color="#5D666D" />
+                <TrashIcon color="textMuted" />
               </Box>
             )}
           </Pressable>

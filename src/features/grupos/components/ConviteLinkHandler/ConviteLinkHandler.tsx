@@ -3,6 +3,7 @@ import { Alert, Linking } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { getErrorMessage } from '../../../../services/api/apiClient';
 import { aceitarConvite, getConvite, parseConviteUrl } from '../../services/conviteService';
+import { useTranslation } from '../../../../hooks/useTranslation';
 
 interface ConviteLinkHandlerProps {
   isAuthenticated: boolean;
@@ -16,6 +17,7 @@ export function ConviteLinkHandler({ isAuthenticated }: ConviteLinkHandlerProps)
   const queryClient = useQueryClient();
   const [pendingToken, setPendingToken] = useState<string | null>(null);
   const processing = useRef(false);
+  const { t } = useTranslation();
 
   useEffect(() => {
     Linking.getInitialURL()
@@ -41,26 +43,26 @@ export function ConviteLinkHandler({ isAuthenticated }: ConviteLinkHandlerProps)
       try {
         const convite = await getConvite(token);
         Alert.alert(
-          'Convite para grupo',
-          `${convite.convidadoPor} convidou você para o grupo "${convite.grupoNome}".`,
+          t('grupos.inviteTitle'),
+          t('grupos.inviteMessage', { convidadoPor: convite.convidadoPor, grupoNome: convite.grupoNome }),
           [
-            { text: 'Agora não', style: 'cancel' },
+            { text: t('grupos.inviteCancel'), style: 'cancel' },
             {
-              text: 'Entrar no grupo',
+              text: t('grupos.inviteJoin'),
               onPress: async () => {
                 try {
                   await aceitarConvite(token);
                   await queryClient.invalidateQueries({ queryKey: ['grupos'] });
-                  Alert.alert('Pronto!', `Você entrou no grupo "${convite.grupoNome}".`);
+                  Alert.alert(t('grupos.inviteJoinedTitle'), t('grupos.inviteJoinedMsg', { grupoNome: convite.grupoNome }));
                 } catch (error) {
-                  Alert.alert('Não foi possível entrar no grupo', getErrorMessage(error));
+                  Alert.alert(t('grupos.inviteJoinErrorTitle'), getErrorMessage(error));
                 }
               },
             },
           ],
         );
       } catch (error) {
-        Alert.alert('Convite inválido', getErrorMessage(error));
+        Alert.alert(t('grupos.inviteInvalidTitle'), getErrorMessage(error));
       } finally {
         processing.current = false;
       }

@@ -1,19 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Alert } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
 import { Modal } from '../../../../components/Modal';
 import { Button } from '../../../../components/Button';
 import { Pill } from '../../../../components/Pill';
 import { Box, Text, PressableBox } from '../../../../theme';
+import { useTranslation } from '../../../../hooks/useTranslation';
 import { PaymentCard } from '../../../pagamentos/components/PaymentCard/PaymentCard';
 import { NewPaymentModal } from '../../../pagamentos/components/NewPaymentModal/NewPaymentModal';
 import { EditPaymentModal } from '../../../pagamentos/components/EditPaymentModal/EditPaymentModal';
 import { useAppCommitments, useAppGroups } from '../../../../contexts/AppContext';
 import { getErrorMessage } from '../../../../services/api/apiClient';
+import { getGrupo, toGroup } from '../../../../features/grupos/services/grupoService';
 import { commitmentPayments, summarizeCommitment } from '../../services/split';
 import type { Commitment } from '../../types/Commitment';
 import type { Payment } from '../../../pagamentos/types/Payment';
-import { formatCurrency } from '../../../../utils/currency';
-import { diffDays } from '../../../../utils/date';
+import type { Group } from '../../../../features/grupos/types/Group';
+import { MoneyValue } from '../../../../components/MoneyValue';
+import { useFormatMoney } from '../../../../hooks/useFormatMoney';
+import { diffDays, isCommitmentOverdue } from '../../../../utils/date';
+import { translateCategory } from '../../../../utils/categoryTranslations';
 
 interface CommitmentDetailModalProps {
   visible: boolean;
@@ -33,29 +39,67 @@ export function CommitmentDetailModal({
   const { deleteCommitment, addCommitmentMembers, removeCommitmentMember } =
     useAppCommitments();
   const { getGroup } = useAppGroups();
+  const queryClient = useQueryClient();
+  const { t, language } = useTranslation();
+  const formatMoney = useFormatMoney();
 
   const [payingShareId, setPayingShareId] = useState<string | null>(null);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const [busy, setBusy] = useState(false);
+  const [groupMembers, setGroupMembers] = useState<Group['members']>([]);
+  const [groupLoading, setGroupLoading] = useState(false);
+  const [dropdownShareId, setDropdownShareId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!commitment) return;
+    let active = true;
+    const groupId = commitment.groupId;
+    const cachedGroup = getGroup(groupId);
+
+    async function loadGroup() {
+      if (cachedGroup?.members?.length) {
+        setGroupMembers(cachedGroup.members);
+        setGroupLoading(false);
+        return;
+      }
+
+      setGroupLoading(true);
+      try {
+        const dto = await getGrupo(groupId);
+        const group = await toGroup(dto);
+        if (active) {
+          setGroupMembers(group.members ?? []);
+          setGroupLoading(false);
+        }
+      } catch {
+        if (active) setGroupLoading(false);
+      }
+    }
+
+    loadGroup();
+    return () => {
+      active = false;
+    };
+  }, [commitment, getGroup]);
 
   if (!commitment) return null;
 
-  const group = getGroup(commitment.groupId);
   // Integrantes do grupo que ainda não entraram nesta divisão.
-  const missingMembers = (group?.members ?? []).filter(
+  const missingMembers = groupMembers.filter(
     (member) =>
       !commitment.splits.some((split) => split.integranteToken === member.integranteToken),
   );
   const relatedPayments = commitmentPayments(commitment);
   const summary = summarizeCommitment(commitment);
   const due = diffDays(commitment.dueDate);
+  const isOverdue = isCommitmentOverdue(commitment);
   const settledCount = commitment.splits.filter((split) => split.paid).length;
 
   const handleDelete = () => {
-    Alert.alert('Excluir compromisso', `Excluir "${commitment.name}"?`, [
-      { text: 'Cancelar', style: 'cancel' },
+    Alert.alert(t('commitments.deleteTitle'), t('commitments.deleteConfirm', { name: commitment.name }), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Excluir',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           setBusy(true);
@@ -65,7 +109,7 @@ export function CommitmentDetailModal({
             if (onDeleted) onDeleted();
             else onClose();
           } catch (error) {
-            Alert.alert('Erro', getErrorMessage(error));
+            Alert.alert(t('common.errorTitle'), getErrorMessage(error));
           } finally {
             setBusy(false);
           }
@@ -79,20 +123,22 @@ export function CommitmentDetailModal({
       ? commitment.amount / (commitment.splits.length + 1)
       : commitment.amount;
     Alert.alert(
-      'Incluir na divisão',
-      `Incluir ${name} com ${formatCurrency(share)}?`,
+      t('commitments.includeInDivision'),
+      t('commitments.includeMember', { name, amount: formatMoney(share) }),
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Incluir',
+          text: t('commitments.addMember'),
           onPress: async () => {
             setBusy(true);
             try {
               await addCommitmentMembers(commitment.id, [
                 { integranteToken, amount: Number(share.toFixed(2)) },
               ]);
+              // Atualiza a tela de detalhe do compromisso para refletir o novo membro
+              queryClient.invalidateQueries({ queryKey: ['compromisso', commitment.id] });
             } catch (error) {
-              Alert.alert('Erro', getErrorMessage(error));
+              Alert.alert(t('common.errorTitle'), getErrorMessage(error));
             } finally {
               setBusy(false);
             }
@@ -103,17 +149,19 @@ export function CommitmentDetailModal({
   };
 
   const handleRemoveShare = (shareId: string, name: string) => {
-    Alert.alert('Remover da divisão', `Remover ${name} deste compromisso?`, [
-      { text: 'Cancelar', style: 'cancel' },
+    Alert.alert(t('commitments.removeFromDivision'), t('commitments.removeMember', { name }), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Remover',
+        text: t('commitments.remove'),
         style: 'destructive',
         onPress: async () => {
           setBusy(true);
           try {
             await removeCommitmentMember(shareId);
+            // Atualiza a tela de detalhe do compromisso para refletir a remoção
+            queryClient.invalidateQueries({ queryKey: ['compromisso', commitment.id] });
           } catch (error) {
-            Alert.alert('Erro', getErrorMessage(error));
+            Alert.alert(t('common.errorTitle'), getErrorMessage(error));
           } finally {
             setBusy(false);
           }
@@ -127,13 +175,13 @@ export function CommitmentDetailModal({
       visible={visible}
       onClose={onClose}
       title={commitment.name}
-      subtitle={commitment.category}
+      subtitle={translateCategory(commitment.category, language)}
       showCloseButton
       footer={
         <Box flexDirection="row" gap="sm">
           <Box flex={1}>
             <Button
-              title="Editar"
+              title={t('commitmentDetail.edit')}
               variant="outline"
               fullWidth
               onPress={() => onEdit?.(commitment)}
@@ -141,7 +189,7 @@ export function CommitmentDetailModal({
           </Box>
           <Box flex={1}>
             <Button
-              title="Excluir"
+              title={t('commitmentDetail.delete')}
               variant="danger"
               fullWidth
               loading={busy}
@@ -161,34 +209,41 @@ export function CommitmentDetailModal({
             p="md"
           >
             <Box flex={1}>
-              <Text variant="captionStrong" color="primary">TOTAL</Text>
-              <Text variant="display" color="primary">
-                {formatCurrency(commitment.amount)}
+              <Text variant="captionStrong" color="primary">
+                {t('commitments.total')}
               </Text>
-              <Text variant="caption" color="textSecondary">
-                Pago: {formatCurrency(summary.paid)} • Restante:{' '}
-                {formatCurrency(summary.remaining)}
+              <Text variant="display" color="primary" numberOfLines={1} ellipsizeMode="tail">
+                <MoneyValue amount={commitment.amount} variant="display" />
               </Text>
-            </Box>
-            <Box alignItems="flex-end">
-              <Pill
-                label={
-                  due !== null && due < 0
-                    ? `Venceu em ${commitment.dueDate}`
-                    : `Vence em ${commitment.dueDate}`
-                }
-                tone={due !== null && due < 0 ? 'danger' : 'primary'}
-              />
+              <Text variant="caption" color="textSecondary" mt="xs">
+                {t('commitments.paid')}: <MoneyValue amount={summary.paid} />
+              </Text>
+              <Text variant="caption" color="textSecondary" mt="xs">
+                {t('commitments.remaining')}:{' '}
+                <MoneyValue amount={summary.remaining} />
+              </Text>
             </Box>
           </Box>
 
-          <Box flexDirection="row" gap="xs" flexWrap="wrap">
-            <Pill label={commitment.groupName} tone="neutral" />
-            <Pill label={commitment.category} tone="neutral" />
-            <Pill
-              label={commitment.splitMode === 'equal' ? 'Divisão igual' : 'Valor exato'}
-              tone="primary"
-            />
+          <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap="xs" flexWrap="wrap" mb="sm">
+            <Box flexDirection="row" alignItems="center" gap="xs" flexWrap="wrap">
+              <Pill label={commitment.groupName} tone="neutral" />
+              <Pill label={translateCategory(commitment.category, language)} tone="neutral" />
+              <Pill
+                label={commitment.splitMode === 'equal' ? t('commitments.equalSplit') : t('commitments.exactSplit')}
+                tone="primary"
+              />
+              {due !== null && (
+                <Pill
+                  label={
+                    isOverdue
+                      ? t('commitments.overdueOn', { date: commitment.dueDate })
+                      : t('commitments.dueOn', { date: commitment.dueDate })
+                  }
+                  tone={isOverdue ? 'danger' : 'primary'}
+                />
+              )}
+            </Box>
           </Box>
 
           <Box
@@ -199,14 +254,14 @@ export function CommitmentDetailModal({
             p="md"
           >
             <Box flexDirection="row" alignItems="center" justifyContent="space-between">
-              <Text variant="bodyStrong">Integrantes</Text>
+              <Text variant="bodyStrong">{t('commitments.members')}</Text>
               <Text variant="caption" color="textSecondary">
-                {settledCount}/{commitment.splits.length} quitados
+                {t('commitments.membersCount', { settled: settledCount, total: commitment.splits.length })}
               </Text>
             </Box>
             {commitment.splits.length === 0 ? (
               <Text variant="caption" color="textSecondary" mt="sm">
-                Nenhum integrante nesta divisão.
+                {t('commitments.noMembers')}
               </Text>
             ) : (
               commitment.splits.map((split) => (
@@ -235,37 +290,90 @@ export function CommitmentDetailModal({
                     <Box flex={1}>
                       <Text variant="body">{split.name}</Text>
                       <Text variant="caption" color="textSecondary">
-                        Pago {formatCurrency(split.paidAmount)} de{' '}
-                        {formatCurrency(split.amount)}
+                        {t('commitments.paidOf', {
+                          paid: formatMoney(split.paidAmount),
+                          total: formatMoney(split.amount),
+                        })}
                       </Text>
                     </Box>
                   </Box>
-                  <Box alignItems="flex-end" gap="xxs">
-                    {split.paid ? (
-                      <Text variant="captionStrong" color="success">Quitado</Text>
-                    ) : (
-                      <PressableBox
-                        onPress={() => setPayingShareId(split.shareId)}
-                        accessibilityRole="button"
-                        hitSlop={4}
+                  <Box alignItems="flex-end" gap="xs">
+                    <Button
+                      title={`${t('commitments.actions')} ${dropdownShareId === split.shareId ? '▲' : '▼'}`}
+                      variant="outline"
+                      size="sm"
+                      onPress={() => setDropdownShareId(dropdownShareId === split.shareId ? null : split.shareId)}
+                      disabled={busy}
+                    />
+                    {dropdownShareId === split.shareId && (
+                      <Box
+                        flexDirection="column"
+                        alignItems="flex-end"
+                        gap="none"
+                        mt="xxs"
+                        bg="surface"
+                        borderTopLeftRadius="none"
+                        borderTopRightRadius="none"
+                        borderBottomRightRadius="md"
+                        borderBottomLeftRadius="md"
+                        borderWidth={1}
+                        borderColor="border"
+                        p="none"
+                        overflow="hidden"
                       >
-                        <Text variant="captionStrong" color="primary">Registrar</Text>
-                      </PressableBox>
+                        {!split.paid && (
+                          <PressableBox
+                            onPress={() => {
+                              setPayingShareId(split.shareId);
+                              setDropdownShareId(null);
+                            }}
+                            accessibilityRole="button"
+                            hitSlop={8}
+                          >
+                            <Box
+                              flexDirection="row"
+                              alignItems="center"
+                              justifyContent="flex-start"
+                              px="xs"
+                              py="sm"
+                              borderBottomWidth={0.5}
+                              borderColor="border"
+                            >
+                              <Text variant="captionStrong" color="primary" style={{ fontSize: 13 }}>
+                                {t('commitments.register')}
+                              </Text>
+                            </Box>
+                          </PressableBox>
+                        )}
+                        <PressableBox
+                          onPress={() => {
+                            handleRemoveShare(split.shareId, split.name);
+                            setDropdownShareId(null);
+                          }}
+                          accessibilityRole="button"
+                          hitSlop={8}
+                        >
+                          <Box
+                            flexDirection="row"
+                            alignItems="center"
+                            justifyContent="flex-start"
+                            px="xs"
+                            py="sm"
+                          >
+                            <Text variant="captionStrong" color="danger" style={{ fontSize: 13 }}>
+                              {t('commitments.remove')}
+                            </Text>
+                          </Box>
+                        </PressableBox>
+                      </Box>
                     )}
-                    <PressableBox
-                      onPress={() => handleRemoveShare(split.shareId, split.name)}
-                      accessibilityRole="button"
-                      hitSlop={4}
-                    >
-                      <Text variant="caption" color="danger">Remover</Text>
-                    </PressableBox>
                   </Box>
                 </Box>
               ))
             )}
           </Box>
 
-          {missingMembers.length > 0 ? (
+          {!groupLoading && missingMembers.length > 0 ? (
             <Box
               bg="surface"
               borderRadius="md"
@@ -273,7 +381,7 @@ export function CommitmentDetailModal({
               borderColor="cardBorder"
               p="md"
             >
-              <Text variant="bodyStrong">Fora da divisão</Text>
+              <Text variant="bodyStrong">{t('commitments.outsideDivision')}</Text>
               {missingMembers.map((member, index) => (
                 <Box
                   key={member.integranteToken}
@@ -290,7 +398,7 @@ export function CommitmentDetailModal({
                     accessibilityRole="button"
                     hitSlop={4}
                   >
-                    <Text variant="captionStrong" color="primary">Incluir</Text>
+                    <Text variant="captionStrong" color="primary">{t('commitments.addMember')}</Text>
                   </PressableBox>
                 </Box>
               ))}
@@ -298,9 +406,9 @@ export function CommitmentDetailModal({
           ) : null}
 
           <Box flexDirection="row" alignItems="center" justifyContent="space-between">
-            <Text variant="bodyStrong">Pagamentos ({relatedPayments.length})</Text>
+            <Text variant="bodyStrong">{t('commitments.paymentsCount', { count: relatedPayments.length })}</Text>
             <Button
-              title="Registrar pagamento"
+              title={t('newPayment.modalTitle')}
               variant="outline"
               size="sm"
               onPress={() => setPayingShareId('')}
@@ -308,7 +416,7 @@ export function CommitmentDetailModal({
           </Box>
           {relatedPayments.length === 0 ? (
             <Text variant="caption" color="textSecondary">
-              Nenhum pagamento registrado para este compromisso ainda.
+              {t('commitments.noPaymentsYet')}
             </Text>
           ) : (
             relatedPayments.map((payment) => (

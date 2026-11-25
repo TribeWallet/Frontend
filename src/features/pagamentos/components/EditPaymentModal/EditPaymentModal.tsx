@@ -1,34 +1,33 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert } from 'react-native';
+import * as Sharing from 'expo-sharing';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import * as DocumentPicker from 'expo-document-picker';
 import { File as ExpoFile, Paths } from 'expo-file-system';
+import * as FileSystem from 'expo-file-system';
 import { Modal } from '../../../../components/Modal';
 import { Input } from '../../../../components/Input';
+import { DatePicker } from '../../../../components/DatePicker/DatePicker';
 import { Button } from '../../../../components/Button';
 import { Box, Text, PressableBox } from '../../../../theme';
+import { useTranslation } from '../../../../hooks/useTranslation';
 import { useAppPayments } from '../../../../contexts/AppContext';
 import { getErrorMessage } from '../../../../services/api/apiClient';
-import { formatCurrency } from '../../../../utils/currency';
+import { MoneyValue } from '../../../../components/MoneyValue';
+import { useFormatMoney } from '../../../../hooks/useFormatMoney';
 import { maskDateBR, maskMoney, parseMoney } from '../../../../utils/masks';
 import type { AttachedFile } from '../../../../types/file';
 import { paymentMethodOptions } from '../../services/paymentOptions';
 import { paymentMethodSchema } from '../../validations/paymentSchema';
 import type { Payment, PaymentMethod } from '../../types/Payment';
 
-const schema = z.object({
-  amount: z
-    .string()
-    .min(1, 'Informe um valor')
-    .regex(/^[0-9]+(?:[,.][0-9]{1,2})?$/, 'Valor inválido')
-    .refine((value) => Number(value.replace(',', '.')) > 0, 'O valor precisa ser maior que zero'),
-  date: z.string().regex(/^[0-3][0-9]\/[0-1][0-9]\/[0-9]{4}$/, 'Use o formato DD/MM/AAAA'),
-  method: paymentMethodSchema,
-});
-
-type FormValues = z.infer<typeof schema>;
+type FormValues = {
+  amount: string;
+  date: string;
+  method: PaymentMethod;
+};
 
 interface EditPaymentModalProps {
   visible: boolean;
@@ -38,6 +37,19 @@ interface EditPaymentModalProps {
 }
 
 export function EditPaymentModal({ visible, payment, onClose, onSaved }: EditPaymentModalProps) {
+  const { t } = useTranslation();
+  const formatMoney = useFormatMoney();
+
+  const schema = z.object({
+    amount: z
+      .string()
+      .min(1, t('payments.invalidValue'))
+      .regex(/^[0-9]+(?:[,.][0-9]{1,2})?$/, t('payments.invalidValue'))
+      .refine((value) => Number(value.replace(',', '.')) > 0, t('payments.valueGreaterThanZero')),
+    date: z.string().regex(/^[0-3][0-9]\/[0-1][0-9]\/[0-9]{4}$/, t('payments.dateFormatInvalid')),
+    method: paymentMethodSchema,
+  });
+
   const { updatePayment, deletePayment } = useAppPayments();
   const [busy, setBusy] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -81,6 +93,24 @@ export function EditPaymentModal({ visible, payment, onClose, onSaved }: EditPay
     });
   }, []);
 
+  // Visualização de comprovante salvo no servidor.
+  // Depende do `receiptUrl` fornecido pelo backend (expo-sharing + FileSystem.downloadAsync).
+  // Se o backend não expor essa URL, o botão de visualização não é renderizado (veja JSX abaixo).
+  // Para comprovante anexado localmente (novo pagamento), não há dependência de backend.
+  const viewReceipt = useCallback(
+    async (receiptUrl: string) => {
+      try {
+        const fileName = `comprovante-${Date.now()}.pdf`;
+        const fileUri = `${Paths.cache}/${fileName}`;
+        await FileSystem.downloadAsync(receiptUrl, fileUri);
+        await Sharing.shareAsync(fileUri, { mimeType: 'application/pdf' });
+      } catch {
+        Alert.alert(t('common.errorTitle'), t('payments.receiptOpenError'));
+      }
+    },
+    [t],
+  );
+
   const handleClose = useCallback(() => {
     reset();
     setSubmitError(null);
@@ -109,10 +139,10 @@ export function EditPaymentModal({ visible, payment, onClose, onSaved }: EditPay
 
   const handleDelete = useCallback(() => {
     if (!payment) return;
-    Alert.alert('Excluir pagamento', 'Excluir este pagamento?', [
-      { text: 'Cancelar', style: 'cancel' },
+    Alert.alert(t('editPayment.deleteConfirmTitle'), t('editPayment.deleteConfirmMsg'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Excluir',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           setBusy(true);
@@ -136,14 +166,16 @@ export function EditPaymentModal({ visible, payment, onClose, onSaved }: EditPay
     <Modal
       visible={visible}
       onClose={handleClose}
-      title="Editar pagamento"
-      subtitle={`${payment.commitmentName} • ${payment.payerName}`}
+      title={t('editPayment.modalTitle')}
+      subtitle={
+        `${payment.commitmentName.charAt(0).toUpperCase() + payment.commitmentName.slice(1)} • ${payment.payerName.charAt(0).toUpperCase() + payment.payerName.slice(1)}\nRegistrado: ${formatMoney(payment.amount)}`
+      }
       showCloseButton
       footer={
         <Box flexDirection="row" gap="sm">
           <Box flex={1}>
             <Button
-              title="Excluir"
+              title={t('editPayment.delete')}
               onPress={handleDelete}
               variant="danger"
               loading={busy}
@@ -152,7 +184,7 @@ export function EditPaymentModal({ visible, payment, onClose, onSaved }: EditPay
           </Box>
           <Box flex={1}>
             <Button
-              title="Salvar"
+              title={t('editPayment.save')}
               onPress={onValidSubmit}
               loading={busy}
               disabled={!isValid}
@@ -164,13 +196,13 @@ export function EditPaymentModal({ visible, payment, onClose, onSaved }: EditPay
     >
       <Box gap="md">
         <Box bg="background" borderRadius="md" borderWidth={1} borderColor="border" p="md">
-          <Text variant="captionStrong" color="textSecondary">PAGAMENTO DE</Text>
+          <Text variant="captionStrong" color="textSecondary">{t('editPayment.paymentOf')}</Text>
           <Text variant="bodyStrong" mt="xxs">{payment.payerName}</Text>
           <Text variant="caption" color="textSecondary">
             {payment.commitmentName} • {payment.groupName}
           </Text>
           <Text variant="caption" color="textSecondary">
-            Registrado: {formatCurrency(payment.amount)}
+            {t('editPayment.registered')} {formatMoney(payment.amount)}
           </Text>
         </Box>
 
@@ -181,11 +213,12 @@ export function EditPaymentModal({ visible, payment, onClose, onSaved }: EditPay
               name="amount"
               render={({ field: { onChange, value, onBlur } }) => (
                 <Input
-                  label="Valor"
+                  label={t('editPayment.value')}
+                  prefix="R$"
                   value={value}
                   onChangeText={(text) => onChange(maskMoney(text))}
                   onBlur={onBlur}
-                  placeholder="0,00"
+                  placeholder={t('payments.amountPlaceholder')}
                   keyboardType="decimal-pad"
                   error={errors.amount?.message}
                 />
@@ -196,44 +229,16 @@ export function EditPaymentModal({ visible, payment, onClose, onSaved }: EditPay
             <Controller
               control={control}
               name="date"
-              render={({ field: { onChange, value, onBlur } }) => (
-                <Input
-                  label="Data"
+              render={({ field: { onChange, value } }) => (
+                <DatePicker
+                  label={t('editPayment.date')}
                   value={value}
-                  onChangeText={(text) => onChange(maskDateBR(text))}
-                  onBlur={onBlur}
-                  placeholder="DD/MM/AAAA"
-                  keyboardType="numeric"
+                  onChange={onChange}
+                  placeholder={t('datePicker.placeholderDate')}
                   error={errors.date?.message}
                 />
               )}
             />
-          </Box>
-        </Box>
-
-        <Box>
-          <Text variant="label" marginBottom="xs">Comprovante (PDF, opcional)</Text>
-          <Box flexDirection="row" gap="xs" alignItems="center">
-            <Button
-              title={comprovante ? 'Trocar arquivo' : 'Anexar PDF'}
-              variant="outline"
-              size="sm"
-              onPress={pickComprovante}
-            />
-            {comprovante ? (
-              <Box flex={1} flexDirection="row" alignItems="center" gap="xs">
-                <Text variant="caption" numberOfLines={1} flex={1} color="primary">
-                  {comprovante.name}
-                </Text>
-                <PressableBox onPress={() => setComprovante(null)} hitSlop={8}>
-                  <Text variant="captionStrong" color="danger">Remover</Text>
-                </PressableBox>
-              </Box>
-            ) : payment?.receiptUrl ? (
-              <Text variant="caption" color="textSecondary" flex={1} numberOfLines={1}>
-                Já existe um comprovante anexado.
-              </Text>
-            ) : null}
           </Box>
         </Box>
 
@@ -242,7 +247,7 @@ export function EditPaymentModal({ visible, payment, onClose, onSaved }: EditPay
           name="method"
           render={({ field: { onChange, value } }) => (
             <Box>
-              <Text variant="label" marginBottom="xs">Forma de pagamento</Text>
+              <Text variant="label" marginBottom="xs">{t('payments.paymentMethod')}</Text>
               <Box flexDirection="row" gap="xs" flexWrap="wrap">
                 {paymentMethodOptions.map((option) => {
                   const active = value === option.id;
@@ -262,7 +267,7 @@ export function EditPaymentModal({ visible, payment, onClose, onSaved }: EditPay
                         borderColor={active ? 'primary' : 'border'}
                       >
                         <Text variant="captionStrong" color={active ? 'white' : 'text'}>
-                          {option.label}
+                          {t(option.label as any)}
                         </Text>
                       </Box>
                     </PressableBox>
@@ -272,6 +277,29 @@ export function EditPaymentModal({ visible, payment, onClose, onSaved }: EditPay
             </Box>
           )}
         />
+
+        <Box>
+          <Text variant="label" marginBottom="xs">{t('payments.receipt')}</Text>
+          <Box flexDirection="column" gap="xs">
+            <Button
+              title={comprovante ? t('payments.changeFile') : t('payments.attachFile')}
+              variant="outline"
+              size="sm"
+              fullWidth
+              onPress={pickComprovante}
+            />
+            {comprovante ? (
+              <Box flexDirection="row" alignItems="center" gap="xs">
+                <Text variant="caption" numberOfLines={1} flex={1} color="primary">
+                  {comprovante.name}
+                </Text>
+                <PressableBox onPress={() => setComprovante(null)} hitSlop={8}>
+                  <Text variant="captionStrong" color="danger">{t('commitments.remove')}</Text>
+                </PressableBox>
+              </Box>
+            ) : null}
+          </Box>
+        </Box>
 
         {submitError ? (
           <Text variant="caption" color="danger">

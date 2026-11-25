@@ -26,7 +26,8 @@ export function CommitmentDetailScreen() {
         name: dto.grupo?.nome ?? route.params.groupName ?? '',
       });
     },
-    enabled: !cachedCommitment,
+    // Sempre permite refetch (quando invalidoQueries é chamado) mesmo com cache.
+    enabled: true,
   });
   const commitment = cachedCommitment ?? detailQuery.data;
 

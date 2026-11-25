@@ -48,19 +48,19 @@ export interface PaymentPatch {
 }
 
 export const paymentMethodLabels: Record<PaymentMethod, string> = {
-  pix: 'PIX',
-  dinheiro: 'Dinheiro',
-  credito: 'Crédito',
-  debito: 'Débito',
-  transferencia: 'Transferência',
-  boleto: 'Boleto',
+  pix: 'payments.methodPix',
+  dinheiro: 'payments.methodDinheiro',
+  credito: 'payments.methodCredito',
+  debito: 'payments.methodDebito',
+  transferencia: 'payments.methodTransferencia',
+  boleto: 'payments.methodBoleto',
 };
 
 export const paymentMethodFullLabels: Record<PaymentMethod, string> = {
-  pix: 'PIX',
-  dinheiro: 'Dinheiro',
-  credito: 'Cartão de crédito',
-  debito: 'Cartão de débito',
-  transferencia: 'Transferência bancária',
-  boleto: 'Boleto bancário',
+  pix: 'payments.methodPix',
+  dinheiro: 'payments.methodDinheiro',
+  credito: 'payments.methodCredito',
+  debito: 'payments.methodDebito',
+  transferencia: 'payments.methodTransferencia',
+  boleto: 'payments.methodBoleto',
 };

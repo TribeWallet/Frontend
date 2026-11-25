@@ -7,9 +7,10 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { TopBar } from '../../../components/TopBar';
 import { Input } from '../../../components/Input';
 import { Button } from '../../../components/Button';
-import { Box, Text } from '../../../theme';
+import { Box, Text, useTheme } from '../../../theme';
 import { useUserStore } from '../stores/userStore';
 import { useTopBarActions } from '../../../hooks/useTopBarActions';
+import { useTranslation } from '../../../hooks/useTranslation';
 import type { RootStackParamList } from '../../../navigation/types';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Support'>;
@@ -19,16 +20,18 @@ export function SupportScreen() {
   const profile = useUserStore((state) => state.profile);
   const topBar = useTopBarActions();
   const { width } = useWindowDimensions();
+  const { t } = useTranslation();
 
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
 
   const isSmallPhone = width < 360;
+  const theme = useTheme();
 
   // Não existe endpoint de suporte na API: a mensagem sai pelo app que o usuário escolher.
   const handleSubmit = async () => {
     if (!subject.trim() || !message.trim()) {
-      Alert.alert('Suporte', 'Preencha o assunto e a mensagem.');
+      Alert.alert(t('support.alertTitle'), t('support.fillFields'));
       return;
     }
     try {
@@ -39,12 +42,12 @@ export function SupportScreen() {
       setSubject('');
       setMessage('');
     } catch {
-      Alert.alert('Suporte', 'Não foi possível abrir o compartilhamento.');
+      Alert.alert(t('support.alertTitle'), t('support.shareError'));
     }
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFB' }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
       <Box flex={1} width="100%" maxWidth={430} alignSelf="center" bg="background">
         <TopBar
           initials={profile?.initials ?? ''}
@@ -59,26 +62,25 @@ export function SupportScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <Box width="100%" px={isSmallPhone ? 'sm' : 'md'} pt="md" gap="md">
-            <Text variant="h2">Suporte</Text>
+            <Text variant="h2">{t('support.title')}</Text>
             <Text variant="bodySmall" color="textSecondary">
-              Descreva o que está acontecendo e envie pelo app de sua preferência
-              (e-mail, mensageria).
+              {t('support.subtitle')}
             </Text>
             <Input
-              label="Assunto"
+              label={t('support.subject')}
               value={subject}
               onChangeText={setSubject}
-              placeholder="Resumo do problema"
+              placeholder={t('support.subjectPlaceholder')}
             />
             <Input
-              label="Mensagem"
+              label={t('support.message')}
               value={message}
               onChangeText={setMessage}
-              placeholder="Detalhe o ocorrido..."
+              placeholder={t('support.messagePlaceholder')}
               multiline
               numberOfLines={6}
             />
-            <Button title="Enviar mensagem" onPress={handleSubmit} fullWidth />
+            <Button title={t('support.send')} onPress={handleSubmit} fullWidth />
           </Box>
         </ScrollView>
       </Box>

@@ -11,21 +11,15 @@ import { EmptyState } from '../../../../components/EmptyState';
 import { Loading } from '../../../../components/Loading';
 import { Select, SelectOption } from '../../../../components/Select';
 import { GroupCard } from '../../components/GroupCard/GroupCard';
-import { Box } from '../../../../theme';
+import { Box, useTheme } from '../../../../theme';
 import { useGroups } from '../../../../hooks/useGroups';
 import { useNotifications } from '../../../../hooks/useNotifications';
 import { useUserStore } from '../../../usuario/stores/userStore';
 import { useTopBarActions } from '../../../../hooks/useTopBarActions';
+import { useTranslation } from '../../../../hooks/useTranslation';
 import type { RootStackParamList } from '../../../../navigation/types';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
-
-const TONE_FILTERS: SelectOption[] = [
-  { id: 'all', label: 'Todas categorias' },
-  { id: 'blue', label: 'Casa' },
-  { id: 'green', label: 'Viagem' },
-  { id: 'family', label: 'Família' },
-];
 
 export function GruposScreen() {
   const navigation = useNavigation<NavigationProp>();
@@ -37,6 +31,15 @@ export function GruposScreen() {
   const isSmallPhone = width < 360;
   const [search, setSearch] = useState('');
   const [toneFilter, setToneFilter] = useState('all');
+  const { t } = useTranslation();
+
+  const TONE_FILTERS: SelectOption[] = [
+    { id: 'all', label: t('grupos.filterAll') },
+    { id: 'blue', label: t('grupos.filterCasa') },
+    { id: 'green', label: t('grupos.filterViagem') },
+    { id: 'family', label: t('grupos.filterFamilia') },
+  ];
+  const theme = useTheme();
 
   const filteredGroups = groups.filter((group) => {
     const matchesSearch = group.name.toLowerCase().includes(search.toLowerCase());
@@ -49,7 +52,7 @@ export function GruposScreen() {
   }, [navigation]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFB' }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
       <Box flex={1} width="100%" maxWidth={430} alignSelf="center" bg="background">
         <TopBar
           initials={profile?.initials ?? ''}
@@ -67,11 +70,11 @@ export function GruposScreen() {
         >
           <Box width="100%" px={isSmallPhone ? 'sm' : 'md'} pt="md">
             <ScreenHeader
-              title="Grupos"
-              subtitle="Gerencie seus grupos financeiros"
+              title={t('grupos.title')}
+              subtitle={t('grupos.subtitle')}
             >
               <Button
-                title="Criar grupo"
+                title={t('grupos.createGroup')}
                 onPress={handleCreate}
                 fullWidth
               />
@@ -80,24 +83,24 @@ export function GruposScreen() {
             <Box gap="sm" mb="md">
               <TextInput
                 style={{
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: theme.colors.surface,
                   borderRadius: 12,
                   borderWidth: 1,
-                  borderColor: '#DFE4E7',
+                  borderColor: theme.colors.border,
                   paddingHorizontal: 16,
                   height: 48,
                   fontSize: 16,
-                  color: '#171717',
+                  color: theme.colors.text,
                 }}
                 value={search}
                 onChangeText={setSearch}
-                placeholder="Buscar grupos..."
-                placeholderTextColor="#8E969B"
+                placeholder={t('grupos.searchGroups')}
+                placeholderTextColor={theme.colors.textMuted}
               />
 
               <Select
-                label="Categoria"
-                placeholder="Todas categorias"
+                label={t('grupos.category')}
+                placeholder={t('grupos.allCategories')}
                 value={toneFilter}
                 onChange={setToneFilter}
                 options={TONE_FILTERS}
@@ -105,19 +108,19 @@ export function GruposScreen() {
             </Box>
 
             {groupsLoading ? (
-              <Loading label="Carregando grupos..." />
+              <Loading label={t('grupos.loading')} />
             ) : groupsError ? (
               <EmptyState
-                title="Não foi possível carregar os grupos"
+                title={t('grupos.errorTitle')}
                 description={groupsError}
-                actionLabel="Tentar novamente"
+                actionLabel={t('common.tryAgain')}
                 onAction={refetchGroups}
               />
             ) : filteredGroups.length === 0 ? (
               <EmptyState
-                title="Nenhum grupo encontrado"
-                description="Ajuste a busca ou crie um novo grupo."
-                actionLabel="Criar grupo"
+                title={t('grupos.noGroups')}
+                description={t('grupos.noGroupsDesc')}
+                actionLabel={t('grupos.createGroup')}
                 onAction={handleCreate}
               />
             ) : (

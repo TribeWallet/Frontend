@@ -17,8 +17,10 @@ export function parseBRDate(value: string): Date | null {
 }
 
 export function diffDays(value?: string): number | null {
-  const date = parseBRDate(value ?? '');
-  if (!date) return null;
+  let date = parseBRDate(value ?? '');
+  // Aceita também ISO (ex.: "2026-10-12T00:00:00Z") quando não está no formato DD/MM/AAAA.
+  if (!date && value) date = new Date(value);
+  if (!date || Number.isNaN(date.getTime())) return null;
   const start = new Date();
   start.setHours(0, 0, 0, 0);
   return Math.round((date.getTime() - start.getTime()) / 86400000);
@@ -30,6 +32,25 @@ export function isoToBR(value: string | null | undefined): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return '';
   return formatBR(parsed);
+}
+
+/**
+ * Determina se um compromisso está vencido, de forma consistente em todo o app.
+ * - Se já está pago, não considera vencido (mesmo que a data tenha passado).
+ * - Usa diffDays da dueDate (DD/MM/AAAA) como fonte da verdade.
+ * - Fallback para o campo `overdue` do backend quando diffDays não puder calcular.
+ */
+export function isCommitmentOverdue(commitment: {
+  status: string;
+  dueDate?: string | null;
+  overdue?: boolean;
+}): boolean {
+  if (commitment.status === 'paid') return false;
+
+  const days = commitment.dueDate ? diffDays(commitment.dueDate) : null;
+  if (days !== null) return days < 0;
+
+  return Boolean(commitment.overdue);
 }
 
 /**

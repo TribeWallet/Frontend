@@ -5,14 +5,14 @@ import { Modal } from '../../../../components/Modal';
 import { Input } from '../../../../components/Input';
 import { Button } from '../../../../components/Button';
 import { Box, Text, PressableBox } from '../../../../theme';
+import { useTranslation } from '../../../../hooks/useTranslation';
 import { getErrorMessage } from '../../../../services/api/apiClient';
-import { isValidEmail } from '../../../../utils/formatters';
+import { initialsFromName, isValidEmail } from '../../../../utils/formatters';
 import type { AttachedFile } from '../../../../types/file';
 
 const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg'];
 
 export interface ProfileSaveData {
-  initials: string;
   name: string;
   email: string;
   imagem?: AttachedFile;
@@ -20,7 +20,6 @@ export interface ProfileSaveData {
 
 interface ProfileModalProps {
   visible: boolean;
-  initials: string;
   name: string;
   imageUrl?: string | null;
   email: string;
@@ -33,7 +32,6 @@ interface ProfileModalProps {
 
 export function ProfileModal({
   visible,
-  initials: initialInitials,
   name: initialName,
   imageUrl: initialImageUrl,
   email: initialEmail,
@@ -43,21 +41,20 @@ export function ProfileModal({
   onLogout,
   emailEditable = true,
 }: ProfileModalProps) {
-  const [initials, setInitials] = useState(initialInitials);
   const [imageUrl, setImageUrl] = useState<string | null | undefined>(undefined);
   const [name, setName] = useState(initialName);
   const [email, setEmail] = useState(initialEmail);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [imagem, setImagem] = useState<AttachedFile | null>(null);
+  const { t } = useTranslation();
 
   useEffect(() => {
-    setInitials(initialInitials);
     setName(initialName);
     setImageUrl(initialImageUrl);
     setEmail(initialEmail);
     setImagem(null);
-  }, [initialInitials, initialName, initialEmail, initialImageUrl, visible]);
+  }, [initialName, initialEmail, initialImageUrl, visible]);
 
   const pickImagem = useCallback(async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -85,17 +82,16 @@ export function ProfileModal({
 
   const handleSave = async () => {
     if (name.trim().length < 3) {
-      setError('Informe um nome com pelo menos 3 caracteres.');
+      setError(t('profile.nameMinLength'));
       return;
     }
     if (!isValidEmail(email)) {
-      setError('Informe um e-mail válido.');
+      setError(t('profile.invalidEmail'));
       return;
     }
     setSaving(true);
     try {
       await onSave?.({
-        initials: initials.trim() || 'NV',
         name: name.trim(),
         email: email.trim(),
         imagem: imagem ?? undefined,
@@ -118,14 +114,14 @@ export function ProfileModal({
     <Modal
       visible={visible}
       onClose={onClose}
-      title="Editar perfil"
-      subtitle="Atualize suas informações pessoais"
+      title={t('profile.editProfile')}
+      subtitle={t('profile.subtitle')}
       showCloseButton
       footer={
         <Box gap="sm">
-          <Button title="Salvar alterações" onPress={handleSave} loading={saving} fullWidth />
+          <Button title={t('settings.save')} onPress={handleSave} loading={saving} fullWidth />
           {onLogout ? (
-            <Button title="Sair" onPress={onLogout} variant="danger" fullWidth />
+            <Button title={t('profile.logout')} onPress={onLogout} variant="danger" fullWidth />
           ) : null}
         </Box>
       }
@@ -148,46 +144,42 @@ export function ProfileModal({
             {avatarSource ? (
               <Image source={avatarSource} style={{ width: 80, height: 80 }} />
             ) : (
-              <Text variant="h2" color="white">{initials}</Text>
+              <Text variant="h2" color="white">
+                {initialsFromName(name)}
+              </Text>
             )}
           </Box>
 
           <Box flexDirection="row" gap="xs" alignItems="center">
             <Button
-              title={imagem ? 'Trocar foto' : 'Escolher foto'}
+              title={imagem ? t('profile.changePhoto') : t('profile.choosePhoto')}
               variant="outline"
               size="sm"
               onPress={pickImagem}
             />
             {imagem ? (
               <PressableBox onPress={() => setImagem(null)} hitSlop={8}>
-                <Text variant="captionStrong" color="danger">Remover</Text>
+                <Text variant="captionStrong" color="danger">{t('profile.removePhoto')}</Text>
               </PressableBox>
             ) : null}
           </Box>
 
           <Box width="100%" gap="sm">
             <Input
-              label="Iniciais"
-              value={initials}
-              onChangeText={(text) => setInitials(text.toUpperCase().slice(0, 2))}
-              placeholder='G'
-            />
-            <Input
-              label="Nome"
+              label={t('profile.name') ?? 'Nome'}
               value={name}
               onChangeText={setName}
-              placeholder="Nome completo"
+              placeholder={t('profile.fullName') ?? 'Nome completo'}
             />
             <Input
-              label="E-mail"
+              label={t('profile.email') ?? 'E-mail'}
               value={email}
               onChangeText={setEmail}
-              placeholder="email@exemplo.com"
+              placeholder={t('profile.emailPlaceholder') ?? 'email@exemplo.com'}
               keyboardType="email-address"
               autoCapitalize="none"
               editable={emailEditable}
-              helperText={emailEditable ? undefined : 'O e-mail não pode ser alterado.'}
+              helperText={emailEditable ? undefined : t('profile.emailNotEditable')}
             />
           </Box>
           {error ? (

@@ -1,6 +1,6 @@
 import React from 'react';
 import Svg, { Path } from 'react-native-svg';
-import { Box, Text } from '../../theme';
+import { Box, Text, useTheme } from '../../theme';
 import { Button } from '../Button';
 
 export interface EmptyStateProps {
@@ -12,11 +12,12 @@ export interface EmptyStateProps {
 }
 
 function DefaultIcon() {
+  const theme = useTheme();
   return (
     <Svg width={48} height={48} viewBox="0 0 24 24" fill="none">
       <Path
         d="M12 8v4M12 16h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
-        stroke="#8C949B"
+        stroke={theme.colors.textMuted}
         strokeWidth={1.8}
         strokeLinecap="round"
         strokeLinejoin="round"

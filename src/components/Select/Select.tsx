@@ -16,7 +16,8 @@ import Animated, {
 } from 'react-native-reanimated';
 // import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
-import { Box, Text } from '../../theme';
+import { Box, Text, useTheme } from '../../theme';
+import { useTranslation } from '../../hooks/useTranslation';
 
 export interface SelectOption {
   id: string;
@@ -73,12 +74,12 @@ function SearchIcon({ color }: { color: string }) {
   );
 }
 
-function CheckIcon() {
+function CheckIcon({ color }: { color: string }) {
   return (
     <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
       <Path
         d="m5 12.5 5 5L20 6.5"
-        stroke="#0071DF"
+        stroke={color}
         strokeWidth={2.2}
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -89,18 +90,23 @@ function CheckIcon() {
 
 export function Select({
   label: labelProp,
-  placeholder = 'Selecione uma opção',
+  placeholder: placeholderProp,
   value,
   options,
   onChange,
   error,
   helperText,
-  emptyText = 'Nenhuma opção disponível',
+  emptyText: emptyTextProp,
   disabled,
   searchable = false,
-  searchPlaceholder = 'Buscar...',
+  searchPlaceholder: searchPlaceholderProp,
   sheetTitle,
 }: SelectProps) {
+  const theme = useTheme();
+  const { t } = useTranslation();
+  const resolvedPlaceholder = placeholderProp ?? t('common.selectOption');
+  const resolvedEmptyText = emptyTextProp ?? t('common.noOptions');
+  const resolvedSearchPlaceholder = searchPlaceholderProp ?? t('common.search');
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
 
@@ -149,7 +155,7 @@ export function Select({
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={labelProp ?? placeholder}
+        accessibilityLabel={labelProp ?? resolvedPlaceholder}
         accessibilityState={{ expanded: open, disabled: !!disabled }}
         onPress={handleOpen}
         hitSlop={4}
@@ -173,12 +179,12 @@ export function Select({
               <Text
                 variant="input"
                 numberOfLines={1}
-                style={!selected ? { color: '#8C949B' } : undefined}
+                style={!selected ? { color: theme.colors.textMuted } : undefined}
               >
-                {selected ? selected.label : placeholder}
+                {selected ? selected.label : resolvedPlaceholder}
               </Text>
             </Box>
-            <ChevronDown color={open ? '#0071DF' : '#6D7379'} />
+            <ChevronDown color={open ? theme.colors.primary : theme.colors.textMuted} />
           </Box>
         )}
       </Pressable>
@@ -210,7 +216,7 @@ export function Select({
             <Pressable
               style={StyleSheet.absoluteFill}
               onPress={handleClose}
-              accessibilityLabel="Fechar seleção"
+              accessibilityLabel={t('common.closeSelection')}
               accessibilityRole="button"
             />
           </Animated.View>
@@ -220,11 +226,19 @@ export function Select({
               Easing.out(Easing.cubic),
             )}
             exiting={SlideOutDown.duration(180)}
-            style={[styles.sheet, sheetStyle]}
+            style={[
+              { ...styles.sheet, backgroundColor: theme.colors.surface },
+              sheetStyle,
+            ]}
             pointerEvents="auto"
           >
             <Box alignItems="center" pt="xs" pb="xs">
-              <View style={styles.grabber} />
+              <View
+                style={{
+                  ...styles.grabber,
+                  backgroundColor: theme.colors.border,
+                }}
+              />
             </Box>
 
             <Box
@@ -237,12 +251,14 @@ export function Select({
             >
               <Box flex={1} pr="sm">
                 <Text variant="h3" numberOfLines={1}>
-                  {sheetTitle ?? labelProp ?? 'Selecione'}
+                  {sheetTitle ?? labelProp ?? t('common.select')}
                 </Text>
                 {options.length > 0 ? (
                   <Text variant="caption" color="textMuted">
-                    {options.length}{' '}
-                    {options.length === 1 ? 'opção' : 'opções'} disponíveis
+                    {options.length === 1
+                      ? t('common.optionOne', { count: options.length })
+                      : t('common.optionOther', { count: options.length })} {' '}
+                      {t('common.available')}
                   </Text>
                 ) : null}
               </Box>
@@ -250,7 +266,7 @@ export function Select({
                 onPress={handleClose}
                 hitSlop={10}
                 accessibilityRole="button"
-                accessibilityLabel="Fechar"
+                accessibilityLabel={t('common.close')}
                 style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
               >
                 <Box
@@ -261,7 +277,7 @@ export function Select({
                   alignItems="center"
                   justifyContent="center"
                 >
-                  <CloseIcon color="#171717" />
+                  <CloseIcon color={theme.colors.text} />
                 </Box>
               </Pressable>
             </Box>
@@ -272,18 +288,21 @@ export function Select({
                   flexDirection="row"
                   alignItems="center"
                   gap="xs"
-                  bg="background"
+                  bg="surface"
                   borderRadius="md"
                   borderWidth={1}
                   borderColor="border"
                   px="md"
                   minHeight={44}
                 >
-                  <SearchIcon color="#8C949B" />
+                  <SearchIcon color={theme.colors.textMuted} />
                   <TextInput
-                    style={styles.searchInput}
-                    placeholder={searchPlaceholder}
-                    placeholderTextColor="#8C949B"
+                    style={[
+                      styles.searchInput,
+                      { color: theme.colors.text },
+                    ]}
+                    placeholder={resolvedSearchPlaceholder}
+                    placeholderTextColor={theme.colors.textMuted}
                     value={query}
                     onChangeText={setQuery}
                     autoCorrect={false}
@@ -294,7 +313,12 @@ export function Select({
               </Box>
             ) : null}
 
-            <View style={styles.divider} />
+            <View
+              style={{
+                ...styles.divider,
+                backgroundColor: theme.colors.border,
+              }}
+            />
 
             <FlatList
               data={filtered}
@@ -305,12 +329,12 @@ export function Select({
               ListEmptyComponent={
                 <Box py="xl" alignItems="center" gap="xs">
                   <Text variant="bodySmall" color="textSecondary">
-                    {query ? 'Nenhum resultado encontrado.' : emptyText}
+                    {query ? t('common.noResults') : resolvedEmptyText}
                   </Text>
                   {query ? (
                     <Pressable onPress={() => setQuery('')} hitSlop={6}>
                       <Text variant="captionStrong" color="primary">
-                        Limpar busca
+                        {t('common.clearSearch')}
                       </Text>
                     </Pressable>
                   ) : null}
@@ -367,7 +391,7 @@ export function Select({
                             ) : null}
                           </Box>
                         </Box>
-                        {active ? <CheckIcon /> : null}
+                        {active ? <CheckIcon color={theme.colors.primary} /> : null}
                       </Box>
                     )}
                   </Pressable>

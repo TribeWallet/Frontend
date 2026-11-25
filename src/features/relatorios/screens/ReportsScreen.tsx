@@ -9,25 +9,27 @@ import { Pill } from '../../../components/Pill';
 import { Select, SelectOption } from '../../../components/Select';
 import { Button } from '../../../components/Button';
 import { Loading } from '../../../components/Loading';
-import { Box, Text } from '../../../theme';
+import { Box, Text, useTheme } from '../../../theme';
 import { getErrorMessage } from '../../../services/api/apiClient';
 import { MetodoPagamento } from '../../../types/ApiResponse';
-import { paymentMethodLabels } from '../../pagamentos/types/Payment';
 import { shareReport } from '../services/reportSharing';
 import { getGroupReport, getUserReport } from '../services/reportService';
 import { useTopBarActions } from '../../../hooks/useTopBarActions';
+import { useTranslation } from '../../../hooks/useTranslation';
 import { useAuthStore } from '../../auth/stores/authStore';
 import { useUserStore } from '../../usuario/stores/userStore';
-import { formatCurrency } from '../../../utils/currency';
+import { MoneyValue } from '../../../components/MoneyValue';
+import { MaskedText } from '../../../components/MaskedText';
+import { useFormatMoney } from '../../../hooks/useFormatMoney';
 import { isoToBR } from '../../../utils/date';
 
-const paymentMethodLabelsById: Record<number, string> = {
-  [MetodoPagamento.pix]: paymentMethodLabels.pix,
-  [MetodoPagamento.dinheiro]: paymentMethodLabels.dinheiro,
-  [MetodoPagamento.cartaoCredito]: paymentMethodLabels.credito,
-  [MetodoPagamento.cartaoDebito]: paymentMethodLabels.debito,
-  [MetodoPagamento.transferenciaBancaria]: paymentMethodLabels.transferencia,
-  [MetodoPagamento.boleto]: paymentMethodLabels.boleto,
+const paymentMethodLabelKeys: Record<number, string> = {
+  [MetodoPagamento.pix]: 'payments.methodPix',
+  [MetodoPagamento.dinheiro]: 'payments.methodDinheiro',
+  [MetodoPagamento.cartaoCredito]: 'payments.methodCredito',
+  [MetodoPagamento.cartaoDebito]: 'payments.methodDebito',
+  [MetodoPagamento.transferenciaBancaria]: 'payments.methodTransferencia',
+  [MetodoPagamento.boleto]: 'payments.methodBoleto',
 };
 
 export function ReportsScreen() {
@@ -35,6 +37,9 @@ export function ReportsScreen() {
   const topBar = useTopBarActions();
   const profile = useUserStore((state) => state.profile);
   const usuarioToken = useAuthStore((state) => state.user?.id);
+  const theme = useTheme();
+  const { t } = useTranslation();
+  const formatMoney = useFormatMoney();
 
   const [groupFilter, setGroupFilter] = useState<string>('all');
   const [exporting, setExporting] = useState(false);
@@ -52,7 +57,7 @@ export function ReportsScreen() {
 
   const groupOptions = useMemo<SelectOption[]>(
     () => [
-      { id: 'all', label: 'Todos os grupos' },
+      { id: 'all', label: t('common.allGroups') },
       ...(userReportQuery.data?.grupos ?? []).map((group) => ({
         id: group.grupoToken,
         label: group.nomeGrupo,
@@ -72,7 +77,7 @@ export function ReportsScreen() {
 
   const handleShare = async () => {
     if (!usuarioToken) {
-      Alert.alert('Erro', 'Não foi possível identificar o usuário da sessão.');
+      Alert.alert(t('common.errorTitle'), t('reports.sessionUserError'));
       return;
     }
 
@@ -81,8 +86,8 @@ export function ReportsScreen() {
       await shareReport(usuarioToken, groupFilter === 'all' ? undefined : groupFilter);
     } catch (error) {
       Alert.alert(
-        'Erro',
-        error instanceof Error ? error.message : 'Não foi possível exportar o relatório.',
+        t('common.errorTitle'),
+        error instanceof Error ? error.message : t('reports.exportError'),
       );
     } finally {
       setExporting(false);
@@ -90,7 +95,7 @@ export function ReportsScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFB' }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
       <Box flex={1} width="100%" maxWidth={430} alignSelf="center" bg="background">
         <TopBar
           initials={profile?.initials ?? ''}
@@ -105,28 +110,30 @@ export function ReportsScreen() {
         >
           <Box width="100%" px={isSmallPhone ? 'sm' : 'md'} pt="md">
             <ScreenHeader
-              title="Relatórios"
-              subtitle="Exporte um resumo financeiro completo"
+              title={t('reports.title')}
+              subtitle={t('reports.subtitle')}
             >
               <Button
-                title="Exportar relatório"
+                title={t('reports.export')}
                 onPress={handleShare}
                 loading={exporting}
                 fullWidth
               />
             </ScreenHeader>
 
-            <Select
-              label="Filtrar por grupo"
-              placeholder="Todos os grupos"
-              value={groupFilter}
-              onChange={setGroupFilter}
-              options={groupOptions}
-            />
+            <Box mb="md">
+              <Select
+                label={t('reports.filterGroup')}
+                placeholder={t('common.allGroups')}
+                value={groupFilter}
+                onChange={setGroupFilter}
+                options={groupOptions}
+              />
+            </Box>
 
             {reportLoading ? (
               <Box alignItems="center" py="xl">
-                <Loading label="Carregando relatório..." />
+                <Loading label={t('common.loading')} />
               </Box>
             ) : reportError ? (
               <Text variant="caption" color="danger" mb="md">
@@ -143,12 +150,12 @@ export function ReportsScreen() {
               mb="md"
             >
               <Box>
-                <Text variant="captionStrong" color="primary">PAGO</Text>
-                <Text variant="h2" color="primary">{formatCurrency(report.totalPago)}</Text>
+                <Text variant="captionStrong" color="primary">{t('reports.paid')}</Text>
+                <MoneyValue amount={report.totalPago} variant="h2" />
               </Box>
               <Box alignItems="flex-end">
-                <Text variant="captionStrong" color="danger">EM ABERTO</Text>
-                <Text variant="h2" color="danger">{formatCurrency(report.totalDevido)}</Text>
+                <Text variant="captionStrong" color="danger">{t('reports.open')}</Text>
+                <MoneyValue amount={report.totalDevido} variant="h2" />
               </Box>
             </Box>
 
@@ -160,9 +167,9 @@ export function ReportsScreen() {
               p="md"
               mb="md"
             >
-              <Text variant="bodyStrong" mb="sm">Pagamentos por categoria</Text>
+              <Text variant="bodyStrong" mb="sm">{t('reports.paymentsByCategory')}</Text>
               {report.totaisPagosPorCategorias.length === 0 ? (
-                <Text variant="caption" color="textSecondary">Nenhum pagamento registrado.</Text>
+                <Text variant="caption" color="textSecondary">{t('reports.noPaymentsRegistered')}</Text>
               ) : (
                 report.totaisPagosPorCategorias.map(({ categoria, valorPagoTotal }) => (
                   <Box
@@ -175,7 +182,7 @@ export function ReportsScreen() {
                     borderColor="border"
                   >
                     <Text variant="body">{categoria}</Text>
-                    <Text variant="bodyStrong">{formatCurrency(valorPagoTotal)}</Text>
+                    <MoneyValue amount={valorPagoTotal} />
                   </Box>
                 ))
               )}
@@ -190,9 +197,9 @@ export function ReportsScreen() {
               p="md"
               mb="md"
             >
-              <Text variant="bodyStrong" mb="sm">Pagamentos por grupo</Text>
+              <Text variant="bodyStrong" mb="sm">{t('reports.paymentsByGroup')}</Text>
               {(userReportQuery.data?.grupos.length ?? 0) === 0 ? (
-                <Text variant="caption" color="textSecondary">Nenhum pagamento registrado.</Text>
+                <Text variant="caption" color="textSecondary">{t('reports.noPaymentsRegistered')}</Text>
               ) : (
                 userReportQuery.data?.grupos.map(({ grupoToken, nomeGrupo, totalPago }) => (
                   <Box
@@ -205,7 +212,7 @@ export function ReportsScreen() {
                     borderColor="border"
                   >
                     <Text variant="body">{nomeGrupo}</Text>
-                    <Text variant="bodyStrong">{formatCurrency(totalPago)}</Text>
+                    <MoneyValue amount={totalPago} />
                   </Box>
                 ))
               )}
@@ -220,9 +227,9 @@ export function ReportsScreen() {
               p="md"
               mb="md"
             >
-              <Text variant="bodyStrong" mb="sm">Compromissos em aberto</Text>
+              <Text variant="bodyStrong" mb="sm">{t('reports.commitmentsOpen')}</Text>
               {report.compromissosEmAberto.length === 0 ? (
-                <Text variant="caption" color="textSecondary">Nada em aberto.</Text>
+                <Text variant="caption" color="textSecondary">{t('reports.nothingOpen')}</Text>
               ) : (
                 report.compromissosEmAberto.map((item, index) => (
                   <Box
@@ -240,7 +247,7 @@ export function ReportsScreen() {
                         {item.nomeGrupo} • {isoToBR(item.dataVencimento)}
                       </Text>
                     </Box>
-                    <Pill label={formatCurrency(item.valorEmAberto)} tone="primary" />
+                    <Pill label={formatMoney(item.valorEmAberto)} tone="primary" />
                   </Box>
                 ))
               )}
@@ -254,7 +261,7 @@ export function ReportsScreen() {
               p="md"
               mb="md"
             >
-              <Text variant="bodyStrong" mb="sm">Pagamentos por forma</Text>
+              <Text variant="bodyStrong" mb="sm">{t('reports.paymentsByMethod')}</Text>
               {report.totaisPagosPorMetodos.length === 0 ? (
                 <Text variant="caption" color="textSecondary">Nenhum pagamento registrado.</Text>
               ) : (
@@ -269,17 +276,18 @@ export function ReportsScreen() {
                     borderColor="border"
                   >
                     <Text variant="body">
-                      {paymentMethodLabelsById[metodoPagamento] ?? `Método ${metodoPagamento}`}
+                      {t(paymentMethodLabelKeys[metodoPagamento] ?? 'payments.methodPix')}
                     </Text>
-                    <Text variant="bodyStrong">{formatCurrency(totalPago)}</Text>
+                    <Text variant="bodyStrong">
+                      <MoneyValue amount={totalPago} />
+                    </Text>
                   </Box>
                 ))
               )}
             </Box>
 
             <Text variant="caption" color="textSecondary" mb="md">
-              O relatório é compartilhado como arquivo PDF pelos apps
-              instalados (e-mail, mensageria, drive).
+              {t('reports.sharedAsPDF')}
             </Text>
               </>
             ) : null}

@@ -1,11 +1,11 @@
 import React from 'react';
 import { ActivityIndicator, Pressable } from 'react-native';
-import { Box, Text } from '../../theme';
+import { Box, Text, useTheme } from '../../theme';
 
 export interface ButtonProps {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'outline' | 'danger';
+  variant?: 'primary' | 'secondary' | 'outline' | 'danger' | 'dangerOutline';
   size?: 'sm' | 'md' | 'lg';
   fullWidth?: boolean;
   disabled?: boolean;
@@ -29,6 +29,8 @@ export const Button = React.forwardRef<any, ButtonProps>(
     },
     ref,
   ) => {
+    const theme = useTheme();
+
     const sizeConfig: any = {
       sm: { px: 'sm', py: 'xs', borderRadius: 'sm', fontSize: 14, minHeight: 36 },
       md: { px: 'md', py: 'sm', borderRadius: 'md', fontSize: 16, minHeight: 48 },
@@ -40,6 +42,7 @@ export const Button = React.forwardRef<any, ButtonProps>(
       secondary: { bg: 'primaryLight', textColor: 'primary', borderColor: 'primaryLight' },
       outline: { bg: 'surface', textColor: 'primary', borderColor: 'primary' },
       danger: { bg: 'danger', textColor: 'white', borderColor: 'danger' },
+      dangerOutline: { bg: 'surface', textColor: 'danger', borderColor: 'danger' },
     };
 
     const cfg = sizeConfig[size];
@@ -70,15 +73,16 @@ export const Button = React.forwardRef<any, ButtonProps>(
         >
           {loading ? (
             <ActivityIndicator
-              color={variant === 'primary' || variant === 'danger' ? '#FFFFFF' : '#0071DF'}
+              color={variant === 'primary' || variant === 'danger' ? theme.colors.white : theme.colors.primary}
               size="small"
             />
           ) : (
             <>
               {leftIcon}
               <Text
-                variant={variant === 'outline' || variant === 'secondary' ? 'buttonSecondary' : 'button'}
-                style={{ fontSize: cfg.fontSize }}
+                variant={variant === 'outline' || variant === 'secondary' || variant === 'dangerOutline' ? 'buttonSecondary' : 'button'}
+                style={{ fontSize: cfg.fontSize, color: isDisabled ? 'textMuted' : palette.textColor }}
+                numberOfLines={2}
               >
                 {title}
               </Text>

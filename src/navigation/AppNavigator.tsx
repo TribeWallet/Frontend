@@ -40,6 +40,19 @@ export const navTheme = {
   },
 };
 
+export const darkNavTheme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    background: '#0B1120',
+    card: '#141B2D',
+    primary: '#3B82F6',
+    text: '#F8FAFC',
+    border: '#334155',
+    notification: '#F87171',
+  },
+};
+
 function renderTabBar(props: any) {
   return <TabBar {...props} />;
 }
