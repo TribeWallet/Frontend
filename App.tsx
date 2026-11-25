@@ -203,7 +203,11 @@ function App() {
   const openProfile = useCallback(() => {
     const nav = navRef.current;
     if (nav?.isReady()) {
-      nav.navigate('Profile');
+      if (nav.getCurrentRoute()?.name === 'Profile') {
+        nav.navigate('Main', { screen: 'Home' } as never);
+      } else {
+        nav.navigate('Profile');
+      }
     }
   }, []);
 
