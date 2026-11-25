@@ -23,7 +23,6 @@ import AuthNavigator from './src/navigation/AuthNavigator';
 import { AppProvider } from './src/contexts/AppContext';
 import { ConviteLinkHandler } from './src/features/grupos/components/ConviteLinkHandler/ConviteLinkHandler';
 import { Loading } from './src/components/Loading';
-import { BiometricLockOverlay } from './src/components/BiometricLock/BiometricLockOverlay';
 import { useUserStore } from './src/features/usuario/stores/userStore';
 import { useAuthStore } from './src/features/auth/stores/authStore';
 import { usePreferencesStore } from './src/features/configuracoes/stores/preferencesStore';
@@ -161,8 +160,6 @@ function App() {
   const systemColorScheme = useColorScheme();
   const [systemScheme, setSystemScheme] = React.useState<'light' | 'dark' | null>(systemColorScheme);
   const { appearance } = usePreferencesStore();
-  const biometricLock = usePreferencesStore((state) => state.biometricLock);
-  const [biometricUnlocked, setBiometricUnlocked] = React.useState(false);
 
   React.useEffect(() => {
     const subscription = Appearance.addChangeListener(({ colorScheme }) => {
@@ -179,8 +176,6 @@ function App() {
   const theme = useMemo(() => (effectiveAppearance === 'dark' ? darkTheme : lightTheme), [effectiveAppearance]);
 
   const effectiveTheme = effectiveAppearance;
-
-  const showBiometricLock = isAuthenticated && biometricLock && !biometricUnlocked;
 
   React.useEffect(() => {
     navRef.current = navigationRef as unknown as NavigationContainerRef<RootStackParamList> | null;
@@ -203,11 +198,7 @@ function App() {
   const openProfile = useCallback(() => {
     const nav = navRef.current;
     if (nav?.isReady()) {
-      if (nav.getCurrentRoute()?.name === 'Profile') {
-        nav.navigate('Main', { screen: 'Home' } as never);
-      } else {
-        nav.navigate('Profile');
-      }
+      nav.navigate('Profile');
     }
   }, []);
 
@@ -217,7 +208,6 @@ function App() {
       if (!nav?.isReady()) return;
       if (action === 'logout') {
         authLogout();
-        setBiometricUnlocked(false);
         return;
       }
       const tab = TAB_NAVIGATION[action];
@@ -251,7 +241,6 @@ function App() {
 
   const handleLogout = useCallback(() => {
     authLogout();
-    setBiometricUnlocked(false);
   }, [authLogout]);
 
   return (
@@ -261,10 +250,6 @@ function App() {
           <StatusBar barStyle={effectiveTheme === 'dark' ? 'light-content' : 'dark-content'} />
           <ThemeProvider theme={theme}>
             <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-              <BiometricLockOverlay
-                visible={showBiometricLock}
-                onUnlocked={() => setBiometricUnlocked(true)}
-              />
               <AppProvider
                 onOpenProfile={openProfile}
                 onNavigate={handleNavigate}
