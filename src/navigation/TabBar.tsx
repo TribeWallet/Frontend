@@ -109,7 +109,7 @@ function TabItem({
         <Animated.View
           style={[animatedStyle, { opacity: pressed ? 0.7 : 1, position: 'relative' }]}
         >
-          <Box alignItems="center" justifyContent="center" py="xs" px="sm" minWidth={56}>
+          <Box flex="1" alignItems="center" justifyContent="center" py="xs" px="sm" minWidth={56}>
             {children}
             {badge && badge > 0 ? (
               <Box
@@ -163,7 +163,7 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
         borderTopColor: theme.colors.border,
       }}
     >
-      <Box flexDirection="row" alignItems="center" justifyContent="space-around" px="xs" py="xs">
+      <Box flexDirection="row" alignItems="center" justifyContent="space-between" px="xs" py="xs">
         {tabs.map((tab) => {
           const isActive = tab.key === currentRoute;
           const color = isActive ? activeColor : inactiveColor;
@@ -192,7 +192,9 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
               <Text
                 variant="captionStrong"
                 color={isActive ? 'primary' : 'textSecondary'}
-                numberOfLines={1}
+                numberOfLines={2}
+                textAlign="center"
+                style={{ fontSize: 11 }}
               >
                 {tab.label}
               </Text>

@@ -52,7 +52,7 @@ export function DashboardScreen() {
   const user = useAuthStore((state) => state.user);
   const isSmallPhone = width < 360;
   const theme = useTheme();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
 
   const isVencido = useCallback(
     (commitment: { status: string; dueDate?: string | null; overdue?: boolean }) =>
@@ -90,13 +90,13 @@ export function DashboardScreen() {
               tone: 'green' as const,
               icon: 'trend' as const,
               label: t('dashboard.statPunctuality'),
-              value: `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(
+              value: `${new Intl.NumberFormat(language || 'pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
                 data.taxaDePontualidade * 100,
               )}%`,
             },
           ]
         : [],
-    [data],
+    [data, language],
   );
 
   const transactions = useMemo(

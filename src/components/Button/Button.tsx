@@ -30,6 +30,7 @@ export const Button = React.forwardRef<any, ButtonProps>(
     ref,
   ) => {
     const theme = useTheme();
+
     const sizeConfig: any = {
       sm: { px: 'sm', py: 'xs', borderRadius: 'sm', fontSize: 14, minHeight: 36 },
       md: { px: 'md', py: 'sm', borderRadius: 'md', fontSize: 16, minHeight: 48 },
@@ -81,6 +82,7 @@ export const Button = React.forwardRef<any, ButtonProps>(
               <Text
                 variant={variant === 'outline' || variant === 'secondary' || variant === 'dangerOutline' ? 'buttonSecondary' : 'button'}
                 style={{ fontSize: cfg.fontSize, color: isDisabled ? 'textMuted' : palette.textColor }}
+                numberOfLines={2}
               >
                 {title}
               </Text>

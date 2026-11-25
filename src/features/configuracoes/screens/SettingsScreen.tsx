@@ -13,6 +13,7 @@ import { LegalModal } from '../../../components/LegalModal/LegalModal';
 import { useUserStore } from '../../usuario/stores/userStore';
 import { useAppGroups } from '../../../contexts/AppContext';
 import { useAppNotifications } from '../../../hooks/useNotifications';
+import { useBiometricAuth } from '../../../hooks/useBiometricAuth';
 import {
   usePreferencesStore,
   AppearanceMode,
@@ -156,6 +157,15 @@ export function SettingsScreen() {
     settings: notifSettings,
     updateSettings,
   } = useAppNotifications();
+
+  const { supported: biometricSupported, checkSupport: checkBiometricSupport } =
+    useBiometricAuth();
+
+  React.useEffect(() => {
+    checkBiometricSupport();
+  }, [checkBiometricSupport]);
+
+  const biometricDisabled = !biometricSupported;
 
   const groupOptions: SelectOption[] = [
     { id: '', label: t('settings.groupNone') },
@@ -316,9 +326,11 @@ export function SettingsScreen() {
               trailing={
                 <Switch
                   value={biometricLock}
-                  onValueChange={setBiometricLock}
+                  onValueChange={biometricDisabled ? undefined : setBiometricLock}
+                  disabled={biometricDisabled}
                   trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
                   thumbColor={theme.colors.white}
+                  style={{ opacity: biometricDisabled ? 0.5 : 1 }}
                 />
               }
             />

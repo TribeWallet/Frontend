@@ -15,9 +15,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useKeyboardScroll } from '../../../../hooks/useKeyboardScroll';
 import { useTranslation } from '../../../../hooks/useTranslation';
+import { useTheme } from '../../../../theme';
 
 // 1. IMPORTAÇÃO DOS ESTILOS SEPARADOS
-import { styles } from './ForgotPasswordScreen.styles';
+import { createStyles } from './ForgotPasswordScreen.styles';
 
 // 2. IMPORTAÇÃO DOS COMPONENTES
 import { TribeWalletLogo } from '../../components/TribeWalletLogo';
@@ -30,6 +31,8 @@ export function ForgotPasswordScreen({
   onBackToLogin,
 }: ForgotPasswordScreenProps) {
   const { width, height } = useWindowDimensions();
+  const theme = useTheme();
+  const styles = createStyles(theme);
   const { t } = useTranslation();
 
   const [email, setEmail] = useState<string>('');
@@ -116,7 +119,7 @@ export function ForgotPasswordScreen({
    */
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={theme.colors.background === '#0B1120' ? 'light-content' : 'dark-content'} />
 
       <KeyboardAvoidingView
         style={styles.keyboard}
@@ -169,14 +172,14 @@ export function ForgotPasswordScreen({
                     onFocusCapture={handleFocusCapture}
                     style={styles.input}
                     placeholder={t('auth.emailPlaceholder')}
-                    placeholderTextColor="#9AA0A6"
+                    placeholderTextColor={theme.colors.placeholder}
                     keyboardType="email-address"
                     autoCapitalize="none"
                     autoCorrect={false}
                     autoComplete="email"
                     textContentType="emailAddress"
                     returnKeyType="done"
-                    selectionColor="#087BE5"
+                    selectionColor={theme.colors.primary}
                     editable={!loading}
                     onSubmitEditing={handleRecoverPassword}
                   />

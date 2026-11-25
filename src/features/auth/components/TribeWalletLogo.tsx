@@ -2,7 +2,10 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
 
+import { useTheme } from '../../../theme';
+
 export function TribeWalletLogo() {
+  const theme = useTheme();
   return (
     <View style={styles.container}>
       <View style={styles.icon}>
@@ -59,7 +62,7 @@ export function TribeWalletLogo() {
         </Svg>
       </View>
 
-      <Text style={styles.text}>
+      <Text style={[styles.text, { color: theme.colors.text }]}>
         TribeWallet
       </Text>
     </View>

@@ -12,10 +12,10 @@ import {
 } from 'react-native';
 import { useKeyboardScroll } from '../../../../hooks/useKeyboardScroll';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Circle, Path } from 'react-native-svg';
+import Feather from 'react-native-vector-icons/Feather';
 
 // 1. IMPORTAÇÃO DOS ESTILOS SEPARADOS
-import { styles } from './RegisterScreen.styles';
+import { createStyles } from './RegisterScreen.styles';
 
 // 2. IMPORTAÇÃO DOS COMPONENTES
 import { TribeWalletLogo } from '../../components/TribeWalletLogo';
@@ -33,6 +33,7 @@ export interface RegisterScreenProps {
 export function RegisterScreen({ onLogin }: RegisterScreenProps) {
   const { width, height } = useWindowDimensions();
   const theme = useTheme();
+  const styles = createStyles(theme);
   const { t } = useTranslation();
 
   /*
@@ -174,7 +175,7 @@ export function RegisterScreen({ onLogin }: RegisterScreenProps) {
    */
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={theme.colors.background === '#0B1120' ? 'light-content' : 'dark-content'} />
 
       <KeyboardAvoidingView
         style={styles.keyboard}
@@ -440,38 +441,10 @@ interface PasswordEyeProps {
 function PasswordEye({ visible }: PasswordEyeProps) {
   const theme = useTheme();
   return (
-    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-      {visible ? (
-        <>
-          <Path
-            d="M3 3L21 21"
-            stroke={theme.colors.textSecondary}
-            strokeWidth={1.7}
-            strokeLinecap="round"
-          />
-          <Path
-            d="M10.6 6.9C11.05 6.84 11.5 6.8 12 6.8C18.2 6.8 21.5 12 21.5 12C20.85 13 20.05 13.9 19.1 14.65"
-            stroke={theme.colors.textSecondary}
-            strokeWidth={1.5}
-            strokeLinecap="round"
-          />
-          <Path
-            d="M6.2 9.15C4.05 10.4 2.5 12 2.5 12C2.5 12 5.8 17.2 12 17.2C13.15 17.2 14.2 17 15.15 16.7"
-            stroke={theme.colors.textSecondary}
-            strokeWidth={1.5}
-            strokeLinecap="round"
-          />
-        </>
-      ) : (
-        <>
-          <Path
-            d="M2.5 12C2.5 12 5.8 7 12 7C18.2 7 21.5 12 21.5 12C21.5 12 18.2 17 12 17C5.8 17 2.5 12 2.5 12Z"
-            stroke={theme.colors.textSecondary}
-            strokeWidth={1.5}
-          />
-          <Circle cx="12" cy="12" r="2.5" stroke={theme.colors.textSecondary} strokeWidth={1.5} />
-        </>
-      )}
-    </Svg>
+    <Feather
+      name={visible ? 'eye' : 'eye-off'}
+      size={22}
+      color={theme.colors.textSecondary}
+    />
   );
 }

@@ -6,7 +6,7 @@ module.exports = {
     '^.+\\.(js|jsx)$': 'babel-jest',
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(react-native|@react-native|@react-navigation|react-native-svg|expo|@expo|@react-native-community)/)',
+    'node_modules/(?!(react-native|@react-native|@react-navigation|react-native-svg|react-native-vector-icons|expo|@expo|@react-native-community)/)',
   ],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
   testMatch: ['**/__tests__/**/*.test.{ts,tsx}'],
@@ -22,6 +22,7 @@ module.exports = {
     '^react-native$': '<rootDir>/__mocks__/reactNative.mock.ts',
     '^react-native-safe-area-context$': '<rootDir>/__mocks__/safeAreaContext.mock.ts',
     '^react-native-svg$': '<rootDir>/__mocks__/reactNativeSvg.mock.ts',
+    '^react-native-vector-icons/Feather$': '<rootDir>/__mocks__/reactNativeVectorIcons.mock.ts',
     '^react-native-reanimated$': '<rootDir>/__mocks__/reactNativeReanimated.mock.ts',
     '^@shopify/restyle$': '<rootDir>/__mocks__/restyle.mock.ts',
     '^@react-navigation/native-stack$': '<rootDir>/__mocks__/nativeStack.mock.ts',

@@ -8,7 +8,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { TopBar } from '../../../components/TopBar';
 import { Button } from '../../../components/Button';
 import { Pill } from '../../../components/Pill';
-import { Box, Text, useTheme } from '../../../theme';
+import { Box, PressableBox, Text, useTheme } from '../../../theme';
 import { ProfileModal } from '../components/ProfileModal/ProfileModal';
 import { useUserStore } from '../stores/userStore';
 import { useSaveProfile } from '../hooks/useSaveProfile';
@@ -41,12 +41,18 @@ export function ProfileScreen() {
   const topBar = useTopBarActions();
   const [editing, setEditing] = useState(false);
   const theme = useTheme();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const formatMoney = useFormatMoney();
   const { data, isLoading, isError: dashboardError, refetch } = useAppDashboard();
+  const usuarioToken = useAuthStore((state) => state.user?.id);
 
-  const totalPaid = data?.valorTotalPago ?? payments.reduce((sum, p) => sum + p.amount, 0);
-  const punctuality = data?.taxaDePontualidade? (data.taxaDePontualidade)*100 : 0;
+  // O total pago deve somar apenas o que o próprio usuário logado pagou,
+  // não os pagamentos de outras pessoas dos grupos.
+  const totalPaid = data?.valorTotalPago ??
+    payments
+      .filter((p) => p.payerId === usuarioToken)
+      .reduce((sum, p) => sum + p.amount, 0);
+  const punctuality = data?.taxaDePontualidade ? data.taxaDePontualidade * 100 : 0;
   const totalGroups = data?.gruposAtivosCount ?? groups.length;
   const dynamicStats = useMemo(
     () => [
@@ -56,6 +62,11 @@ export function ProfileScreen() {
     ],
     [groups.length, payments.length, punctuality],
   );
+
+  // Mantém o total pago atualizado sempre que houver alteração nos pagamentos
+  React.useEffect(() => {
+    refetch();
+  }, [payments, refetch]);
 
   React.useEffect(() => {
     setStats(dynamicStats);
@@ -95,27 +106,31 @@ export function ProfileScreen() {
           showsVerticalScrollIndicator={false}
         >
           <Box width="100%" px="md" pt="md" alignItems="center" gap="md">
-            <Box
-              width={96}
-              height={96}
-              borderRadius="full"
-              bg="primary"
-              alignItems="center"
-              justifyContent="center"
-              overflow="hidden"
+            <PressableBox
+              onPress={() => navigation.navigate('Main', { screen: 'Home' })}
             >
-              {user?.imageUrl ? (
-                <Image
-                  source={{ uri: `${environment.mediaUrl}/${user.imageUrl}` }}
-                  resizeMode="cover"
-                  style={{ width: 96, height: 96 }}
-                />
-              ) : (
-                <Text variant="display" color="white">
-                  {user?.initials ?? ''}
-                </Text>
-              )}
-            </Box>
+              <Box
+                width={96}
+                height={96}
+                borderRadius="full"
+                bg="primary"
+                alignItems="center"
+                justifyContent="center"
+                overflow="hidden"
+              >
+                {user?.imageUrl ? (
+                  <Image
+                    source={{ uri: `${environment.mediaUrl}/${user.imageUrl}` }}
+                    resizeMode="cover"
+                    style={{ width: 96, height: 96 }}
+                  />
+                ) : (
+                  <Text variant="display" color="white">
+                    {user?.initials ?? ''}
+                  </Text>
+                )}
+              </Box>
+            </PressableBox>
             <Box alignItems="center">
               <Text variant="h2">{user?.name ?? ''}</Text>
               <Text variant="caption" color="textSecondary">
@@ -159,7 +174,7 @@ export function ProfileScreen() {
               <Box flexDirection="row" alignItems="center" justifyContent="space-between">
                 <Text variant="bodyStrong">{t('profile.punctuality')}</Text>
                 <Pill
-                  label={`${punctuality}%`}
+                  label={`${new Intl.NumberFormat(language || 'pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(punctuality)}%`}
                   tone={punctuality >= 80 ? 'success' : punctuality >= 60 ? 'warning' : 'danger'}
                 />
               </Box>

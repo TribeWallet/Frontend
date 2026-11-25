@@ -32,7 +32,7 @@ export function LegalModal({ visible, onClose, title, content }: LegalModalProps
       }
     >
       <Box gap="md">
-        {content}
+        <Text variant="body">{content}</Text>
       </Box>
     </Modal>
   );
