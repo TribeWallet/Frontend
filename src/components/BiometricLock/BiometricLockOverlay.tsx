@@ -80,13 +80,11 @@ export function BiometricLockOverlay({
                 alignItems="center"
                 justifyContent="center"
                 minHeight={56}
-                style={{ opacity: authenticating ? 0.7 : 1 }}
-                pointerEvents={authenticating ? 'none' : 'auto'}
+                style={{ opacity: 0.5 }}
+                pointerEvents="none"
               >
                 <Text variant="button" color="white" textAlign="center">
-                  {authenticating
-                    ? t('biometric.authenticating')
-                    : t('biometric.authenticate')}
+                  {t('biometric.authenticate')}
                 </Text>
               </Box>
             ) : (
