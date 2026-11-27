@@ -160,7 +160,7 @@ export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalPr
             borderColor="cardBorder"
             p="md"
           >
-            <Box flexDirection="row" alignItems="center" justifyContent="space-between">
+            {/* <Box flexDirection="row" alignItems="center" justifyContent="space-between">
               <Text variant="bodyStrong">{t('common.members')}</Text>
               <Box mb="sm">
                 <Button
@@ -172,7 +172,7 @@ export function GroupDetailModal({ visible, group, onClose }: GroupDetailModalPr
                   disabled={inviting}
                 />
               </Box>
-            </Box>
+            </Box> */}
             {group.members.map((member) => (
               <Box
                 key={member.id}
