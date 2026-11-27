@@ -80,9 +80,15 @@ describe('AuthService - Registro', () => {
     expect(result.usuarioToken).toBeDefined();
     expect(result.email).toBe('maria@teste.com');
     expect(result.nome).toBe('Maria');
-    expect(mockApiClient.postForm).toHaveBeenCalledWith(
+    expect(mockApiClient.post).toHaveBeenCalledWith(
       endpoints.auth.register,
-      expect.any(FormData),
+      {
+        nome: 'Maria',
+        sobrenome: 'Santos',
+        username: 'mariasantos',
+        email: 'maria@teste.com',
+        senha: 'senha456',
+      },
       { auth: false },
     );
   });

@@ -252,6 +252,25 @@ export const mockApiClient = {
       return { usuarioResponseDto: user, jwtToken: authToken } as T;
     }
 
+    if (path === '/api/auth/register') {
+      const existing = DB.usuarios.find(
+        (u: any) => u.email === body.email || u.username === body.username,
+      );
+      if (existing) throw new ApiError('E-mail ou nome de usuário já cadastrado.', 400);
+      const usuario = {
+        usuarioToken: `user_${Date.now()}`,
+        nome: body.nome,
+        sobrenome: body.sobrenome,
+        email: body.email,
+        username: body.username,
+        senha: body.senha,
+        imageUrl: null,
+        deletedAt: null,
+      };
+      DB.usuarios.push(usuario);
+      return usuario as T;
+    }
+
     // Grupos - create
     if (path === '/api/grupos') {
       const grupoToken = `grupo_${Date.now()}`;
@@ -357,29 +376,6 @@ export const mockApiClient = {
 
   postForm: jest.fn(async <T>(path: string, form: any): Promise<T> => {
     await new Promise((r) => setTimeout(r, 50));
-
-    // Auth register
-    if (path === '/api/auth/register') {
-      const existing = DB.usuarios.find(
-        (u: any) => u.email === form.get('Email') || u.username === form.get('Username'),
-      );
-      if (existing) {
-        throw new ApiError('E-mail ou nome de usuário já cadastrado.', 400);
-      }
-      const usuarioToken = `user_${Date.now()}`;
-      const usuario = {
-        usuarioToken,
-        nome: form.get('Nome'),
-        sobrenome: form.get('Sobrenome'),
-        email: form.get('Email'),
-        username: form.get('Username'),
-        senha: form.get('Senha'),
-        imageUrl: null,
-        deletedAt: null,
-      };
-      DB.usuarios.push(usuario);
-      return usuario as T;
-    }
 
     // Compromissos - create (via form)
     if (path.startsWith('/api/compromissos/') && !path.includes('/integrantes')) {

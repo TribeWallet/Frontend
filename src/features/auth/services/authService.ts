@@ -32,14 +32,8 @@ export async function login(input: LoginInput): Promise<{ user: AuthUser; token:
 }
 
 export async function register(input: RegisterInput): Promise<UsuarioResponse> {
-  const form = new FormData();
-  form.append('Nome', input.nome);
-  form.append('Sobrenome', input.sobrenome);
-  form.append('Username', input.username);
-  form.append('Email', input.email);
-  form.append('Senha', input.senha);
   try {
-    return await apiClient.postForm<UsuarioResponse>(endpoints.auth.register, form, {
+    return await apiClient.post<UsuarioResponse>(endpoints.auth.register, input, {
       auth: false,
     });
   } catch (error) {

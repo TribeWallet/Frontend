@@ -211,9 +211,15 @@ describe('E2E - Fluxo completo de integração', () => {
       expect.any(Object),
       { auth: false },
     );
-    expect(mockApiClient.postForm).toHaveBeenCalledWith(
+    expect(mockApiClient.post).toHaveBeenCalledWith(
       endpoints.auth.register,
-      expect.any(FormData),
+      {
+        nome: 'João',
+        sobrenome: 'Silva',
+        username: 'joaosilva_e2e',
+        email: 'joao.e2e@teste.com',
+        senha: 'senha123',
+      },
       { auth: false },
     );
     expect(mockApiClient.post).toHaveBeenCalledWith(
